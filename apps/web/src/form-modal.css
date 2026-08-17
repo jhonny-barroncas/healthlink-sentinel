@@ -4,22 +4,41 @@
   z-index: 1200;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: 12px;
   overflow-y: auto;
   background: rgba(2, 8, 15, 0.76);
   backdrop-filter: blur(9px);
   -webkit-backdrop-filter: blur(9px);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(83, 121, 146, 0.72) transparent;
+}
+
+.form-modal-backdrop::-webkit-scrollbar { width: 8px; }
+.form-modal-backdrop::-webkit-scrollbar-track { background: transparent; }
+.form-modal-backdrop::-webkit-scrollbar-thumb { border: 2px solid transparent; background-clip: padding-box; border-radius: 99px; background-color: rgba(83, 121, 146, 0.72); }
+
+.confirm-dialog-message {
+  margin: 4px 0 20px;
+  color: #b7c8d5;
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .form-modal-backdrop .form-card {
-  width: min(980px, 100%);
-  max-height: calc(100vh - 48px);
+  width: min(1040px, 100%);
+  max-height: calc(100vh - 24px);
   margin: 0;
   overflow-y: auto;
   border-color: rgba(53, 211, 208, 0.44);
   background: rgba(9, 22, 36, 0.94);
   box-shadow: 0 22px 70px rgba(0, 0, 0, 0.5), 0 0 34px rgba(53, 211, 208, 0.08);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(83, 121, 146, 0.72) transparent;
 }
+
+.form-modal-backdrop .form-card::-webkit-scrollbar { width: 8px; }
+.form-modal-backdrop .form-card::-webkit-scrollbar-track { background: transparent; }
+.form-modal-backdrop .form-card::-webkit-scrollbar-thumb { border: 2px solid transparent; background-clip: padding-box; border-radius: 99px; background-color: rgba(83, 121, 146, 0.72); }
 
 .form-modal-backdrop .form-card .panel-title {
   position: sticky;
@@ -53,7 +72,7 @@
 .unit-context-menu p {
   margin: 0;
   color: #6f91a7;
-  font: 9px 'IBM Plex Mono';
+  font: 12px Arial, Helvetica, 'Segoe UI', sans-serif;
   letter-spacing: .08em;
 }
 
@@ -64,12 +83,15 @@
 }
 
 .unit-context-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 9px 10px;
   border: 1px solid transparent;
   background: transparent;
   color: #b9cedc;
   text-align: left;
-  font: 10px 'IBM Plex Mono';
+  font: 12px Arial, Helvetica, 'Segoe UI', sans-serif;
   cursor: pointer;
 }
 
