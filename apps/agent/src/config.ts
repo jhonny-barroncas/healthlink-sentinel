@@ -1,0 +1,54 @@
+import 'dotenv/config';
+
+function required(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`${name} é obrigatório para o agente Starlink.`);
+  return value;
+}
+
+function optional(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value || undefined;
+}
+
+function numberEnv(name: string, fallback: number, minimum: number): number {
+  const value = Number(process.env[name] ?? fallback);
+  if (!Number.isFinite(value) || value < minimum) throw new Error(`${name} deve ser um número maior ou igual a ${minimum}.`);
+  return value;
+}
+
+export type AgentConfig = {
+  apiUrl: string;
+  apiToken?: string;
+  apiEmail?: string;
+  apiPassword?: string;
+  tenantId?: string;
+  equipmentId: string;
+  starlinkHost: string;
+  starlinkPort: number;
+  pollIntervalMs: number;
+  timeoutMs: number;
+  queuePath: string;
+};
+
+export function loadConfig(): AgentConfig {
+  const apiToken = optional('HEALTHLINK_API_TOKEN');
+  const apiEmail = optional('HEALTHLINK_API_EMAIL');
+  const apiPassword = optional('HEALTHLINK_API_PASSWORD');
+  if (!apiToken && (!apiEmail || !apiPassword)) {
+    throw new Error('Configure HEALTHLINK_API_TOKEN ou HEALTHLINK_API_EMAIL + HEALTHLINK_API_PASSWORD para o agente Starlink.');
+  }
+  return {
+    apiUrl: required('HEALTHLINK_API_URL').replace(/\/$/, ''),
+    apiToken,
+    apiEmail,
+    apiPassword,
+    tenantId: optional('HEALTHLINK_TENANT_ID'),
+    equipmentId: required('HEALTHLINK_EQUIPMENT_ID'),
+    starlinkHost: process.env.STARLINK_HOST?.trim() || '192.168.100.1',
+    starlinkPort: numberEnv('STARLINK_PORT', 9200, 1),
+    pollIntervalMs: numberEnv('STARLINK_POLL_INTERVAL_MS', 15_000, 5_000),
+    timeoutMs: numberEnv('STARLINK_TIMEOUT_MS', 3_000, 500),
+    queuePath: process.env.STARLINK_QUEUE_PATH?.trim() || '.healthlink-starlink-queue.json',
+  };
+}

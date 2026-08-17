@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+obsidian/00-Inbox/CREDENCIAL LOCAL — SYSADMIN.md
+coverage/
+*.log
+.npm-cache/
+.healthlink-starlink-queue.json
+tmp/

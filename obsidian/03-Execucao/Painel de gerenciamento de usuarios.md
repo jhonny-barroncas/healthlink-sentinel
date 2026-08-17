@@ -1,0 +1,42 @@
+# Painel de gerenciamento de usuários
+
+## Entrega
+
+- Criada a área **Usuários** no menu lateral do HealthLink Sentinel.
+- Listagem por cliente/tenant com nome, e-mail, perfil, status e data de acesso.
+- Cadastro de usuário com nome, e-mail, senha e perfil.
+- Edição de nome, perfil e senha.
+- Bloqueio/desbloqueio por desativação lógica.
+- Exclusão lógica do vínculo com o cliente; o histórico do usuário é preservado.
+- Impedida a exclusão do próprio usuário logado.
+
+## API
+
+- `GET /v1/users`
+- `POST /v1/users`
+- `PATCH /v1/users/:id`
+- `DELETE /v1/users/:id`
+
+Todas as rotas exigem autenticação e a permissão `users.manage`. A implementação respeita o tenant do token e os perfis existentes: Administrador, Supervisor, Operador NOC e Visualizador.
+
+## Verificação
+
+- `npm.cmd run typecheck` passou.
+- `npm.cmd run build:web` passou.
+
+## Correção da listagem de bloqueados
+
+O painel apresentava erro SQL e ficava vazio porque `ut.active` era retornado no `SELECT`, mas não estava incluído no `GROUP BY`. A consulta foi corrigida para agrupar por `u.id, ut.active`.
+
+Usuários bloqueados continuam visíveis na lista com status bloqueado; o bloqueio apenas impede o login. O desbloqueio deve usar o botão de edição/ação de ativar, sem recriar o usuário.
+## Correção do botão Excluir
+
+O botão agora solicita confirmação e remove somente o vínculo `user_tenants` do tenant atual. O usuário sai da lista, mas o cadastro global e o histórico permanecem preservados. Bloquear continua separado e mantém o usuário visível como bloqueado.
+## Correção do carregamento visual (10/08/2026)
+
+Corrigido erro de sintaxe no CSS do painel de usuários: a regra do formulário de solicitação estava truncada (`padding`), fazendo o Vite acusar `Unclosed block` e impedir o carregamento da aplicação. A regra foi restaurada e o CSS separado da media query responsiva.
+
+Validação concluída com `npm run typecheck` e `npm run build:web`.
+## Ajuste do cabeçalho (10/08/2026)
+
+Removido o botão visual de troca de tema do cabeçalho para manter o produto em modo escuro corporativo e evitar o ícone solto no topo. O perfil do usuário permanece disponível.

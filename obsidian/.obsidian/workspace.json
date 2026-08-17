@@ -1,0 +1,222 @@
+{
+  "main": {
+    "id": "8de5921ecdd252be",
+    "type": "split",
+    "children": [
+      {
+        "id": "6347f57889f8a262",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "4ee5de2a52bce1a9",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Visualização em gráfico"
+            }
+          }
+        ],
+        "stacked": true
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "76a61da7fbdf2efa",
+    "type": "split",
+    "children": [
+      {
+        "id": "fd7ba774f9149c8f",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "b145fa3682f7fa3b",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Explorador de arquivos"
+            }
+          },
+          {
+            "id": "bd2f1bad660f3e29",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Procurar"
+            }
+          },
+          {
+            "id": "1cfcff6924d42d15",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-bookmark",
+              "title": "Marcadores"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 200
+  },
+  "right": {
+    "id": "3997d52a7983dacd",
+    "type": "split",
+    "children": [
+      {
+        "id": "e9b4e3f6a288917c",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "7f62e15901b527f1",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "03-Execucao/Dados de Demonstração.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Links inversos"
+            }
+          },
+          {
+            "id": "55f7c2400293c3bb",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "03-Execucao/Dados de Demonstração.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Links de saída"
+            }
+          },
+          {
+            "id": "2a85abb953ed2b7f",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Etiquetas"
+            }
+          },
+          {
+            "id": "6348a5eebbcfcfbe",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Todas as propriedades"
+            }
+          },
+          {
+            "id": "692aade6e663beea",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "03-Execucao/Dados de Demonstração.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Sumário"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Abrir a troca rápida": false,
+      "graph:Abrir visualização em gráfico": false,
+      "canvas:Criar novo canvas": false,
+      "daily-notes:Abrir a nota de hoje": false,
+      "templates:Inserir modelo": false,
+      "command-palette:Abrir paleta de comandos": false,
+      "bases:Criar nova base": false
+    }
+  },
+  "active": "4ee5de2a52bce1a9",
+  "lastOpenFiles": [
+    "Sem título.base",
+    "Sem título 1.canvas",
+    "Sem título.canvas",
+    "Sem título 1",
+    "03-Execucao/Correcao Cadastro de Equipamentos - Campos Opcionais.md",
+    "03-Execucao/Modulo Starlink - Estrategia Hibrida.md",
+    "03-Execucao/Tooltip e origem da latencia.md",
+    "03-Execucao/Correcao Telemetria SNMP FortiGate.md",
+    "00-Índice e Contexto Atual.md",
+    "00-Mapa Mestre do Vault.md",
+    "02-Arquitetura/Briefing Visual - Como funciona o HealthLink Sentinel.md",
+    "00-Handoff Novo Chat.md",
+    "03-Execucao/Header Profile Dropdown e Theme Switch.md",
+    "03-Execucao/Formulario Usuarios e Popups Host Status.md",
+    "03-Execucao/Notificacoes NOC e Design Revision.md",
+    "03-Execucao/Status e ponte de hosts Zabbix.md",
+    "03-Execucao/Solicitacao e aprovacao de acesso.md",
+    "03-Execucao/Painel de gerenciamento de usuarios.md",
+    "03-Execucao/Otimizacao de carregamento do mapa.md",
+    "03-Execucao/Revisao visual glassmorphism.md",
+    "03-Execucao/Diagnostico flutuante e menu na lista.md",
+    "03-Execucao/Diagnosticos Ping e Tracert.md",
+    "03-Execucao/Menu contextual do mapa - diagnosticos.md",
+    "03-Execucao/Status sem telemetria - regra visual.md",
+    "03-Execucao/Sugestao de vinculo - correspondencia por nome.md",
+    "03-Execucao/Sugestao de vinculo clicavel.md",
+    "03-Execucao/Geolocalizacao automatica Zabbix.md",
+    "03-Execucao/Correcao tela Integracao Zabbix.md",
+    "03-Execucao/Centro Operacional - Mapa Geografico Dark.md",
+    "Sem título",
+    "01-Produto/Fonte PRD"
+  ]
+}

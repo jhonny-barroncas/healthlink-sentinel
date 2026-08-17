@@ -1,0 +1,50 @@
+{
+  "name": "healthlink-sentinel",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Plataforma corporativa de monitoramento operacional para unidades móveis de saúde.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch apps/api/src/server.ts",
+    "dev:web": "vite apps/web --host 0.0.0.0 --port 5173",
+    "build:web": "vite build apps/web --outDir ../../dist/web",
+    "admin:reset-password": "tsx apps/api/src/scripts/reset-password.ts",
+    "agent:starlink": "tsx apps/agent/src/index.ts",
+    "start": "tsx apps/api/src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.0.0",
+    "@fastify/jwt": "^10.2.1",
+    "@gibme/starlink": "^22.3.1",
+    "@svg-maps/brazil": "^2.0.0",
+    "dotenv": "^16.4.7",
+    "fastify": "^5.2.1",
+    "fastify-plugin": "6.0.0",
+    "maplibre-gl": "^6.2.0",
+    "pg": "^8.13.3",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-map-gl": "^8.1.2",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/pg": "^8.11.10",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.3.4",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^5.4.21",
+    "vitest": "^2.1.8"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "esbuild@0.21.5": true
+  }
+}
