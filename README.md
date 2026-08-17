@@ -1,30 +1,178 @@
 # HealthLink Sentinel
 
-Base técnica do SaaS corporativo para monitoramento operacional de unidades móveis de saúde.
+Plataforma corporativa de monitoramento operacional para unidades móveis de saúde, com arquitetura multi-tenant, autenticação JWT, RBAC, auditoria, integração Zabbix e agente local Starlink.
 
-## Princípios implementados nesta fundação
+## Requisitos
 
-- Multi-tenancy por cliente desde o banco, aplicação e políticas RLS.
-- Frontend desacoplado: esta fase não contém telas.
-- Zabbix tratado como fonte de coleta; o HealthLink mantém o estado operacional.
-- Arquitetura modular, com jobs e adaptadores de integração isolados.
-- Auditoria e RBAC como requisitos de plataforma, não complementos.
+- Git
+- Node.js 22 ou superior
+- npm (incluído no Node.js)
+- Docker Desktop com Compose
+- PostgreSQL 16 e Redis 7 — podem ser executados pelo `docker compose`
+- Opcional: acesso a um servidor Zabbix para sincronização
+- Opcional: antena Starlink acessível na rede local para usar `apps/agent`
 
-## Estrutura
+Verifique as versões:
 
+```powershell
+node --version
+npm --version
+docker --version
+docker compose version
 ```
-apps/api/                 API HTTP e módulos de domínio
-apps/api/database/        schema e migrations PostgreSQL
-docker-compose.yml        PostgreSQL, Redis e API
-docs/                     decisões de arquitetura
+
+## Instalação
+
+Clone o projeto e entre na pasta:
+
+```powershell
+git clone https://github.com/jhonny-barroncas/healthlink-sentinel.git
+cd healthlink-sentinel
 ```
 
-## Execução local
+Instale as dependências:
 
-1. Copie `.env.example` para `.env` e defina os segredos.
-2. Suba infraestrutura com `docker compose up -d postgres redis`.
-3. Execute, em ordem numérica, as migrations de `apps/api/database/migrations`.
-4. Instale dependências com `npm.cmd install`.
-5. Inicie a API com `npm.cmd run dev`.
+```powershell
+npm.cmd install
+```
 
-O endpoint `GET /health` é público. Os demais endpoints serão protegidos por autenticação e contexto de tenant.
+Crie a configuração local. O arquivo `.env` nunca deve ser commitado:
+
+```powershell
+Copy-Item .env.example .env
+notepad .env
+```
+
+No mínimo, defina valores próprios para:
+
+```env
+JWT_SECRET=um-segredo-local-com-no-minimo-32-caracteres
+ZABBIX_CREDENTIALS_ENCRYPTION_KEY=uma-chave-local-com-no-minimo-32-caracteres
+```
+
+Se Zabbix for utilizado, preencha também `ZABBIX_API_URL` e `ZABBIX_API_TOKEN` somente no `.env` local.
+
+## Banco e infraestrutura
+
+Suba PostgreSQL e Redis:
+
+```powershell
+docker compose up -d postgres redis
+```
+
+Aplique as migrations na ordem numérica. No PowerShell:
+
+```powershell
+Get-ChildItem apps/api/database/migrations/*.sql | Sort-Object Name | ForEach-Object {
+  Get-Content -Raw $_.FullName | docker compose exec -T postgres psql -U healthlink -d healthlink -f -
+}
+```
+
+Confira a API:
+
+```powershell
+Invoke-WebRequest http://localhost:3000/health
+```
+
+## Executar o sistema
+
+Abra dois terminais na raiz do projeto.
+
+Terminal 1 — API:
+
+```powershell
+npm.cmd run dev
+```
+
+Terminal 2 — frontend:
+
+```powershell
+npm.cmd run dev:web
+```
+
+Acesse [http://localhost:5173](http://localhost:5173). A API ficará em [http://localhost:3000](http://localhost:3000).
+
+O frontend usa automaticamente a API na porta `3000` do mesmo computador. Para acessar de outro computador da rede, abra a porta no firewall e use o endereço IP da máquina que executa a API/frontend.
+
+## Primeiro acesso
+
+O projeto não publica usuários ou senhas padrão. Crie o primeiro usuário pelo fluxo de provisionamento disponível no ambiente ou por um procedimento administrativo seguro. Nunca coloque senhas no código, no README ou em commits.
+
+## Agente Starlink
+
+O agente roda no servidor local da unidade e consulta a antena pela API gRPC local, normalmente em `192.168.100.1:9200`. Ele mantém uma fila local quando a API central está indisponível.
+
+Para uma unidade com usuário de serviço, preencha no `.env`:
+
+```env
+HEALTHLINK_API_URL=http://localhost:3000
+HEALTHLINK_API_TOKEN=
+HEALTHLINK_API_EMAIL=agent-starlink-unidade-001@local
+HEALTHLINK_API_PASSWORD=senha-do-usuario-de-servico
+HEALTHLINK_TENANT_ID=
+HEALTHLINK_EQUIPMENT_ID=uuid-do-equipamento-starlink
+STARLINK_HOST=192.168.100.1
+STARLINK_PORT=9200
+STARLINK_POLL_INTERVAL_MS=15000
+STARLINK_TIMEOUT_MS=15000
+STARLINK_QUEUE_PATH=.healthlink-starlink-queue.json
+```
+
+O usuário deve possuir o perfil `service_agent`. O agente usa somente a permissão de integração e renova o JWT automaticamente. Não use o token ou a senha de um usuário administrador.
+
+Teste uma coleta única:
+
+```powershell
+npm.cmd run agent:starlink -- --once
+```
+
+Para execução contínua:
+
+```powershell
+npm.cmd run agent:starlink
+```
+
+Antes do teste, confirme a rede:
+
+```powershell
+Test-NetConnection 192.168.100.1 -Port 9200
+```
+
+Se a Starlink estiver atrás de um MikroTik, o servidor precisa alcançar `192.168.100.1:9200` pela Ethernet. Se estiver conectado diretamente ao Wi‑Fi da Starlink, o computador precisa estar na rede Wi‑Fi correta. O agente não abre a porta gRPC na internet.
+
+## Validação do projeto
+
+```powershell
+npm.cmd run typecheck
+npm.cmd run test
+npm.cmd run build:web
+```
+
+## Estrutura principal
+
+```text
+apps/api/                 API Fastify, autenticação, RBAC e integrações
+apps/api/database/        migrations PostgreSQL
+apps/agent/               agente local Starlink
+apps/web/                 frontend React/Vite
+docs/                     arquitetura resumida
+obsidian/                 memória documental do projeto
+output/                   artefatos gerados, como o briefing PDF
+docker-compose.yml        PostgreSQL e Redis locais
+.env.example              modelo de configuração sem segredos
+```
+
+## Segurança
+
+- Nunca versione `.env`, tokens, senhas, cookies ou filas locais.
+- Troque os segredos de desenvolvimento antes de qualquer ambiente compartilhado.
+- Use HTTPS/VPN entre o agente e a API central.
+- Mantenha a porta `9200` somente na rede local da unidade.
+- Revogue e substitua qualquer credencial que tenha sido exposta.
+
+## Documentação adicional
+
+- [Plano de coleta Starlink e unidade móvel](obsidian/03-Execucao/Plano%20de%20Coleta%20Starlink%20e%20Unidade%20Movel.md)
+- [Módulo Starlink — estratégia híbrida](obsidian/03-Execucao/Modulo%20Starlink%20-%20Estrategia%20Hibrida.md)
+- [Arquitetura de referência](obsidian/02-Arquitetura/Arquitetura%20de%20Referência.md)
+- [Índice do vault Obsidian](obsidian/00-Mapa%20Mestre%20do%20Vault.md)
