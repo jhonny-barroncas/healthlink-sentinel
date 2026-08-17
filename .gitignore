@@ -7,3 +7,10 @@ coverage/
 .npm-cache/
 .healthlink-starlink-queue.json
 tmp/
+.codex/
+.impeccable/
+.agents/
+node_modules/
+start.bat
+.claude/
+output/
