@@ -21,7 +21,7 @@ type ManagedUser = { id: string; email: string; display_name: string; active: bo
 type AccessRequest = { id: string; email: string; display_name: string; requested_role: string; status: string; created_at: string };
 type Toast = { id: string; type: 'error' | 'warning' | 'success' | 'info'; title: string; detail?: string; sticky?: boolean; durationMs?: number };
 
-const apiBase = `http://${window.location.hostname}:3000`;
+const apiBase = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 
 async function api<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, { ...init, headers: { ...(init?.body ? { 'content-type': 'application/json' } : {}), authorization: `Bearer ${token}`, ...init?.headers } });
