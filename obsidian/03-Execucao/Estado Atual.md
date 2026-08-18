@@ -44,6 +44,8 @@ phase: foundation
 
 # Estado Atual
 
+> Atualização 2026-08-18: o painel Starlink passou a mostrar explicitamente a unidade vinculada e sua cidade/UF junto das métricas da antena, incluindo coordenadas e obstrução quando fornecidas pelo agente.
+
 > **Atualização vigente:** o texto histórico abaixo foi preservado. Para o estado canônico mais recente, consulte [[../00-Índice e Contexto Atual]].
 
 ## Atualização — 2026-08-07

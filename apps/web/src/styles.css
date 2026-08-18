@@ -872,7 +872,7 @@ button, input, select, textarea { border-radius: 10px; }
 
 /* Starlink telemetry detail */
 .starlink-telemetry-panel { margin-top: 14px; }
-.starlink-telemetry-panel .panel-title { margin-bottom: 18px; }
+.starlink-telemetry-panel .panel-title { margin-bottom: 18px; }.starlink-unit-location { display: block; margin-top: 5px; color: #89a5b8; font-size: 11px; }
 .starlink-telemetry-card { border-top: 1px solid #14263a; padding-top: 15px; }
 .starlink-telemetry-card + .starlink-telemetry-card { margin-top: 15px; }
 .starlink-telemetry-card-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
@@ -884,4 +884,6 @@ button, input, select, textarea { border-radius: 10px; }
 .starlink-metric span, .starlink-metric strong { display: block; }
 .starlink-metric span { color: #6f879a; font: 9px 'IBM Plex Mono'; text-transform: uppercase; }
 .starlink-metric strong { color: var(--cyan); font: 15px 'IBM Plex Mono'; margin-top: 7px; }
+.starlink-collector-log { margin-top: 16px; border: 1px solid #172f42; background: rgba(3,12,21,.72); padding: 10px 12px; font-family: 'IBM Plex Mono', monospace; }.starlink-collector-log-head { display: flex; justify-content: space-between; color: #7894a8; font-size: 9px; letter-spacing: .12em; margin-bottom: 8px; }.starlink-log-line { display: grid; grid-template-columns: 70px minmax(0,1fr) auto 82px; gap: 9px; align-items: center; padding: 5px 0; border-top: 1px solid rgba(31,59,78,.55); font-size: 10px; }.starlink-log-line time, .starlink-log-line em { color: #668196; font-style: normal; }.starlink-log-line span { color: #a8becb; }.starlink-log-line strong { color: var(--cyan); font-weight: 500; text-align: right; }.starlink-log-empty { color: #71899a; font-size: 10px; padding: 4px 0; }
+.starlink-table-wrap { overflow-x: auto; border: 1px solid #172f42; background: rgba(3,12,21,.72); }.starlink-collector-table { width: 100%; min-width: 980px; border-collapse: collapse; font-family: 'IBM Plex Mono', monospace; font-size: 10px; }.starlink-collector-table th, .starlink-collector-table td { padding: 9px 10px; border-bottom: 1px solid rgba(31,59,78,.55); text-align: left; white-space: nowrap; }.starlink-collector-table th { color: #7894a8; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; font-weight: 500; }.starlink-collector-table td { color: #b8cad5; }.starlink-collector-table td:not(:first-child) { color: var(--cyan); }
 
