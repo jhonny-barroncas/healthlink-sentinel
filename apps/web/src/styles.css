@@ -340,6 +340,16 @@ button { transition: border-color .18s ease, background .18s ease, color .18s ea
 .map-context-card, .form-modal .form-card, .state-map-dialog, .diagnostic-float, .connection-hover-details, .metric-hover-detail,
 .glass-options { border-radius: 13px; background: linear-gradient(145deg, rgba(19, 42, 61, .78), rgba(6, 18, 31, .76)); border-color: rgba(126, 186, 208, .34); box-shadow: 0 24px 60px rgba(0, 0, 0, .42), inset 0 1px 0 var(--glass-highlight); }
 .state-map-header, .state-map-footer, .state-map-units { background: rgba(8, 24, 38, .64); }
+.state-map-header-actions { display: flex; align-items: center; gap: 10px; }
+.tunnel-status-body, .starlink-card-note { display: grid; gap: 5px; min-height: 56px; align-content: center; padding: 3px 0 7px; }
+.tunnel-status-body strong { color: #d8e7f1; font-size: 12px; }
+.tunnel-status-body small, .starlink-card-note { color: #7891a4; font-size: 11px; }
+.starlink-card .state-link-health-icon { color: #49d8ff; }
+.state-map-canvas.map-theme-light .maplibregl-canvas { filter: brightness(.78) saturate(.78); }
+.map-theme-switch { display: inline-flex; align-items: center; gap: 3px; padding: 3px; border: 1px solid rgba(126,186,208,.24); border-radius: 999px; background: rgba(3,12,21,.42); }
+.map-theme-switch button { border: 0; border-radius: 999px; padding: 6px 9px; color: #7890a4; background: transparent; cursor: pointer; font: 11px Arial, Helvetica, 'Segoe UI', sans-serif; }
+.map-theme-switch button:hover, .map-theme-switch button:focus-visible { color: #e9fbff; outline: none; }
+.map-theme-switch button.active { color: #06131e; background: var(--cyan); box-shadow: 0 0 12px rgba(53,211,208,.22); }
 .inline-form input, .inline-form select, .search-input, .link-select, .login-panel input { border-radius: 9px; border-color: rgba(126, 186, 208, .24); background: rgba(5, 17, 29, .5); }
 .status, .problem-count, .alert-tab, .overview-switcher, .overview-nav-button { border-radius: 999px; }
 .nav-item, .nav-subitem { border-radius: 9px; }
@@ -851,6 +861,11 @@ button, input, select, textarea { border-radius: 10px; }
 .link-chart-stage:hover .link-chart-point, .link-chart-point:hover { opacity: 1; }
 .link-chart-point:hover { r: 7px; }
 .link-chart-tooltip { position: absolute; z-index: 5; min-width: 132px; padding: 9px 11px; border: 1px solid rgba(53,211,208,.52); border-radius: 8px; background: rgba(5,17,29,.96); box-shadow: 0 10px 28px rgba(0,0,0,.5), 0 0 14px rgba(53,211,208,.1); pointer-events: none; transform: translate(-50%, calc(-100% - 12px)); text-align: center; backdrop-filter: blur(12px); }
+.state-map-dialog { isolation: isolate; }
+.link-analysis-backdrop { z-index: 1200; }
+.map-unit-context-card { z-index: 1300 !important; }
+.diagnostic-float { z-index: 1400; }
+.link-analysis-identity { min-height: 340px; overflow: visible; }
 .link-chart-tooltip strong, .link-chart-tooltip small { display: block; }
 .link-chart-tooltip strong { color: var(--cyan); font: 12px Arial, Helvetica, 'Segoe UI', sans-serif; }
 .link-chart-tooltip small { margin-top: 4px; color: #7f97a9; font: 12px Arial, Helvetica, 'Segoe UI', sans-serif; white-space: nowrap; }

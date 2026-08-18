@@ -4,6 +4,22 @@
 
 O mapa vetorial nacional com `@svg-maps/brazil` permanece como visão estratégica por UF. Ao clicar em um estado, o Centro Operacional abre uma camada geográfica detalhada usando MapLibre GL, React Map GL e o estilo dark do OpenFreeMap.
 
+## Preferência de tema
+
+O mapa geográfico detalhado agora permite alternar entre `Dark` e `Claro` no próprio cabeçalho. A preferência é persistida no navegador (`healthlink.map-theme`) e se aplica ao estilo vetorial do OpenFreeMap e ao fallback raster do CARTO. O mapa vetorial nacional permanece dark por fazer parte da identidade operacional do Centro Operacional.
+
+## Cards por tipo de telemetria
+
+- Links com telemetria de interface (SNMP e itens equivalentes) mantêm o card de latência, perda e tráfego.
+- Equipamentos `vpn`/IPsec usam card de estado do túnel, com `UP`, `DOWN`, atenção ou ausência de estado, sem apresentar métricas de interface inexistentes.
+- Equipamentos `starlink` usam card próprio, com métricas `starlink.latency.ms`, `starlink.download.bps` e `starlink.upload.bps` quando disponíveis.
+
+## Diagnóstico e camadas
+
+- Ping manual bem-sucedido passa a aparecer no card e na análise detalhada mesmo quando não existe amostra recente do Zabbix, sempre identificado como `Ping manual`.
+- O aviso de telemetria zerada continua sendo usado quando não há nem amostra do Zabbix nem diagnóstico manual válido.
+- A análise detalhada, o menu contextual e o painel de diagnóstico receberam uma hierarquia explícita de camadas para evitar sobreposição incorreta entre avisos, botões e modais.
+
 ## Fluxo implementado
 
 1. Operador seleciona uma UF no mapa nacional.
