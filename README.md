@@ -60,6 +60,17 @@ Suba PostgreSQL e Redis:
 docker compose up -d postgres redis
 ```
 
+Para produção, o Compose também pode construir e iniciar a aplicação na porta única `5174`, aplicar as migrations e manter PostgreSQL/Redis sem portas públicas:
+
+```powershell
+Copy-Item .env.example .env
+notepad .env
+docker compose up -d --build
+docker compose ps
+```
+
+O endereço externo será `https://aplicacao.gbringel.com:5174`. Consulte [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) antes de usar em produção.
+
 Aplique as migrations na ordem numérica. No PowerShell:
 
 ```powershell

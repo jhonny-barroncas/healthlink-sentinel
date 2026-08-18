@@ -1,0 +1,15 @@
+node_modules
+dist
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+obsidian/.obsidian
+.tmp
+*.tmp
+*.pptx
+*.ndjson
+.healthlink-starlink-queue.json
+HealthLink-Sentinel-Apresentacao-Corporativa
+output
