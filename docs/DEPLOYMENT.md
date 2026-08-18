@@ -109,6 +109,34 @@ O build do frontend é servido pela própria API a partir de `dist/web`. Portant
 
 ## 6. Build e inicialização
 
+### Usando Docker Compose
+
+Na raiz do projeto:
+
+```bash
+cp .env.example .env
+# edite .env e troque todos os segredos e a senha do PostgreSQL
+docker compose up -d --build
+docker compose ps
+docker compose logs -f healthlink
+```
+
+O serviço `migrate` aguarda o PostgreSQL ficar saudável e aplica as migrations antes de iniciar o `healthlink`. O PostgreSQL e o Redis ficam sem publicação de portas no host; somente `5174` é publicada pelo Compose.
+
+Para parar sem remover os dados:
+
+```bash
+docker compose down
+```
+
+Para remover também o volume do banco, ação destrutiva que apaga os dados locais:
+
+```bash
+docker compose down -v
+```
+
+### Execução sem Compose
+
 Na raiz do projeto:
 
 ```bash
