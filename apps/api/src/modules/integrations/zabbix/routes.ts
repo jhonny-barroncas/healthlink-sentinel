@@ -293,13 +293,15 @@ export const zabbixRoutes: FastifyPluginAsync = async (app) => {
             metricKey.endsWith('.ms') ? 'ms' : metricKey.endsWith('.pct') ? '%' : 'bps', Number(selected.item.lastclock),
             { source: 'zabbix_item', itemId: selected.item.itemid, itemName: selected.item.name, itemKey: selected.item.key_ }]);
         }
-        if (telemetryCollected) {
-          await db.query(`
-            UPDATE equipment_status_snapshots
-            SET observed_at = now(), source_payload = source_payload || jsonb_build_object('source', 'zabbix_telemetry')
-            WHERE equipment_id = $1 AND tenant_id = $2
-          `, [mapping.equipment_id, request.auth.tenantId]);
-        }
+        await db.query(`
+          UPDATE equipment_status_snapshots
+          SET operational_status = CASE WHEN $3 THEN operational_status ELSE 'unknown'::operational_status END,
+              observed_at = now(),
+              source_payload = CASE WHEN $3
+                THEN source_payload || jsonb_build_object('source', 'zabbix_telemetry')
+                ELSE jsonb_build_object('source', 'zabbix_telemetry', 'reason', 'no_recent_samples') END
+          WHERE equipment_id = $1 AND tenant_id = $2
+        `, [mapping.equipment_id, request.auth.tenantId, telemetryCollected]);
       }
 
       for (const problem of problems) {
