@@ -36,10 +36,19 @@ Para uma coleta única de diagnóstico:
 npm.cmd run agent:starlink -- --once
 ```
 
+Para testar somente a rota até a antena, sem exigir token ou equipamento no HealthLink:
+
+```powershell
+npm.cmd run agent:starlink:check
+```
+
+Esse teste consulta apenas o endpoint local gRPC da Starlink e testa cada IPv4 local para identificar a interface que alcança `STARLINK_HOST:STARLINK_PORT`. O resultado informa o nome da interface e o endereço de origem, seja Wi-Fi/LAN Starlink ou uma rota Ethernet atrás do MikroTik.
+
 Se a API central estiver indisponível, o lote é mantido no arquivo de fila configurado e reenviado no próximo ciclo. O agente não executa comandos destrutivos na antena: usa somente consultas de status e telemetria.
 
 ## Limites atuais
 
+- O transporte local usa os contratos protobuf derivados pelo projeto Eitol/starlink-client; o adapter HealthLink expõe somente operações de leitura nesta fase.
 - A primeira versão coleta a antena Starlink; MikroTik ainda será adicionado em um adaptador separado.
 - O perfil `service_agent` possui somente `integrations.manage`; usando e-mail/senha, o agente renova o JWT automaticamente.
 - O protocolo gRPC é não oficial e pode variar com o firmware.

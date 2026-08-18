@@ -11,4 +11,9 @@ describe('Starlink telemetry normalization', () => {
     const samples = normalizeStarlinkPayload({ lossPct: 12 });
     expect(deriveStarlinkStatus(samples)).toBe('degraded');
   });
+
+  it('does not mark an equipment online from auxiliary metrics alone', () => {
+    const samples = normalizeStarlinkPayload({ temperatureC: 41, latitude: -3.1, longitude: -60 });
+    expect(deriveStarlinkStatus(samples)).toBe('unknown');
+  });
 });

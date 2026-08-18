@@ -15,6 +15,28 @@ status: active
 
 > Atualização 2026-08-17: o agente passou a aceitar usuário de serviço com perfil RBAC `service_agent` e renovar o JWT automaticamente, eliminando a dependência de sessão expirada do usuário operacional. Consulte [[03-Execucao/Modulo Starlink - Estrategia Hibrida]].
 
+> Atualização 2026-08-17: iniciada a Fase 1 da integração baseada no Eitol/starlink-client. O agente agora usa um adapter gRPC isolado com os protobufs do projeto e oferece `npm.cmd run agent:starlink:check` para validar somente a conectividade da unidade antes de configurar o envio ao HealthLink. Consulte [[03-Execucao/Modulo Starlink - Estrategia Hibrida]].
+
+> Atualização 2026-08-17: o diagnóstico passou a identificar a interface local que alcança a Starlink, testando cada IPv4 disponível. Neste ambiente, a conexão foi detectada pela Ethernet `192.168.88.254`; métricas ausentes ou inválidas, como latência `-1`, são exibidas como `N/D`.
+
+> Atualização 2026-08-17: o agente passou a incluir no log de falha de autenticação a mensagem sanitizada da API, limitada e sem credenciais, para diagnosticar respostas `HTTP 500` do backend.
+
+> Atualização 2026-08-17: o cadastro/edição de usuários agora permite definir explicitamente a senha, inclusive para identidades de serviço com e-mail técnico que não recebem convite.
+
+> Validação 2026-08-17: primeira coleta ponta a ponta concluída. O agente consultou a antena Starlink, autenticou com o usuário de serviço e enviou 5 métricas à API, zerando a fila pendente.
+
+> Atualização 2026-08-17: concluída a projeção inicial no frontend. O detalhe da unidade consulta as últimas métricas Starlink a cada 15 segundos e a API preenche a geolocalização da unidade quando a antena fornece um par válido e não há coordenadas manuais.
+
+> Correção 2026-08-17: corrigida a tela preta no painel Starlink convertendo valores numéricos serializados como texto antes da formatação no frontend.
+
+> Correção 2026-08-17: ajustada a projeção operacional para não indicar comunicação com base em snapshot antigo ou métricas auxiliares; Starlink sem coleta recente (30s) aparece como sem telemetria.
+
+> Correção 2026-08-17: o painel Starlink agora oculta valores persistidos antigos e mostra `N/D` quando a amostra mais recente tem mais de 30 segundos, evitando confundir histórico com telemetria atual.
+
+> Atualização 2026-08-17: a API e o painel Starlink agora indicam explicitamente erro do coletor quando não há amostra por mais de 30 segundos, orientando verificar o serviço do agente e a conectividade com a antena.
+
+> Atualização 2026-08-17: a branch remota `frontend-padronizacao` foi incorporada à `main` local a partir do merge publicado no GitHub. A padronização de UI foi combinada manualmente com o painel Starlink, autenticação de usuário de serviço e regras de telemetria stale.
+
 > Atualização 2026-08-13: o gráfico detalhado de latência possui tooltip próprio com valor em ms e horário da amostra; valores submilissegundo não são mais arredondados para zero. Ping manual e coleta automática permanecem fluxos distintos. Consulte [[03-Execucao/Tooltip e origem da latencia]].
 
 > Atualização 2026-08-13: corrigido o ranking de itens SNMP para hosts FortiGate com múltiplas interfaces. O `FW-LAV-IRANDUBA` foi validado usando `wan1 (LINK-ICOM-100Mb)`. Consulte [[03-Execucao/Correcao Telemetria SNMP FortiGate]].

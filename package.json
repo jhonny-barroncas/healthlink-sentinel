@@ -13,6 +13,7 @@
     "build:web": "vite build apps/web --outDir ../../dist/web",
     "admin:reset-password": "tsx apps/api/src/scripts/reset-password.ts",
     "agent:starlink": "tsx apps/agent/src/index.ts",
+    "agent:starlink:check": "tsx apps/agent/src/check.ts",
     "start": "tsx apps/api/src/server.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
@@ -21,6 +22,8 @@
     "@fastify/cors": "^11.0.0",
     "@fastify/jwt": "^10.2.1",
     "@gibme/starlink": "^22.3.1",
+    "@grpc/grpc-js": "^1.13.4",
+    "@grpc/proto-loader": "^0.7.13",
     "@svg-maps/brazil": "^2.0.0",
     "dotenv": "^16.4.7",
     "fastify": "^5.2.1",

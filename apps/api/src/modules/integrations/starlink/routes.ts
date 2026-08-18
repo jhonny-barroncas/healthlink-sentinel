@@ -11,6 +11,10 @@ function requireAccess(request: { auth: { roles: string[] } }) {
   if (!hasPermission(request.auth.roles, permission.integrationsManage)) throw Object.assign(new Error('Permissão insuficiente.'), { statusCode: 403 });
 }
 
+function requireRead(request: { auth: { roles: string[] } }) {
+  if (!hasPermission(request.auth.roles, permission.monitoringRead)) throw Object.assign(new Error('Permissão insuficiente.'), { statusCode: 403 });
+}
+
 export const starlinkRoutes: FastifyPluginAsync = async (app) => {
   app.get('/v1/integrations/starlink/sources', { preHandler: [app.authenticate] }, async (request) => {
     requireAccess(request);
@@ -32,6 +36,35 @@ export const starlinkRoutes: FastifyPluginAsync = async (app) => {
     });
   });
 
+  app.get('/v1/integrations/starlink/telemetry/:equipmentId', { preHandler: [app.authenticate] }, async (request) => {
+    requireRead(request);
+    const equipmentId = z.string().uuid().parse((request.params as { equipmentId: string }).equipmentId);
+    return withTenant(request.auth.tenantId, async (db) => {
+      const equipment = await db.query<{ id: string; name: string; equipment_type: string }>(`
+        SELECT e.id, e.name, et.code AS equipment_type
+        FROM equipment e JOIN equipment_types et ON et.id = e.equipment_type_id
+        WHERE e.id = $1 AND e.tenant_id = $2 AND e.active = true AND et.code = 'starlink'
+      `, [equipmentId, request.auth.tenantId]);
+      if (!equipment.rows[0]) throw Object.assign(new Error('Equipamento Starlink não encontrado neste tenant.'), { statusCode: 404 });
+      const samples = await db.query<{ metric_key: string; value: number; unit: string; observed_at: string }>(`
+        SELECT DISTINCT ON (metric_key) metric_key, value, unit, observed_at
+        FROM metric_samples
+        WHERE tenant_id = $1 AND equipment_id = $2
+        ORDER BY metric_key, observed_at DESC
+      `, [request.auth.tenantId, equipmentId]);
+      const observedAt = samples.rows.reduce<string | null>((latest, sample) => !latest || sample.observed_at > latest ? sample.observed_at : latest, null);
+      const collectorStale = !observedAt || Date.now() - new Date(observedAt).getTime() > 30_000;
+      return {
+        equipmentId,
+        equipmentName: equipment.rows[0].name,
+        observedAt,
+        collectorStatus: collectorStale ? 'offline' : 'online',
+        collectorError: collectorStale ? 'Agente Starlink sem comunicação há mais de 30 segundos. Verifique se o serviço está em execução e se a antena está acessível.' : null,
+        metrics: samples.rows,
+      };
+    });
+  });
+
   app.post('/v1/integrations/starlink/telemetry', { preHandler: [app.authenticate] }, async (request, reply) => {
     requireAccess(request);
     const input = ingestSchema.parse(request.body);
@@ -39,7 +72,7 @@ export const starlinkRoutes: FastifyPluginAsync = async (app) => {
     const samples = normalizeStarlinkPayload(input.payload, observedAt);
     if (!samples.length) return reply.code(422).send({ error: 'Nenhuma métrica Starlink reconhecida; dados ausentes permanecem N/D.' });
     return withTenant(request.auth.tenantId, async (db) => {
-      const ownership = await db.query(`SELECT 1 FROM equipment e JOIN equipment_types et ON et.id = e.equipment_type_id WHERE e.id = $1 AND e.tenant_id = $2 AND e.active = true AND et.code = 'starlink'`, [input.equipmentId, request.auth.tenantId]);
+      const ownership = await db.query<{ unit_id: string }>(`SELECT e.unit_id FROM equipment e JOIN equipment_types et ON et.id = e.equipment_type_id WHERE e.id = $1 AND e.tenant_id = $2 AND e.active = true AND et.code = 'starlink'`, [input.equipmentId, request.auth.tenantId]);
       if (!ownership.rows[0]) throw Object.assign(new Error('Equipamento Starlink não encontrado neste tenant.'), { statusCode: 404 });
       let samplesPersisted = 0;
       for (const sample of samples) {
@@ -50,6 +83,11 @@ export const starlinkRoutes: FastifyPluginAsync = async (app) => {
         }
         await db.query(`INSERT INTO metric_samples (tenant_id, equipment_id, metric_key, value, unit, observed_at, source_payload) VALUES ($1,$2,$3,$4,$5,$6,$7)`, [request.auth.tenantId, input.equipmentId, sample.metricKey, sample.value, sample.unit, sample.observedAt, sourcePayload]);
         samplesPersisted += 1;
+      }
+      const latitude = samples.find((sample) => sample.metricKey === 'starlink.location.latitude')?.value;
+      const longitude = samples.find((sample) => sample.metricKey === 'starlink.location.longitude')?.value;
+      if (latitude !== undefined && longitude !== undefined) {
+        await db.query(`UPDATE health_units SET latitude = $1, longitude = $2, updated_at = now() WHERE id = $3 AND tenant_id = $4 AND latitude IS NULL AND longitude IS NULL`, [latitude, longitude, ownership.rows[0].unit_id, request.auth.tenantId]);
       }
       const status = deriveStarlinkStatus(samples);
       await db.query(`INSERT INTO equipment_status_snapshots (equipment_id, tenant_id, operational_status, observed_at, source_payload) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (equipment_id) DO UPDATE SET operational_status = EXCLUDED.operational_status, observed_at = EXCLUDED.observed_at, source_payload = EXCLUDED.source_payload`, [input.equipmentId, request.auth.tenantId, status, observedAt, { source: `starlink_${input.source}`, sampleCount: samples.length }]);
