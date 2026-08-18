@@ -9,7 +9,7 @@ type Unit = { unit_id: string; code: string; name: string; state_code: string; c
 type Alert = { id: string; title: string; severity: number; status: string; unit_id?: string | null; unit_code?: string; equipment_id?: string | null; equipment_name?: string; opened_at: string; resolved_at?: string | null };
 type Equipment = { equipment_id: string; unit_id: string; equipment_type: string; name: string; serial_number?: string | null; management_address?: string | null; contracted_download_mbps?: number | null; contracted_upload_mbps?: number | null; operational_status: 'online' | 'degraded' | 'offline' | 'unknown'; observed_at?: string };
 type LatencyPoint = { value: number; observed_at: string };
-type LinkTelemetry = { unit_id: string; unit_code: string; unit_name: string; equipment_id: string; equipment_name: string; contracted_download_mbps: number | null; contracted_upload_mbps: number | null; operational_status: Unit['operational_status']; observed_at: string | null; telemetry_stale?: boolean; telemetry_error?: string | null; metrics: Record<string, number>; latency_history: LatencyPoint[] };
+type LinkTelemetry = { unit_id: string; unit_code: string; unit_name: string; equipment_id: string; equipment_name: string; equipment_type: string; contracted_download_mbps: number | null; contracted_upload_mbps: number | null; operational_status: Unit['operational_status']; observed_at: string | null; telemetry_stale?: boolean; telemetry_error?: string | null; metrics: Record<string, number>; latency_history: LatencyPoint[] };
 type StarlinkTelemetry = { equipmentId: string; equipmentName: string; observedAt: string | null; collectorStatus?: 'online' | 'offline'; collectorError?: string | null; metrics: Array<{ metric_key: string; value: number; unit: string; observed_at: string }> };
 type ZabbixHost = { hostid: string; host: string; name: string; status: string | number; interfaces?: Array<{ ip?: string; dns?: string; port?: string }>; tags?: Array<{ tag: string; value: string }>; inventory?: { location?: string; location_lat?: string; location_lon?: string } };
 type ZabbixMapping = { id: string; zabbix_host_id: string; equipment_id: string };
@@ -352,6 +352,18 @@ const mapRasterFallbackStyle = {
   },
   layers: [{ id: 'carto-dark-tiles', type: 'raster' as const, source: 'cartoDark' }],
 };
+const mapRasterLightFallbackStyle = {
+  version: 8 as const,
+  sources: {
+    cartoLight: {
+      type: 'raster' as const,
+      tiles: ['https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      attribution: '© OpenStreetMap contributors © CARTO',
+    },
+  },
+  layers: [{ id: 'carto-light-tiles', type: 'raster' as const, source: 'cartoLight' }],
+};
 
 function getStateFill(uf: string, units: Unit[]) {
   const stateUnits = units.filter((unit) => unit.state_code.toUpperCase() === uf.toUpperCase());
@@ -477,9 +489,14 @@ function LinkSparkline({ values, status }: { values: number[]; status: Unit['ope
 }
 
 function LinkTelemetryCard({ unit, link, located, diagnosticLatencyMs, onView, onContext }: { unit: Unit; link?: LinkTelemetry; located: boolean; diagnosticLatencyMs?: number; onView: () => void; onContext: (event: ReactMouseEvent<HTMLElement>) => void }) {
+  const equipmentType = link?.equipment_type ?? '';
+  if (equipmentType === 'starlink') return <StarlinkLinkCard unit={unit} link={link} located={located} onView={onView} onContext={onContext} />;
+  if (equipmentType === 'vpn' || /ipsec|vpn/i.test(link?.equipment_name ?? '')) return <TunnelStatusCard unit={unit} link={link} located={located} onView={onView} onContext={onContext} />;
   const metrics = link?.metrics ?? {};
-  const stale = link?.telemetry_stale ?? (!link?.observed_at || Date.now() - new Date(link.observed_at).getTime() > 30_000);
-  const latency = stale ? 0 : diagnosticLatencyMs ?? metrics['network.latency.ms'];
+  const telemetryStale = link?.telemetry_stale ?? (!link?.observed_at || Date.now() - new Date(link.observed_at).getTime() > 30_000);
+  const manualPing = Number.isFinite(diagnosticLatencyMs);
+  const stale = telemetryStale && !manualPing;
+  const latency = manualPing ? diagnosticLatencyMs : stale ? 0 : metrics['network.latency.ms'];
   const loss = stale ? 0 : metrics['network.loss.pct'];
   const inbound = stale ? 0 : metrics['network.in.bps'];
   const outbound = stale ? 0 : metrics['network.out.bps'];
@@ -494,16 +511,40 @@ function LinkTelemetryCard({ unit, link, located, diagnosticLatencyMs, onView, o
       <span className="state-link-open-hint">{located ? '›' : '+'}</span>
     </div>
     {stale && <div className="state-link-zero-warning">⚠ TELEMETRIA ZERADA · SEM COMUNICAÇÃO</div>}
-    <div className="state-link-card-meta"><span>{unit.code} · {unit.city}</span><span>Plano: ↓ {formatContractedMbps(link?.contracted_download_mbps)} · ↑ {formatContractedMbps(link?.contracted_upload_mbps)}</span><small>{stale ? 'TELEMETRIA ZERADA' : link?.observed_at ? new Date(link.observed_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'SEM TELEMETRIA'}</small></div>
+    <div className="state-link-card-meta"><span>{unit.code} · {unit.city}</span><span>Plano: ↓ {formatContractedMbps(link?.contracted_download_mbps)} · ↑ {formatContractedMbps(link?.contracted_upload_mbps)}</span><small>{manualPing ? 'PING MANUAL' : stale ? 'TELEMETRIA ZERADA' : link?.observed_at ? new Date(link.observed_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'SEM TELEMETRIA'}</small></div>
+  </article>;
+}
+
+function TunnelStatusCard({ unit, link, located, onView, onContext }: { unit: Unit; link?: LinkTelemetry; located: boolean; onView: () => void; onContext: (event: ReactMouseEvent<HTMLElement>) => void }) {
+  const stale = link?.telemetry_stale ?? !link?.observed_at;
+  const status = stale ? 'unknown' : unit.operational_status;
+  const label = status === 'online' ? 'TÚNEL UP' : status === 'offline' ? 'TÚNEL DOWN' : status === 'degraded' ? 'ATENÇÃO' : 'SEM ESTADO';
+  return <article className={`state-link-card tunnel-card ${status} ${located ? '' : 'pending'}`} role="button" tabIndex={0} aria-label={`${located ? 'Focalizar' : 'Localizar'} ${link?.equipment_name ?? unit.name}`} onClick={onView} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onView(); } }} onContextMenu={onContext}>
+    <div className="state-link-card-head"><strong>{link?.equipment_name ?? unit.name}</strong><span className="state-link-health-icon">{status === 'online' ? '◆' : status === 'offline' ? '⇩' : '○'}</span><span className="state-link-badge">{label}</span></div>
+    <div className="tunnel-status-body"><strong>{status === 'online' ? 'Conectividade do túnel normal' : status === 'offline' ? 'Túnel indisponível' : 'Aguardando estado do túnel'}</strong><small>IPsec/VPN · monitoramento por estado</small></div>
+    <div className="state-link-card-meta"><span>{unit.code} · {unit.city}</span><small>{link?.observed_at ? `VERIFICADO ${new Date(link.observed_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : 'SEM VERIFICAÇÃO'}</small></div>
+  </article>;
+}
+
+function StarlinkLinkCard({ unit, link, located, onView, onContext }: { unit: Unit; link?: LinkTelemetry; located: boolean; onView: () => void; onContext: (event: ReactMouseEvent<HTMLElement>) => void }) {
+  const metrics = link?.metrics ?? {};
+  const stale = link?.telemetry_stale ?? !link?.observed_at;
+  const status = stale ? 'unknown' : unit.operational_status;
+  return <article className={`state-link-card starlink-card ${status} ${located ? '' : 'pending'}`} role="button" tabIndex={0} aria-label={`${located ? 'Focalizar' : 'Localizar'} ${link?.equipment_name ?? unit.name}`} onClick={onView} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onView(); } }} onContextMenu={onContext}>
+    <div className="state-link-card-head"><strong>{link?.equipment_name ?? unit.name}</strong><span className="state-link-health-icon">✦</span><span className="state-link-badge">{status === 'online' ? 'STARLINK' : 'N/D'}</span></div>
+    <div className="state-link-values"><span>Latência: <b>{stale ? '—' : formatLatencyMs(metrics['starlink.latency.ms'])}</b></span><span>Download: <b>{stale ? '—' : formatLinkRate(metrics['starlink.download.bps'])}</b></span><span>Upload: <b>{stale ? '—' : formatLinkRate(metrics['starlink.upload.bps'])}</b></span></div>
+    <div className="starlink-card-note">Telemetria da antena · agente local</div>
+    <div className="state-link-card-meta"><span>{unit.code} · {unit.city}</span><small>{stale ? 'SEM TELEMETRIA' : 'COLETOR STARLINK'}</small></div>
   </article>;
 }
 
 function LinkAnalysisPanel({ unit, link, alerts, diagnosticLatencyMs, onClose, onOpenInventory }: { unit: Unit; link?: LinkTelemetry; alerts: Alert[]; diagnosticLatencyMs?: number; onClose: () => void; onOpenInventory: () => void }) {
   const [hoveredLatency, setHoveredLatency] = useState<{ value: number; observedAt: string; left: number; top: number } | null>(null);
   const metrics = link?.metrics ?? {};
-  const stale = link?.telemetry_stale ?? (!link?.observed_at || Date.now() - new Date(link.observed_at).getTime() > 30_000);
-  const effectiveDiagnosticLatency = stale ? undefined : diagnosticLatencyMs;
-  const latency = stale ? 0 : effectiveDiagnosticLatency ?? metrics['network.latency.ms'];
+  const telemetryStale = link?.telemetry_stale ?? (!link?.observed_at || Date.now() - new Date(link.observed_at).getTime() > 30_000);
+  const effectiveDiagnosticLatency = Number.isFinite(diagnosticLatencyMs) ? diagnosticLatencyMs : undefined;
+  const stale = telemetryStale && effectiveDiagnosticLatency === undefined;
+  const latency = effectiveDiagnosticLatency ?? (stale ? 0 : metrics['network.latency.ms']);
   const loss = stale ? 0 : metrics['network.loss.pct'];
   const inbound = stale ? 0 : metrics['network.in.bps'];
   const outbound = stale ? 0 : metrics['network.out.bps'];
@@ -520,7 +561,7 @@ function LinkAnalysisPanel({ unit, link, alerts, diagnosticLatencyMs, onClose, o
     <section className="link-analysis-dialog" role="dialog" aria-modal="true" aria-label={`Análise detalhada de ${link?.equipment_name ?? unit.name}`} onMouseDown={(event) => event.stopPropagation()}>
       <header className="link-analysis-header"><div><p className="eyebrow">ANÁLISE DETALHADA · LINK</p><h2>{link?.equipment_name ?? unit.name}</h2><small>{unit.code} · {unit.name} · {unit.city}/{unit.state_code}</small></div><button onClick={onClose} aria-label="Fechar análise">×</button></header>
       <div className="link-analysis-content">
-        <article className={`link-analysis-identity ${stale ? 'unknown' : unit.operational_status}`}><div className="link-analysis-title"><div><span>LINK MONITORADO</span><strong>{link?.equipment_name ?? unit.name}</strong><small>Unidade {unit.code}</small></div><i /></div><div className="link-analysis-status-grid"><div><span>STATUS ATUAL</span><strong>{stale ? 'Sem telemetria' : statusLabel[unit.operational_status]}</strong></div><div><span>ÚLTIMA AMOSTRA</span><strong>{stale ? 'Telemetria zerada' : link?.observed_at ? new Date(link.observed_at).toLocaleString('pt-BR') : 'Sem telemetria'}</strong></div></div>{stale && <div className="link-analysis-zero-warning">⚠ {link?.telemetry_error ?? 'Telemetria zerada: sem comunicação recente.'}</div>}<button onClick={onOpenInventory}>Abrir inventário completo</button></article>
+        <article className={`link-analysis-identity ${stale ? 'unknown' : unit.operational_status}`}><div className="link-analysis-title"><div><span>LINK MONITORADO</span><strong>{link?.equipment_name ?? unit.name}</strong><small>Unidade {unit.code}</small></div><i /></div><div className="link-analysis-status-grid"><div><span>STATUS ATUAL</span><strong>{stale ? 'Sem telemetria' : statusLabel[unit.operational_status]}</strong></div><div><span>{effectiveDiagnosticLatency === undefined ? 'ÚLTIMA AMOSTRA' : 'ÚLTIMO PING'}</span><strong>{effectiveDiagnosticLatency !== undefined ? `${formatLatencyMs(effectiveDiagnosticLatency)} · medição manual` : stale ? 'Telemetria zerada' : link?.observed_at ? new Date(link.observed_at).toLocaleString('pt-BR') : 'Sem telemetria'}</strong></div></div>{stale && <div className="link-analysis-zero-warning">⚠ {link?.telemetry_error ?? 'Telemetria zerada: sem comunicação recente.'}</div>}<button onClick={onOpenInventory}>Abrir inventário completo</button></article>
         <article className="link-analysis-chart"><div className="link-analysis-section-head"><div><h3>Latência (ms)</h3><small>{effectiveDiagnosticLatency === undefined ? 'AMOSTRAS RECENTES DO ZABBIX · passe o mouse nos pontos' : 'ÚLTIMO PING LOCAL · MEDIÇÃO MANUAL'}</small></div><strong>{formatLatencyMs(hoveredLatency?.value ?? latency)}</strong></div><div className="link-chart-stage"><span>{formatLatencyMs(maximum)}</span><span>0 ms</span><svg viewBox="0 0 680 210" preserveAspectRatio="none" onMouseLeave={() => setHoveredLatency(null)}><line x1="0" y1="35" x2="680" y2="35" /><line x1="0" y1="87" x2="680" y2="87" /><line x1="0" y1="139" x2="680" y2="139" /><line x1="0" y1="190" x2="680" y2="190" /><polyline className={stale ? 'unknown' : unit.operational_status} points={chartPoints} />{chartHistory.map((point, index) => { const x = (index / Math.max(1, chartHistory.length - 1)) * 680; const y = 190 - (point.value / maximum) * 155; const showTooltip = (event: ReactMouseEvent<SVGCircleElement>) => { const stage = event.currentTarget.ownerSVGElement?.parentElement; if (!stage) return; const bounds = stage.getBoundingClientRect(); setHoveredLatency({ value: point.value, observedAt: point.observed_at, left: Math.max(74, Math.min(bounds.width - 74, event.clientX - bounds.left)), top: Math.max(52, event.clientY - bounds.top) }); }; return <circle className="link-chart-point" key={`${point.observed_at}-${index}`} cx={x} cy={y} r="5" onMouseEnter={showTooltip} onMouseMove={showTooltip}><title>{`${formatLatencyMs(point.value)} · ${new Date(point.observed_at).toLocaleString('pt-BR')}`}</title></circle>; })}</svg>{hoveredLatency && <div className="link-chart-tooltip" style={{ left: hoveredLatency.left, top: hoveredLatency.top }}><strong>{formatLatencyMs(hoveredLatency.value)}</strong><small>{new Date(hoveredLatency.observedAt).toLocaleString('pt-BR')}</small></div>}{chartHistory.length < 2 && effectiveDiagnosticLatency === undefined && <div className="link-chart-empty">{stale ? 'Telemetria zerada: aguardando comunicação' : 'Aguardando histórico da coleta rápida'}</div>}</div></article>
         <div className="link-analysis-metrics"><article><span>PERDA DE PACOTES</span><strong>{loss === undefined ? '—' : `${loss.toFixed(2)}%`}</strong><small>última amostra válida</small></article><article><span>DOWNLOAD ATUAL</span><strong>{formatLinkRate(inbound)}</strong><small>tráfego recebido na interface WAN</small></article><article><span>UPLOAD ATUAL</span><strong>{formatLinkRate(outbound)}</strong><small>tráfego enviado pela interface WAN</small></article><article><span>VELOCIDADE CONTRATADA</span><strong>↓ {formatContractedMbps(link?.contracted_download_mbps)}<br />↑ {formatContractedMbps(link?.contracted_upload_mbps)}</strong><small>download e upload cadastrados</small></article></div>
         <article className="link-error-history"><div className="link-error-history-head"><div><span>HISTÓRICO DE ERROS</span><strong>Ocorrências do link</strong></div><small>{linkErrors.length + (stale ? 1 : 0)} registro(s)</small></div>{stale && <div className="link-error-row severity-4 telemetry-zero-error"><span className="link-error-indicator" /><div><strong>Telemetria zerada: sem comunicação</strong><small>{link?.telemetry_error ?? 'Nenhuma amostra válida recebida nos últimos 30 segundos.'}</small></div><span className="status offline">Ativo</span></div>}{linkErrors.length === 0 && !stale ? <div className="link-error-empty"><i>✓</i><div><strong>Nenhum erro registrado</strong><small>Alertas do Zabbix vinculados a este link aparecerão aqui.</small></div></div> : linkErrors.length > 0 && <div className="link-error-list">{linkErrors.map((alert) => <div className={`link-error-row severity-${alert.severity}`} key={alert.id}><span className="link-error-indicator" /><div><strong>{alert.title}</strong><small>{new Date(alert.opened_at).toLocaleString('pt-BR')}{alert.resolved_at ? ` · resolvido em ${new Date(alert.resolved_at).toLocaleString('pt-BR')}` : ''}</small></div><span className={`status ${alert.status === 'resolved' ? 'online' : alert.status === 'acknowledged' ? 'degraded' : 'offline'}`}>{alert.status === 'resolved' ? 'Resolvido' : alert.status === 'acknowledged' ? 'Reconhecido' : 'Ativo'}</span></div>)}</div>}</article>
@@ -535,6 +576,7 @@ function StateLocationMap({ stateCode, units, telemetry = [], alerts = [], onClo
   const [unitContext, setUnitContext] = useState<{ unit: Unit; x: number; y: number } | null>(null);
   const [diagnosticLatencyByUnit, setDiagnosticLatencyByUnit] = useState<Record<string, number>>({});
   const [diagnostic, setDiagnostic] = useState<{ unit: Unit; action: 'ping' | 'tracert'; status: 'running' | 'done' | 'error'; result?: DiagnosticResult; message?: string } | null>(null);
+  const [mapTheme, setMapTheme] = useState<'dark' | 'light'>(() => window.localStorage.getItem('healthlink.map-theme') === 'light' ? 'light' : 'dark');
   // Começamos pelo estilo raster leve: ele evita aguardar o JSON de estilo
   // vetorial antes de mostrar o mapa e reduz o tempo de primeira pintura.
   const [mapFallback, setMapFallback] = useState(true);
@@ -572,24 +614,38 @@ function StateLocationMap({ stateCode, units, telemetry = [], alerts = [], onClo
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [detailUnit, onClose]);
-  useEffect(() => { setMapReady(false); }, [stateCode]);
+  useEffect(() => {
+    setMapReady(false);
+    // Alguns estilos rasterizados exibem os tiles, mas não disparam `load`
+    // de forma consistente em redes locais. O mapa já está utilizável nesse
+    // ponto, então removemos o overlay para não deixá-lo preso na tela.
+    const readyFallback = window.setTimeout(() => setMapReady(true), 3000);
+    return () => window.clearTimeout(readyFallback);
+  }, [stateCode, mapTheme]);
+  const changeMapTheme = (theme: 'dark' | 'light') => {
+    if (mapTheme === theme) return;
+    setMapTheme(theme);
+    window.localStorage.setItem('healthlink.map-theme', theme);
+    setMapFallback(true);
+    setMapReady(false);
+  };
   return <div className="state-map-backdrop" role="presentation" onMouseDown={onClose}>
     <section className="state-map-dialog" role="dialog" aria-modal="true" aria-label={`Localização das unidades em ${stateNameByCode[stateCode] ?? stateCode}`} onMouseDown={(event) => event.stopPropagation()}>
-      <header className="state-map-header"><div><p className="eyebrow">VISÃO GEOGRÁFICA · {stateCode}</p><h2>{stateNameByCode[stateCode] ?? stateCode}</h2><small>{units.length} unidade(s) no estado · {locatedUnits.length} georreferenciada(s)</small></div><button className="state-map-close" onClick={onClose} aria-label="Fechar mapa">×</button></header>
+      <header className="state-map-header"><div><p className="eyebrow">VISÃO GEOGRÁFICA · {stateCode}</p><h2>{stateNameByCode[stateCode] ?? stateCode}</h2><small>{units.length} unidade(s) no estado · {locatedUnits.length} georreferenciada(s)</small></div><div className="state-map-header-actions"><div className="map-theme-switch" role="group" aria-label="Tema do mapa"><button className={mapTheme === 'dark' ? 'active' : ''} onClick={() => changeMapTheme('dark')} aria-pressed={mapTheme === 'dark'}>☾ Dark</button><button className={mapTheme === 'light' ? 'active' : ''} onClick={() => changeMapTheme('light')} aria-pressed={mapTheme === 'light'}>☀ Claro</button></div><button className="state-map-close" onClick={onClose} aria-label="Fechar mapa">×</button></div></header>
       <div className="state-map-body">
-        <div className="state-map-canvas">
-          <Map ref={mapRef} key={stateCode} initialViewState={{ longitude, latitude, zoom: locatedUnits.length > 1 ? 8 : locatedUnits.length === 1 ? 12 : 6 }} mapStyle={mapFallback ? mapRasterFallbackStyle : 'https://tiles.openfreemap.org/styles/dark'} onLoad={(event) => { setMapReady(true); if (mapBounds) { event.target.fitBounds([[mapBounds.minLng, mapBounds.minLat], [mapBounds.maxLng, mapBounds.maxLat]], { padding: 90, maxZoom: 12, duration: 0 }); } else if (locatedUnits.length === 1) { event.target.setZoom(12); } }} onError={() => setMapFallback(true)} attributionControl>
+        <div className={`state-map-canvas ${mapTheme === 'light' ? 'map-theme-light' : ''}`}>
+          <Map ref={mapRef} key={`${stateCode}-${mapTheme}-${mapFallback ? 'raster' : 'vector'}`} initialViewState={{ longitude, latitude, zoom: locatedUnits.length > 1 ? 8 : locatedUnits.length === 1 ? 12 : 6 }} mapStyle={mapFallback ? (mapTheme === 'dark' ? mapRasterFallbackStyle : mapRasterLightFallbackStyle) : (mapTheme === 'dark' ? 'https://tiles.openfreemap.org/styles/dark' : 'https://tiles.openfreemap.org/styles/bright')} onLoad={(event) => { setMapReady(true); if (mapBounds) { event.target.fitBounds([[mapBounds.minLng, mapBounds.minLat], [mapBounds.maxLng, mapBounds.maxLat]], { padding: 90, maxZoom: 12, duration: 0 }); } else if (locatedUnits.length === 1) { event.target.setZoom(12); } }} onIdle={() => setMapReady(true)} onError={() => setMapFallback(true)} attributionControl>
             <NavigationControl position="bottom-right" showCompass={false} />
             {locatedUnits.map((unit) => <Marker key={unit.unit_id} longitude={Number(unit.longitude)} latitude={Number(unit.latitude)} anchor="center" onClick={(event) => { event.originalEvent.stopPropagation(); setSelectedUnit(unit); }}><button className={`unit-map-marker ${unit.operational_status}`} aria-label={`Abrir ${unit.name}`} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); setUnitContext({ unit, x: Math.max(12, Math.min(event.clientX, window.innerWidth - 250)), y: Math.max(12, Math.min(event.clientY, window.innerHeight - 210)) }); }}><span /></button></Marker>)}
             {selectedUnit && <Popup longitude={Number(selectedUnit.longitude)} latitude={Number(selectedUnit.latitude)} anchor="bottom" closeButton={false} offset={18} onClose={() => setSelectedUnit(null)}><div className="unit-map-popup"><span className={`status ${selectedUnit.operational_status}`}>{statusLabel[selectedUnit.operational_status]}</span><strong>{selectedUnit.name}</strong><small>{selectedUnit.code} · {selectedUnit.city}/{selectedUnit.state_code}</small><button onClick={() => setDetailUnit(selectedUnit)}>Abrir unidade</button></div></Popup>}
           </Map>
           {!mapReady && <div className="state-map-loading" role="status"><span className="loading-pulse" /> Preparando mapa operacional…</div>}
           {!locatedUnits.length && <div className="state-map-empty">{pendingUnits[0] ? <button type="button" className="state-map-empty-action" aria-label="Adicionar localização" onClick={() => { onClose(); onLocateUnit(pendingUnits[0].unit_id); }}>+</button> : <span>+</span>}<strong>Localização ainda não informada</strong><small>Cadastre latitude e longitude nas unidades para exibir os pontos exatos.</small></div>}
-          {mapFallback && <div className="state-map-provider-note">Mapa dark otimizado · carregamento rápido</div>}
+          {mapFallback && <div className="state-map-provider-note">Mapa {mapTheme === 'dark' ? 'dark' : 'claro'} otimizado · carregamento rápido</div>}
         </div>
         <aside className="state-map-units state-links-panel"><div className="state-links-heading"><h3>Links Ativos</h3><span>{units.filter((unit) => unit.operational_status === 'online').length}/{units.length}</span></div>{units.length === 0 ? <div className="state-map-list-empty">Nenhuma unidade cadastrada.</div> : units.map((unit) => { const located = locatedUnits.includes(unit); return <LinkTelemetryCard key={unit.unit_id} unit={unit} link={telemetryByUnit.get(unit.unit_id)?.[0]} located={located} diagnosticLatencyMs={diagnosticLatencyByUnit[unit.unit_id]} onView={() => located ? setSelectedUnit(unit) : (onClose(), onLocateUnit(unit.unit_id))} onContext={(event) => { event.preventDefault(); event.stopPropagation(); setUnitContext({ unit, x: Math.max(12, Math.min(event.clientX, window.innerWidth - 250)), y: Math.max(12, Math.min(event.clientY, window.innerHeight - 210)) }); }} />; })}{pendingUnits.length > 0 && <p className="state-map-pending-note">Use LOCAL para adicionar as coordenadas da unidade.</p>}</aside>
       </div>
-      <footer className="state-map-footer"><span><i className="legend-dot online" /> Operacional</span><span><i className="legend-dot degraded" /> Atenção</span><span><i className="legend-dot offline" /> Indisponível</span><span><i className="legend-dot unknown" /> Sem telemetria</span><small>Mapa dark · OpenFreeMap / OpenStreetMap</small></footer>
+      <footer className="state-map-footer"><span><i className="legend-dot online" /> Operacional</span><span><i className="legend-dot degraded" /> Atenção</span><span><i className="legend-dot offline" /> Indisponível</span><span><i className="legend-dot unknown" /> Sem telemetria</span><small>Mapa {mapTheme === 'dark' ? 'dark' : 'claro'} · OpenFreeMap / OpenStreetMap</small></footer>
       {unitContext && <div className="map-context-card map-unit-context-card" style={{ left: unitContext.x, top: unitContext.y }} onMouseDown={(event) => event.stopPropagation()}><button className="map-context-close" aria-label="Fechar menu" onClick={() => setUnitContext(null)}>×</button><p>AÇÃO RÁPIDA · UNIDADE</p><strong>{unitContext.unit.name}</strong><small>{unitContext.unit.code} · {unitContext.unit.city}/{unitContext.unit.state_code}</small><button className="context-action" onClick={() => void runDiagnostic(unitContext.unit, 'ping')}>⌁ Ping</button><button className="context-action" onClick={() => void runDiagnostic(unitContext.unit, 'tracert')}>↝ Tracert</button><button className="primary compact" onClick={() => { setUnitContext(null); onAddEquipment(unitContext.unit); }}>+ Adicionar equipamento</button></div>}
       {diagnostic && <div className="diagnostic-float" role="status"><div className="diagnostic-float-head"><div><p className="eyebrow">DIAGNÓSTICO EM TEMPO REAL · {diagnostic.action === 'ping' ? 'PING' : 'TRACERT'}</p><strong>{diagnostic.unit.name}</strong><small>{diagnostic.unit.code} · alvo {diagnostic.result?.target ?? 'endereço de gerenciamento'}</small></div><button aria-label="Fechar diagnóstico" onClick={() => setDiagnostic(null)}>×</button></div><div className={`diagnostic-state ${diagnostic.status}`}>{diagnostic.status === 'running' ? 'Executando diagnóstico… aguardando resposta do equipamento.' : diagnostic.status === 'error' ? diagnostic.message : diagnostic.result?.success ? 'Concluído com resposta positiva.' : 'Concluído; o alvo não respondeu.'}</div>{diagnostic.status !== 'running' && <pre>{diagnostic.result?.output ?? diagnostic.message}</pre>}<button className="diagnostic-close" onClick={() => setDiagnostic(null)}>Fechar painel</button></div>}
       {detailUnit && <LinkAnalysisPanel unit={detailUnit} link={telemetryByUnit.get(detailUnit.unit_id)?.[0]} alerts={alerts} diagnosticLatencyMs={diagnosticLatencyByUnit[detailUnit.unit_id]} onClose={() => setDetailUnit(null)} onOpenInventory={() => { onClose(); onSelectUnit(detailUnit.unit_id); }} />}
