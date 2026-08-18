@@ -36,6 +36,8 @@ phase: foundation
 
 > Atualização 2026-08-17: a branch `frontend-padronizacao` do repositório remoto foi incorporada à `main`; conflitos do `App.tsx` foram resolvidos preservando as funções Starlink e o fluxo de usuários.
 
+> Atualização 2026-08-18: a regra de expiração de telemetria foi estendida aos links alimentados pelo Zabbix. Após 30 segundos sem amostra, o estado passa a `unknown`, os indicadores atuais são zerados na interface e o histórico de erros sinaliza a perda de comunicação.
+
 > Atualização 2026-08-13: corrigida a seleção de interfaces SNMP FortiGate. O `FW-LAV-IRANDUBA` agora usa `wan1 (LINK-ICOM-100Mb)` para download/upload. Detalhes em [[Correcao Telemetria SNMP FortiGate]].
 
 # Estado Atual

@@ -40,6 +40,7 @@ Adotada a estratégia híbrida: Zabbix/SNMP continua como fonte de disponibilida
 - A tela operacional não exibe mais valores antigos como se fossem atuais: quando a última amostra ultrapassa 30 segundos, todas as métricas do card passam a `N/D` e o card indica `Sem comunicação recente`.
 - A API também retorna o estado do coletor; quando a amostra está obsoleta, o painel registra visualmente o erro `Agente Starlink sem comunicação`, orientando verificar o processo e a rota até a antena.
 - A atualização visual da branch `frontend-padronizacao` foi integrada sem remover o painel de telemetria, o tratamento `N/D` ou o cadastro explícito de senha do agente.
+- Regra padronizada de confiabilidade: telemetria Starlink e telemetria de links/Zabbix com amostra acima de 30 segundos passam a `unknown`; a projeção visual zera latência, perda e tráfego, limpa o sparkline e exibe aviso de `Telemetria zerada`. O histórico persistido não é apagado.
 
 ## Próxima etapa
 

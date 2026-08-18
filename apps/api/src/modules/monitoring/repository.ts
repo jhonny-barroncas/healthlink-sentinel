@@ -47,7 +47,7 @@ export async function listEquipmentStatus(client: PoolClient, tenantId: string) 
            e.serial_number, e.management_address,
            e.contracted_download_mbps::float8, e.contracted_upload_mbps::float8,
            CASE WHEN s.observed_at IS NULL THEN 'unknown'
-                WHEN COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' AND s.observed_at < now() - interval '30 seconds' THEN 'unknown'
+                WHEN (COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' OR COALESCE(s.source_payload->>'source', '') = 'zabbix_telemetry') AND s.observed_at < now() - interval '30 seconds' THEN 'unknown'
                 ELSE s.operational_status END AS operational_status,
            s.observed_at
     FROM equipment e
@@ -62,12 +62,12 @@ export async function listEquipmentStatus(client: PoolClient, tenantId: string) 
 export async function listUnitOperationalStatus(client: PoolClient, tenantId: string) {
   const result = await client.query(`
     SELECT hu.id AS unit_id, hu.code, hu.name, hu.state_code, hu.city, hu.latitude, hu.longitude,
-      CASE WHEN bool_or(CASE WHEN s.observed_at IS NULL THEN 'unknown' WHEN COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' AND s.observed_at < now() - interval '30 seconds' THEN 'unknown' ELSE COALESCE(s.operational_status, 'unknown') END = 'offline') THEN 'offline'
-           WHEN bool_or(CASE WHEN s.observed_at IS NULL THEN 'unknown' WHEN COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' AND s.observed_at < now() - interval '30 seconds' THEN 'unknown' ELSE COALESCE(s.operational_status, 'unknown') END = 'degraded') THEN 'degraded'
-           WHEN bool_and(CASE WHEN s.observed_at IS NULL THEN 'unknown' WHEN COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' AND s.observed_at < now() - interval '30 seconds' THEN 'unknown' ELSE COALESCE(s.operational_status, 'unknown') END = 'online') THEN 'online'
+      CASE WHEN bool_or(CASE WHEN s.observed_at IS NULL THEN 'unknown' WHEN (COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' OR COALESCE(s.source_payload->>'source', '') = 'zabbix_telemetry') AND s.observed_at < now() - interval '30 seconds' THEN 'unknown' ELSE COALESCE(s.operational_status, 'unknown') END = 'offline') THEN 'offline'
+           WHEN bool_or(CASE WHEN s.observed_at IS NULL THEN 'unknown' WHEN (COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' OR COALESCE(s.source_payload->>'source', '') = 'zabbix_telemetry') AND s.observed_at < now() - interval '30 seconds' THEN 'unknown' ELSE COALESCE(s.operational_status, 'unknown') END = 'degraded') THEN 'degraded'
+           WHEN bool_and(CASE WHEN s.observed_at IS NULL THEN 'unknown' WHEN (COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' OR COALESCE(s.source_payload->>'source', '') = 'zabbix_telemetry') AND s.observed_at < now() - interval '30 seconds' THEN 'unknown' ELSE COALESCE(s.operational_status, 'unknown') END = 'online') THEN 'online'
            ELSE 'unknown' END AS operational_status,
-      count(*) FILTER (WHERE (CASE WHEN s.observed_at IS NULL THEN 'unknown' WHEN COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' AND s.observed_at < now() - interval '30 seconds' THEN 'unknown' ELSE COALESCE(s.operational_status, 'unknown') END) = 'offline')::int AS offline_equipment,
-      count(*) FILTER (WHERE (CASE WHEN s.observed_at IS NULL THEN 'unknown' WHEN COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' AND s.observed_at < now() - interval '30 seconds' THEN 'unknown' ELSE COALESCE(s.operational_status, 'unknown') END) = 'degraded')::int AS degraded_equipment
+      count(*) FILTER (WHERE (CASE WHEN s.observed_at IS NULL THEN 'unknown' WHEN (COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' OR COALESCE(s.source_payload->>'source', '') = 'zabbix_telemetry') AND s.observed_at < now() - interval '30 seconds' THEN 'unknown' ELSE COALESCE(s.operational_status, 'unknown') END) = 'offline')::int AS offline_equipment,
+      count(*) FILTER (WHERE (CASE WHEN s.observed_at IS NULL THEN 'unknown' WHEN (COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' OR COALESCE(s.source_payload->>'source', '') = 'zabbix_telemetry') AND s.observed_at < now() - interval '30 seconds' THEN 'unknown' ELSE COALESCE(s.operational_status, 'unknown') END) = 'degraded')::int AS degraded_equipment
     FROM health_units hu
     LEFT JOIN equipment e ON e.unit_id = hu.id AND e.tenant_id = hu.tenant_id AND e.active = true
     LEFT JOIN equipment_status_snapshots s ON s.equipment_id = e.id AND s.tenant_id = hu.tenant_id
@@ -83,7 +83,7 @@ export async function listLinkTelemetry(client: PoolClient, tenantId: string) {
       e.id AS equipment_id, e.name AS equipment_name,
       e.contracted_download_mbps::float8, e.contracted_upload_mbps::float8,
       CASE WHEN s.observed_at IS NULL THEN 'unknown'
-           WHEN COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' AND s.observed_at < now() - interval '30 seconds' THEN 'unknown'
+           WHEN (COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' OR COALESCE(s.source_payload->>'source', '') = 'zabbix_telemetry') AND s.observed_at < now() - interval '30 seconds' THEN 'unknown'
            ELSE s.operational_status END AS operational_status,
       ms.metric_key, ms.value::float8 AS value, ms.observed_at
     FROM health_units hu
@@ -112,12 +112,23 @@ export async function listLinkTelemetry(client: PoolClient, tenantId: string) {
       equipment_id: row.equipment_id, equipment_name: row.equipment_name,
       contracted_download_mbps: row.contracted_download_mbps,
       contracted_upload_mbps: row.contracted_upload_mbps,
-      operational_status: row.operational_status, observed_at: null, metrics: {}, latency_history: [],
+      operational_status: row.operational_status, observed_at: null, telemetry_stale: true, telemetry_error: 'Telemetria zerada: sem comunicação recente.', metrics: {}, latency_history: [],
     };
     if (row.metric_key && current.metrics[row.metric_key] === undefined) current.metrics[row.metric_key] = row.value;
     if (row.metric_key === 'network.latency.ms' && current.latency_history.length < 14) current.latency_history.unshift({ value: row.value, observed_at: row.observed_at });
     if (row.observed_at && (!current.observed_at || row.observed_at > current.observed_at)) current.observed_at = row.observed_at;
     equipment.set(row.equipment_id, current);
   }
-  return [...equipment.values()];
+  return [...equipment.values()].map((item) => {
+    const stale = !item.observed_at || Date.now() - new Date(item.observed_at).getTime() > 30_000;
+    if (!stale) return { ...item, telemetry_stale: false, telemetry_error: null };
+    return {
+      ...item,
+      operational_status: 'unknown',
+      telemetry_stale: true,
+      telemetry_error: 'Telemetria zerada: sem comunicação há mais de 30 segundos. Verifique o Zabbix, o agente e a conectividade da unidade.',
+      metrics: {},
+      latency_history: [],
+    };
+  });
 }
