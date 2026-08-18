@@ -94,6 +94,8 @@ Cadastrar o servidor local obrigatório, identidade/heartbeat do agente, fonte `
 
 Implementar cliente gRPC/Protobuf, mapear respostas para o contrato normalizado, testar modelos/firmwares e tratar método ausente, timeout e antena offline.
 
+**Situação:** a fronteira do adapter foi criada em `apps/agent/src/starlink-client.ts` usando os contratos protobuf do projeto Eitol; a validação física contra a antena real ainda está pendente. O comando de diagnóstico é `npm.cmd run agent:starlink:check`.
+
 ### Fase 3 — coletor MikroTik
 
 Implementar SNMP/API com seleção explícita da interface WAN, separar tráfego de erros/descartes, registrar `N/D` quando não houver item confiável e evitar duplicidade de equipamento.

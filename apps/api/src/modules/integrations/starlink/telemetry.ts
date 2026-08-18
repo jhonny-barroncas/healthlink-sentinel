@@ -47,6 +47,9 @@ export function deriveStarlinkStatus(samples: StarlinkSample[]): 'online' | 'deg
   const latency = samples.find((sample) => sample.metricKey === 'starlink.latency.ms')?.value;
   const loss = samples.find((sample) => sample.metricKey === 'starlink.loss.pct')?.value;
   const obstruction = samples.find((sample) => sample.metricKey === 'starlink.obstruction.pct')?.value;
+  const coverage = samples.find((sample) => sample.metricKey === 'starlink.coverage.available')?.value;
+  if (latency === undefined && loss === undefined && coverage === undefined) return 'unknown';
+  if (coverage !== undefined && coverage <= 0) return 'offline';
   if (loss !== undefined && loss >= 100) return 'offline';
   if ((latency !== undefined && latency >= 250) || (loss !== undefined && loss >= 10) || (obstruction !== undefined && obstruction >= 20)) return 'degraded';
   return 'online';

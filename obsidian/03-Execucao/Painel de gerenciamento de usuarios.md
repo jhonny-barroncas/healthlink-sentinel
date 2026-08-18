@@ -5,6 +5,7 @@
 - Criada a área **Usuários** no menu lateral do HealthLink Sentinel.
 - Listagem por cliente/tenant com nome, e-mail, perfil, status e data de acesso.
 - Cadastro de usuário com nome, e-mail, senha e perfil.
+- A senha é definida diretamente no formulário; no modo de edição, pode ser trocada sem depender de envio de e-mail. A senha nunca é exibida ou armazenada em texto puro.
 - Edição de nome, perfil e senha.
 - Bloqueio/desbloqueio por desativação lógica.
 - Exclusão lógica do vínculo com o cliente; o histórico do usuário é preservado.

@@ -2,6 +2,26 @@ import type { AgentConfig } from './config.js';
 
 type LoginResponse = { accessToken: string; refreshToken: string };
 
+async function apiError(response: Response, operation: string): Promise<Error> {
+  let detail = '';
+  try {
+    const body = await response.text();
+    if (body) {
+      try {
+        const parsed = JSON.parse(body) as { message?: unknown; error?: unknown };
+        const value = parsed.message ?? parsed.error;
+        if (typeof value === 'string') detail = value;
+      } catch {
+        detail = body.replace(/\s+/g, ' ').trim();
+      }
+    }
+  } catch {
+    // Preserve the HTTP status when the response body cannot be read.
+  }
+  const suffix = detail ? `: ${detail.slice(0, 300)}` : '';
+  return new Error(`${operation} (HTTP ${response.status})${suffix}`);
+}
+
 export class HealthLinkAuth {
   private accessToken?: string;
   private refreshToken?: string;
@@ -18,7 +38,7 @@ export class HealthLinkAuth {
       body: JSON.stringify({ email: this.config.apiEmail, password: this.config.apiPassword, tenantId: this.config.tenantId }),
       signal: AbortSignal.timeout(this.config.timeoutMs),
     });
-    if (!response.ok) throw new Error(`Login do agente rejeitado pela API (HTTP ${response.status}).`);
+    if (!response.ok) throw await apiError(response, 'Login do agente rejeitado pela API');
     const result = await response.json() as LoginResponse;
     this.accessToken = result.accessToken;
     this.refreshToken = result.refreshToken;
