@@ -170,6 +170,32 @@ docker-compose.yml        PostgreSQL e Redis locais
 - Mantenha a porta `9200` somente na rede local da unidade.
 - Revogue e substitua qualquer credencial que tenha sido exposta.
 
+## Deploy com uma porta pública
+
+Para o cenário de produção com o domínio `aplicacao.gbringel.com`, a porta pública recomendada neste projeto é a `5174`:
+
+```text
+https://aplicacao.gbringel.com:5174
+```
+
+Essa porta precisa encaminhar para o serviço completo do HealthLink, e não somente para o frontend:
+
+```text
+Frontend: https://aplicacao.gbringel.com:5174
+API:      https://aplicacao.gbringel.com:5174/v1/...
+Health:   https://aplicacao.gbringel.com:5174/health
+```
+
+O agente Starlink também envia os dados pela mesma porta:
+
+```env
+HEALTHLINK_API_URL=https://aplicacao.gbringel.com:5174
+```
+
+Quem administra o firewall/proxy deve liberar TCP `5174` e encaminhá-la para o container ou processo do HealthLink. A API não deve ser publicada em outra porta separada. As portas internas PostgreSQL (`5432`), Redis (`6379`) e Starlink (`9200`) não devem ser expostas na internet.
+
+O passo a passo completo está em [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
 ## Documentação adicional
 
 - [Plano de coleta Starlink e unidade móvel](obsidian/03-Execucao/Plano%20de%20Coleta%20Starlink%20e%20Unidade%20Movel.md)
