@@ -95,7 +95,11 @@ export class EitolStarlinkClient {
 
   async getLocation(): Promise<StarlinkLocation> {
     const response = await this.handle({ get_location: { source: 'AUTO' } });
-    return response.get_location ?? response.getLocation ?? {};
+    const raw = response.get_location ?? response.getLocation ?? response.dish_get_location ?? response.dishGetLocation ?? {};
+    const lla = raw.lla ?? raw.LLA ?? raw.location?.lla ?? raw.location?.LLA ?? raw.position?.lla;
+    const lat = lla?.lat ?? lla?.latitude;
+    const lon = lla?.lon ?? lla?.lng ?? lla?.longitude;
+    return { lla: { lat, lon } };
   }
 
   close(): void {

@@ -45,8 +45,15 @@ export async function collectStarlink(config: AgentConfig): Promise<TelemetryBat
     put(payload, 'coverageAvailable', state === '1' || state === 'CONNECTED' ? 1 : ['2', '3', 'SEARCHING', 'BOOTING'].includes(state) ? 0 : undefined);
     if (transceiverResult.status === 'fulfilled') put(payload, 'temperatureC', transceiverResult.value.modemAsicTemp);
     if (locationResult.status === 'fulfilled' && locationResult.value.lla) {
-      put(payload, 'latitude', locationResult.value.lla.lat);
-      put(payload, 'longitude', locationResult.value.lla.lon);
+      const { lat, lon } = locationResult.value.lla;
+      put(payload, 'latitude', lat);
+      put(payload, 'longitude', lon);
+      if (finite(lat) && finite(lon)) console.log(`[starlink-agent] localização coletada: latitude=${lat} longitude=${lon}`);
+      else console.warn('[starlink-agent] antena respondeu sem latitude/longitude válidas.');
+    } else if (locationResult.status === 'rejected') {
+      console.warn(`[starlink-agent] falha ao coletar localização: ${(locationResult.reason as Error).message}`);
+    } else {
+      console.warn('[starlink-agent] antena não retornou localização.');
     }
     if (!Object.keys(payload).length) throw new Error('A Starlink respondeu sem métricas numéricas reconhecidas.');
     return { equipmentId: config.equipmentId, source: 'local_agent', batchId: crypto.randomUUID(), observedAt: new Date().toISOString(), payload };
