@@ -138,7 +138,7 @@ export function App() {
               type: 'error',
               title: `🔴 HOST DOWN · ${unit.code}`,
               detail: `A unidade ${unit.name} (${unit.city}/${unit.state_code}) ficou ${toLabel.toLowerCase()} (era ${fromLabel.toLowerCase()})!`,
-              sticky: true,
+              durationMs: 10000,
             });
           } else if (unit.operational_status === 'online') {
             addToast({
@@ -165,7 +165,7 @@ export function App() {
           type: 'error',
           title: `🔴 ZABBIX DOWN`,
           detail: `Comunicação com a API Zabbix indisponível ou degradada!`,
-          sticky: true,
+          durationMs: 10000,
         });
       } else if (zabbixStatus.health_status === 'healthy') {
         addToast({
