@@ -73,6 +73,11 @@ export async function deactivateEquipment(client: PoolClient, tenantId: string, 
   return (result.rowCount ?? 0) > 0;
 }
 
+export async function reactivateEquipment(client: PoolClient, tenantId: string, id: string): Promise<boolean> {
+  const result = await client.query('UPDATE equipment SET active = true, updated_at = now() WHERE id = $1 AND tenant_id = $2 AND active = false', [id, tenantId]);
+  return (result.rowCount ?? 0) > 0;
+}
+
 export async function deleteEquipment(client: PoolClient, tenantId: string, id: string): Promise<boolean> {
   const result = await client.query('DELETE FROM equipment WHERE id = $1 AND tenant_id = $2', [id, tenantId]);
   return (result.rowCount ?? 0) > 0;

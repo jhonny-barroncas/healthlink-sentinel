@@ -3,11 +3,12 @@ import { createPortal } from 'react-dom';
 import brazilMap from '@svg-maps/brazil';
 import Map, { Marker, NavigationControl, Popup, type MapRef } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import brandIcon from './assets/brand-icon.svg';
 
 type LoginResponse = { accessToken: string; user: { id: string; displayName: string; email: string }; tenant: { name: string } };
 type Unit = { unit_id: string; code: string; name: string; state_code: string; city: string; latitude: number | string | null; longitude: number | string | null; operational_status: 'online' | 'degraded' | 'offline' | 'unknown'; offline_equipment: number; degraded_equipment: number };
 type Alert = { id: string; title: string; severity: number; status: string; unit_id?: string | null; unit_code?: string; equipment_id?: string | null; equipment_name?: string; opened_at: string; resolved_at?: string | null };
-type Equipment = { equipment_id: string; unit_id: string; equipment_type: string; name: string; serial_number?: string | null; management_address?: string | null; contracted_download_mbps?: number | null; contracted_upload_mbps?: number | null; operational_status: 'online' | 'degraded' | 'offline' | 'unknown'; observed_at?: string };
+type Equipment = { equipment_id: string; unit_id: string; equipment_type: string; name: string; serial_number?: string | null; management_address?: string | null; contracted_download_mbps?: number | null; contracted_upload_mbps?: number | null; operational_status: 'online' | 'degraded' | 'offline' | 'unknown'; observed_at?: string; active?: boolean };
 type LatencyPoint = { value: number; observed_at: string };
 type LinkTelemetry = { unit_id: string; unit_code: string; unit_name: string; equipment_id: string; equipment_name: string; equipment_type: string; contracted_download_mbps: number | null; contracted_upload_mbps: number | null; operational_status: Unit['operational_status']; observed_at: string | null; telemetry_stale?: boolean; telemetry_error?: string | null; metrics: Record<string, number>; latency_history: LatencyPoint[] };
 type StarlinkTelemetry = { equipmentId: string; equipmentName: string; observedAt: string | null; collectorStatus?: 'online' | 'offline'; collectorError?: string | null; metrics: Array<{ metric_key: string; value: number; unit: string; observed_at: string }> };
@@ -36,6 +37,11 @@ async function api<T>(path: string, token: string, init?: RequestInit): Promise<
   return response.json() as Promise<T>;
 }
 
+function friendlyMessage(reason: unknown, fallback: string): string {
+  if (!(reason instanceof Error)) return fallback;
+  return reason.message.replace(/^Falha na plataforma:\s*/, '') || fallback;
+}
+
 export function App() {
   const [session, setSession] = useState<LoginResponse | null>(() => {
     const saved = sessionStorage.getItem('healthlink.session');
@@ -60,6 +66,19 @@ export function App() {
   const [alertsLoading, setAlertsLoading] = useState(false);
   const [error, setError] = useState('');
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const SESSION_EXPIRED_TOAST_ID = 'session-expired';
+  // Requisições que já estavam "em voo" com o token antigo podem resolver logo após um
+  // novo login e reportar 401 tardiamente; ignoramos esse eco por uma janela curta.
+  const reauthGraceUntilRef = useRef(0);
+  useEffect(() => {
+    if (error !== 'Sessão expirada. Entre novamente.') return;
+    setError('');
+    if (Date.now() < reauthGraceUntilRef.current) return;
+    setSessionExpired(true);
+    setToasts((prev) => prev.some((t) => t.id === SESSION_EXPIRED_TOAST_ID) ? prev : [...prev, { id: SESSION_EXPIRED_TOAST_ID, type: 'error', title: 'Sessão expirada', detail: 'Entre novamente para continuar.', sticky: true }]);
+  }, [error]);
+  const lockedStyle = sessionExpired ? { pointerEvents: 'none' as const, opacity: .5, filter: 'grayscale(.4)' } : undefined;
   const [managedUsers, setManagedUsers] = useState<ManagedUser[]>([]);
   const [accessRequests, setAccessRequests] = useState<AccessRequest[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
@@ -136,14 +155,14 @@ export function App() {
           if (unit.operational_status === 'offline' || unit.operational_status === 'degraded') {
             addToast({
               type: 'error',
-              title: `🔴 HOST DOWN · ${unit.code}`,
+              title: `HOST DOWN · ${unit.code}`,
               detail: `A unidade ${unit.name} (${unit.city}/${unit.state_code}) ficou ${toLabel.toLowerCase()} (era ${fromLabel.toLowerCase()})!`,
               durationMs: 10000,
             });
           } else if (unit.operational_status === 'online') {
             addToast({
               type: 'success',
-              title: `🟢 HOST UP · ${unit.code}`,
+              title: `HOST UP · ${unit.code}`,
               detail: `A unidade ${unit.name} (${unit.city}/${unit.state_code}) restabeleceu sinal e está Operacional!`,
             });
           }
@@ -163,14 +182,14 @@ export function App() {
       if (zabbixStatus.health_status === 'unavailable' || zabbixStatus.health_status === 'degraded') {
         addToast({
           type: 'error',
-          title: `🔴 ZABBIX DOWN`,
+          title: `ZABBIX DOWN`,
           detail: `Comunicação com a API Zabbix indisponível ou degradada!`,
           durationMs: 10000,
         });
       } else if (zabbixStatus.health_status === 'healthy') {
         addToast({
           type: 'success',
-          title: `🟢 ZABBIX UP`,
+          title: `ZABBIX UP`,
           detail: `Comunicação com a API Zabbix restabelecida com sucesso!`,
         });
       }
@@ -206,6 +225,8 @@ export function App() {
   }), [units]);
   const selectedUnit = units.find((unit) => unit.unit_id === selectedUnitId);
   const selectedEquipment = equipment.filter((item) => item.unit_id === selectedUnitId);
+  const scopeLabelFor = (scope: 'all' | 'links' | 'vpn' | 'servers') => scope === 'all' ? 'Geral' : scope === 'links' ? 'Links' : scope === 'vpn' ? 'VPN' : 'Servidores';
+  const breadcrumbSectionLabel = view === 'command' ? 'Centro operacional' : view === 'units' ? 'Unidades móveis' : view === 'alerts' ? 'Alertas' : view === 'connections' ? 'Status das conexões' : view === 'users' ? 'Usuários' : 'Integração Zabbix';
   async function refreshAlerts() {
     if (!session) return;
     await loadAlerts(alertMode);
@@ -219,7 +240,7 @@ export function App() {
       addToast({ type: 'success', title: action === 'acknowledge' ? 'Alerta reconhecido' : 'Incidente resolvido', detail: action === 'acknowledge' ? 'O alerta foi reconhecido pelo operador.' : 'O incidente foi encerrado e movido para o histórico.' });
     } catch (reason) {
       const msg = reason instanceof Error ? reason.message : 'Não foi possível atualizar o alerta.';
-      addToast({ type: 'error', title: 'Falha ao atualizar alerta', detail: msg, sticky: true });
+      addToast({ type: 'error', title: 'Falha ao atualizar alerta', detail: msg });
     }
   }
   async function loadZabbixCandidates() {
@@ -262,31 +283,40 @@ export function App() {
     setUnits(nextUnits); setEquipment(nextEquipment);
   }
 
-  if (!session) return <LoginWithRequest showLogoutToast={justLoggedOut} onSuccess={(next) => { sessionStorage.setItem('healthlink.session', JSON.stringify(next)); setJustLoggedOut(false); setSession(next); addToast({ type: 'success', title: 'Acesso confirmado', detail: `Bem-vindo(a) de volta, ${next.user.displayName.split(' ')[0] || 'operador'}.` }); }} />;
+  if (!session) return <LoginWithRequest showLogoutToast={justLoggedOut} onSuccess={(next) => { sessionStorage.setItem('healthlink.session', JSON.stringify(next)); setJustLoggedOut(false); setSession(next); setSessionExpired(false); setError(''); reauthGraceUntilRef.current = Date.now() + 5000; setToasts((prev) => prev.filter((t) => t.id !== SESSION_EXPIRED_TOAST_ID)); addToast({ type: 'success', title: 'Acesso confirmado', detail: `Bem-vindo(a) de volta, ${next.user.displayName.split(' ')[0] || 'operador'}.` }); }} />;
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <div className="brand"><span className="brand-mark">HL</span><div><strong>HealthLink</strong><small>SENTINEL</small></div></div>
+      <aside className="sidebar" style={lockedStyle}>
+        <div className="brand"><img className="brand-mark" src={brandIcon} alt="HealthLink Sentinel" width={38} height={38} /><div><strong>HealthLink</strong><small>SENTINEL</small></div></div>
         <nav>
-          <button className={`nav-item ${view === 'command' ? 'active' : ''}`} onClick={() => { setView('command'); setSelectedUnitId(null); setCommandMenuOpen((open) => !open); }}><span>01</span> Centro operacional <b className="nav-chevron">{commandMenuOpen && view === 'command' ? '−' : '+'}</b></button>
+          <button className={`nav-item ${view === 'command' ? 'active' : ''}`} onClick={() => { setView('command'); setSelectedUnitId(null); setCommandMenuOpen((open) => !open); }}><span className="nav-icon"><NavDashboardIcon /></span> Centro operacional <b className="nav-chevron">{commandMenuOpen && view === 'command' ? '−' : '+'}</b></button>
           {commandMenuOpen && view === 'command' && <div className="nav-submenu" aria-label="Filtros do centro operacional">
-            {([['all', 'Geral'], ['links', 'Links'], ['vpn', 'VPN'], ['servers', 'Servidores']] as const).map(([scope, label]) => <button key={scope} className={`nav-subitem ${commandScope === scope ? 'active' : ''}`} onClick={() => { setCommandScope(scope); setSelectedUnitId(null); }}><span />{label}</button>)}
+            {([['all', 'Geral', <NavGeneralIcon />], ['links', 'Links', <NavLinkIcon />], ['vpn', 'VPN', <NavVpnIcon />], ['servers', 'Servidores', <NavServerIcon />]] as const).map(([scope, label, icon]) => <button key={scope} className={`nav-subitem ${commandScope === scope ? 'active' : ''}`} onClick={() => { setCommandScope(scope); setSelectedUnitId(null); }}><span className="nav-subitem-icon">{icon}</span>{label}</button>)}
           </div>}
-          <button className={`nav-item ${view === 'units' ? 'active' : ''}`} onClick={() => { setView('units'); setSelectedUnitId(null); }}><span>02</span> Unidades móveis</button>
-          <button className={`nav-item ${view === 'alerts' ? 'active' : ''}`} onClick={() => { setView('alerts'); setSelectedUnitId(null); }}><span>03</span> Alertas {activeAlertCount > 0 && <b className="nav-badge">{activeAlertCount}</b>}</button>
-          <button className={`nav-item ${view === 'connections' ? 'active' : ''}`} onClick={() => { setView('connections'); setSelectedUnitId(null); void loadZabbixStatus(); }}><span>04</span> Status das conexões <i className={`nav-health-dot ${zabbixStatus?.health_status ?? 'unknown'}`} /></button>
-          <button className={`nav-item ${view === 'users' ? 'active' : ''}`} onClick={() => { setView('users'); setSelectedUnitId(null); void loadUsers(); }}><span>06</span> Usuários</button>
-          <button className="nav-item"><span>07</span> Relatórios</button>
+          <button className={`nav-item ${view === 'units' ? 'active' : ''}`} onClick={() => { setView('units'); setSelectedUnitId(null); }}><span className="nav-icon"><NavTruckIcon /></span> Unidades móveis</button>
+          <button className={`nav-item ${view === 'alerts' ? 'active' : ''}`} onClick={() => { setView('alerts'); setSelectedUnitId(null); }}><span className="nav-icon"><NavBellIcon /></span> Alertas {activeAlertCount > 0 && <b className="nav-badge">{activeAlertCount}</b>}</button>
+          <button className={`nav-item ${view === 'connections' ? 'active' : ''}`} onClick={() => { setView('connections'); setSelectedUnitId(null); void loadZabbixStatus(); }}><span className="nav-icon"><NavActivityIcon /></span> Status das conexões <i className={`nav-health-dot ${zabbixStatus?.health_status ?? 'unknown'}`} /></button>
+          <button className={`nav-item ${view === 'users' ? 'active' : ''}`} onClick={() => { setView('users'); setSelectedUnitId(null); void loadUsers(); }}><span className="nav-icon"><NavUsersIcon /></span> Usuários</button>
+          <button className="nav-item"><span className="nav-icon"><NavReportIcon /></span> Relatórios</button>
         </nav>
         <SyncStatusButton status={zabbixStatus} onClick={() => { setView('zabbix'); setSelectedUnitId(null); void Promise.all([loadZabbixStatus(), loadZabbixCandidates()]); }} />
         <div className={`sidebar-footer integration-${zabbixStatus?.health_status ?? 'unknown'}`}><span className="pulse" /> {zabbixStatus?.health_status === 'healthy' ? 'Zabbix sincronizado' : zabbixStatus?.health_status === 'unavailable' ? 'Zabbix indisponível' : zabbixStatus?.health_status === 'degraded' ? 'Zabbix em atenção' : 'Zabbix aguardando coleta'}<small>{zabbixStatus?.last_success_at ? `última coleta · ${new Date(zabbixStatus.last_success_at).toLocaleTimeString('pt-BR')}` : 'ciclo automático · 60s'}</small></div>
       </aside>
       <main>
         <header className="topbar">
-          <div><p className="eyebrow">CENTRO DE COMANDO · {session.tenant.name}</p><h1>Consciência operacional</h1></div>
+          <div>
+            <nav className="breadcrumb" aria-label="Navegação" style={lockedStyle}>
+              <button className="breadcrumb-home" onClick={() => { setView('command'); setCommandScope('all'); setSelectedUnitId(null); }} aria-label="Ir para o início"><HomeIcon /></button>
+              <BreadcrumbChevronIcon />
+              <button className={`breadcrumb-item ${!selectedUnitId && (view !== 'command' || commandScope === 'all') ? 'current' : ''}`} onClick={() => { setSelectedUnitId(null); if (view === 'command') setCommandScope('all'); }}>{breadcrumbSectionLabel}</button>
+              {view === 'command' && commandScope !== 'all' && <><BreadcrumbChevronIcon /><span className="breadcrumb-item current">{scopeLabelFor(commandScope)}</span></>}
+              {view === 'units' && selectedUnit && <><BreadcrumbChevronIcon /><span className="breadcrumb-item current">{selectedUnit.code} · {selectedUnit.name}</span></>}
+            </nav>
+            <p className="eyebrow">CENTRO DE COMANDO · {session.tenant.name}</p><h1>Consciência operacional</h1>
+          </div>
           <div className="header-actions-group">
-              <span className="theme-moon-icon">🌙</span>
+              <span className="theme-moon-icon"><MoonIcon /></span>
               <span className="theme-switch-knob" />
             <div className="user-profile-pill-wrapper">
               <button className={`user-profile-pill ${userMenuOpen ? 'active' : ''}`} onClick={() => setUserMenuOpen((prev) => !prev)} aria-expanded={userMenuOpen}>
@@ -296,7 +326,7 @@ export function App() {
               </button>
               {userMenuOpen && (
                 <div className="user-profile-dropdown" onMouseDown={(e) => e.stopPropagation()}>
-                  <button className="dropdown-item" onClick={() => { setUserMenuOpen(false); setProfileModalOpen(true); }}>
+                  <button className="dropdown-item" disabled={sessionExpired} onClick={() => { setUserMenuOpen(false); setProfileModalOpen(true); }}>
                     <span className="dropdown-item-icon"><EditIcon /></span>
                     <span>Editar perfil</span>
                   </button>
@@ -310,16 +340,16 @@ export function App() {
             </div>
           </div>
         </header>
-        <section className="mission-strip"><div><span className="live-dot" /> OPERAÇÃO MONITORADA</div><p>{activeAlertCount ? `${activeAlertCount} alerta(s) requerem avaliação` : 'Nenhum evento crítico em aberto'}</p><time>{new Date().toLocaleString('pt-BR')}</time></section>
-        <section className="content">
+        <section className="mission-strip" style={lockedStyle}><div><span className={`live-dot ${zabbixStatus?.health_status ?? 'unknown'}`} /> OPERAÇÃO MONITORADA</div><p>{activeAlertCount ? `${activeAlertCount} alerta(s) requerem avaliação` : 'Nenhum evento crítico em aberto'}</p><time>{new Date().toLocaleString('pt-BR')}</time></section>
+        <section className="content" style={lockedStyle}>
           {error && (
             <div className="error-banner" role="alert">
-              <span className="error-banner-icon">⚠</span>
+              <span className="error-banner-icon"><WarningIcon /></span>
               <span className="error-banner-text">{error}</span>
-              <button className="error-banner-close" onClick={() => setError('')} title="Fechar">✕</button>
+              <button className="error-banner-close" onClick={() => setError('')} title="Fechar"><CloseIcon /></button>
             </div>
           )}
-          {view === 'alerts' ? <AlertsCenter alerts={alerts} mode={alertMode} loading={alertsLoading} onModeChange={setAlertMode} onAction={changeAlert} onRetry={() => void loadAlerts(alertMode).catch((r: Error) => setError(r.message))} /> : view === 'users' ? <UsersPanel users={managedUsers} requests={accessRequests} loading={usersLoading} token={session.accessToken} onRefresh={loadUsers} onChange={changeUser} onToast={addToast} /> : view === 'command' ? <CommandCenter units={units} equipment={equipment} alerts={activeAlerts} resolvedAlerts={resolvedAlerts} summary={summary} scope={commandScope} token={session.accessToken} onInventoryRefresh={refreshInventory} onError={setError} onSelectUnit={(unitId) => { setSelectedUnitId(unitId); setView('units'); }} /> : view === 'connections' ? <ConnectionStatus integrationStatus={zabbixStatus} onRefresh={loadZabbixStatus} onOpenZabbix={() => { setView('zabbix'); void loadZabbixCandidates(); }} /> : view === 'zabbix' ? <ZabbixIntegration candidates={zabbixCandidates} integrationStatus={zabbixStatus} units={units} loading={zabbixLoading} onRefresh={loadZabbixCandidates} onStatusRefresh={loadZabbixStatus} onInventoryRefresh={refreshInventory} onAlertsRefresh={refreshAlerts} onError={setError} token={session.accessToken} /> : <><InventoryActions token={session.accessToken} units={units} selectedUnit={selectedUnit} onRefresh={refreshInventory} onError={(message) => { setError(message); addToast({ type: 'error', title: 'Falha no cadastro', detail: message, sticky: true }); }} onToast={addToast} /><UnitsView units={units} selectedUnit={selectedUnit} selectedEquipment={selectedEquipment} loading={loading} summary={summary} onSelectUnit={setSelectedUnitId} onBack={() => setSelectedUnitId(null)} onInventoryRefresh={refreshInventory} token={session.accessToken} onToast={addToast} /></>}
+          {view === 'alerts' ? <AlertsCenter alerts={alerts} mode={alertMode} loading={alertsLoading} onModeChange={setAlertMode} onAction={changeAlert} onRetry={() => void loadAlerts(alertMode).catch((r: Error) => setError(r.message))} /> : view === 'users' ? <UsersPanel users={managedUsers} requests={accessRequests} loading={usersLoading} token={session.accessToken} onRefresh={loadUsers} onChange={changeUser} onToast={addToast} /> : view === 'command' ? <CommandCenter units={units} equipment={equipment} alerts={activeAlerts} resolvedAlerts={resolvedAlerts} summary={summary} scope={commandScope} token={session.accessToken} onInventoryRefresh={refreshInventory} onError={setError} onSelectUnit={(unitId) => { setSelectedUnitId(unitId); setView('units'); }} /> : view === 'connections' ? <ConnectionStatus integrationStatus={zabbixStatus} onRefresh={loadZabbixStatus} onOpenZabbix={() => { setView('zabbix'); void loadZabbixCandidates(); }} /> : view === 'zabbix' ? <ZabbixIntegration candidates={zabbixCandidates} integrationStatus={zabbixStatus} units={units} loading={zabbixLoading} onRefresh={loadZabbixCandidates} onStatusRefresh={loadZabbixStatus} onInventoryRefresh={refreshInventory} onAlertsRefresh={refreshAlerts} onError={setError} onToast={addToast} token={session.accessToken} /> : <><InventoryActions token={session.accessToken} units={units} selectedUnit={selectedUnit} onRefresh={refreshInventory} onError={(message) => { setError(message); addToast({ type: 'error', title: 'Falha no cadastro', detail: message }); }} onToast={addToast} /><UnitsView units={units} selectedUnit={selectedUnit} selectedEquipment={selectedEquipment} loading={loading} summary={summary} onSelectUnit={setSelectedUnitId} onBack={() => setSelectedUnitId(null)} onInventoryRefresh={refreshInventory} token={session.accessToken} onToast={addToast} /></>}
         </section>
       </main>
       {profileModalOpen && <EditProfileModal session={session} onSave={(newName) => { setSession({ ...session, user: { ...session.user, displayName: newName } }); addToast({ type: 'success', title: 'Perfil atualizado', detail: 'Nome de exibição salvo com sucesso.' }); }} onClose={() => setProfileModalOpen(false)} />}
@@ -449,12 +479,12 @@ function CommandCenter({ units, equipment, alerts: _alerts, resolvedAlerts, summ
           })}
         </svg>{hoveredStateCode && <div className="map-tooltip"><span>{hoveredStateCode}</span><strong>{stateNameByCode[hoveredStateCode] ?? mapLocations.find((location) => location.id.toUpperCase() === hoveredStateCode)?.name}</strong><small>{hoveredUnits.length ? `${hoveredUnits.length} unidade(s) · ${statusLabel[hoveredStatus]}` : 'Nenhuma unidade cadastrada'}</small></div>}</div>
         <div className="map-selection">{selectedStateCode ? <><strong>{selectedStateCode}</strong><span>{selectedUnits.length ? `${selectedUnits.length} unidade(s) · ${statusLabel[hoveredStatus]}` : 'Nenhuma unidade cadastrada neste estado'}</span><button className="map-open-detail" onClick={() => setStateMapCode(selectedStateCode)}>Explorar mapa</button></> : <span>Selecione um estado no mapa para consultar a prontidão local.</span>}</div>
-        {selectedStateCode && selectedUnits.length > 0 && <div className="map-unit-list">{selectedUnits.map((unit) => <button key={unit.unit_id} onClick={() => onSelectUnit(unit.unit_id)}><span className={`legend-dot ${unit.operational_status}`} /><span><strong>{unit.code}</strong><small>{unit.name}</small></span><em>{statusLabel[unit.operational_status]}</em></button>)}</div>}
+        {selectedStateCode && selectedUnits.length > 0 && <div className="map-unit-list">{selectedUnits.map((unit) => <button key={unit.unit_id} className={unit.operational_status} onClick={() => onSelectUnit(unit.unit_id)}><span className={`legend-dot ${unit.operational_status}`} /><span><strong>{unit.code}</strong><small>{unit.name}</small></span><em>{statusLabel[unit.operational_status]}</em></button>)}</div>}
         <div className="map-legend"><span><i className="legend-dot online" /> 100% online</span><span><i className="legend-dot degraded" /> Atenção / instável</span><span><i className="legend-dot offline" /> &gt;50% offline</span><span><i className="legend-dot unknown" /> Sem unidades</span><span><i className="legend-dot selected" /> UF selecionada</span></div>
       </article>
       <OperationalOverview units={visibleUnits} equipment={visibleEquipment} alerts={alerts} resolvedAlerts={scopedResolvedAlerts} summary={summary} onSelectUnit={onSelectUnit} />
     </div>
-    {mapContext && <div className="map-context-card" style={{ left: mapContext.x, top: mapContext.y }} onMouseDown={(event) => event.stopPropagation()}><button className="map-context-close" aria-label="Fechar menu" onClick={() => setMapContext(null)}>×</button><p>AÇÃO RÁPIDA · {mapContext.stateCode}</p><strong>{stateNameByCode[mapContext.stateCode] ?? mapContext.stateCode}</strong><small>Cadastre uma unidade diretamente neste estado.</small><button className="primary compact" onClick={() => { setQuickCreateStateCode(mapContext.stateCode); setMapContext(null); }}>+ Adicionar unidade</button></div>}
+    {mapContext && <div className="map-context-card" style={{ left: mapContext.x, top: mapContext.y }} onMouseDown={(event) => event.stopPropagation()}><button className="map-context-close" aria-label="Fechar menu" onClick={() => setMapContext(null)}><CloseIcon /></button><p>AÇÃO RÁPIDA · {mapContext.stateCode}</p><strong>{stateNameByCode[mapContext.stateCode] ?? mapContext.stateCode}</strong><small>Cadastre uma unidade diretamente neste estado.</small><button className="primary compact" onClick={() => { setQuickCreateStateCode(mapContext.stateCode); setMapContext(null); }}><PlusIcon /> Adicionar unidade</button></div>}
   </section>;
 }
 
@@ -475,6 +505,11 @@ function formatLatencyMs(value?: number) {
   if (value === undefined || !Number.isFinite(value)) return '—';
   const digits = value < 10 ? 2 : value < 100 ? 1 : 0;
   return `${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value)} ms`;
+}
+
+function formatPercent(value?: number, digits = 1) {
+  if (value === undefined || !Number.isFinite(value)) return '—';
+  return `${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value)}%`;
 }
 
 function isLinkEquipmentType(type: string) {
@@ -500,24 +535,23 @@ function LinkTelemetryCard({ unit, link, located, diagnosticLatencyMs, onView, o
   const loss = stale ? 0 : metrics['network.loss.pct'];
   const inbound = stale ? 0 : metrics['network.in.bps'];
   const outbound = stale ? 0 : metrics['network.out.bps'];
-  const status = stale ? 'unknown' : unit.operational_status;
+  const status = unit.operational_status;
   const statusCode = status === 'online' ? 'OPR' : status === 'degraded' ? 'ATN' : status === 'offline' ? 'DWN' : 'N/D';
   const statusIcon = status === 'online' ? '◆' : status === 'degraded' ? '△' : status === 'offline' ? '⇩' : '○';
   return <article className={`state-link-card ${status} ${stale ? 'telemetry-zeroed' : ''} ${located ? '' : 'pending'}`} role="button" tabIndex={0} aria-label={`${located ? 'Focalizar' : 'Localizar'} ${link?.equipment_name ?? unit.name}`} onClick={onView} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onView(); } }} onContextMenu={onContext}>
     <div className="state-link-card-head"><strong>{link?.equipment_name ?? unit.name}</strong><span className="state-link-health-icon" aria-label={statusLabel[status]}>{statusIcon}</span><span className="state-link-badge">{statusCode}</span></div>
     <div className="state-link-card-body">
-      <div className="state-link-values"><span>Latência: <b>{formatLatencyMs(latency)}</b></span><span>Perda: <b>{loss === undefined ? '—' : `${loss.toFixed(1)}%`}</b></span><span>↓ Download: <b>{formatLinkRate(inbound)}</b></span><span>↑ Upload: <b>{formatLinkRate(outbound)}</b></span></div>
+      <div className="state-link-values"><span>Latência: <b>{formatLatencyMs(latency)}</b></span><span>Perda: <b>{formatPercent(loss, 1)}</b></span><span>↓ Download: <b>{formatLinkRate(inbound)}</b></span><span>↑ Upload: <b>{formatLinkRate(outbound)}</b></span></div>
       <LinkSparkline values={stale || diagnosticLatencyMs === undefined ? (link?.latency_history ?? []).map((point) => point.value) : [...(link?.latency_history ?? []).slice(-13).map((point) => point.value), diagnosticLatencyMs]} status={status} />
       <span className="state-link-open-hint">{located ? '›' : '+'}</span>
     </div>
-    {stale && <div className="state-link-zero-warning">⚠ TELEMETRIA ZERADA · SEM COMUNICAÇÃO</div>}
+    {stale && <div className="state-link-zero-warning"><WarningIcon /> TELEMETRIA ZERADA · SEM COMUNICAÇÃO</div>}
     <div className="state-link-card-meta"><span>{unit.code} · {unit.city}</span><span>Plano: ↓ {formatContractedMbps(link?.contracted_download_mbps)} · ↑ {formatContractedMbps(link?.contracted_upload_mbps)}</span><small>{manualPing ? 'PING MANUAL' : stale ? 'TELEMETRIA ZERADA' : link?.observed_at ? new Date(link.observed_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'SEM TELEMETRIA'}</small></div>
   </article>;
 }
 
 function TunnelStatusCard({ unit, link, located, onView, onContext }: { unit: Unit; link?: LinkTelemetry; located: boolean; onView: () => void; onContext: (event: ReactMouseEvent<HTMLElement>) => void }) {
-  const stale = link?.telemetry_stale ?? !link?.observed_at;
-  const status = stale ? 'unknown' : unit.operational_status;
+  const status = unit.operational_status;
   const label = status === 'online' ? 'TÚNEL UP' : status === 'offline' ? 'TÚNEL DOWN' : status === 'degraded' ? 'ATENÇÃO' : 'SEM ESTADO';
   return <article className={`state-link-card tunnel-card ${status} ${located ? '' : 'pending'}`} role="button" tabIndex={0} aria-label={`${located ? 'Focalizar' : 'Localizar'} ${link?.equipment_name ?? unit.name}`} onClick={onView} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onView(); } }} onContextMenu={onContext}>
     <div className="state-link-card-head"><strong>{link?.equipment_name ?? unit.name}</strong><span className="state-link-health-icon">{status === 'online' ? '◆' : status === 'offline' ? '⇩' : '○'}</span><span className="state-link-badge">{label}</span></div>
@@ -529,9 +563,9 @@ function TunnelStatusCard({ unit, link, located, onView, onContext }: { unit: Un
 function StarlinkLinkCard({ unit, link, located, onView, onContext }: { unit: Unit; link?: LinkTelemetry; located: boolean; onView: () => void; onContext: (event: ReactMouseEvent<HTMLElement>) => void }) {
   const metrics = link?.metrics ?? {};
   const stale = link?.telemetry_stale ?? !link?.observed_at;
-  const status = stale ? 'unknown' : unit.operational_status;
+  const status = unit.operational_status;
   return <article className={`state-link-card starlink-card ${status} ${located ? '' : 'pending'}`} role="button" tabIndex={0} aria-label={`${located ? 'Focalizar' : 'Localizar'} ${link?.equipment_name ?? unit.name}`} onClick={onView} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onView(); } }} onContextMenu={onContext}>
-    <div className="state-link-card-head"><strong>{link?.equipment_name ?? unit.name}</strong><span className="state-link-health-icon">✦</span><span className="state-link-badge">{status === 'online' ? 'STARLINK' : 'N/D'}</span></div>
+    <div className="state-link-card-head"><strong>{link?.equipment_name ?? unit.name}</strong><span className="state-link-health-icon">✦</span><span className="state-link-badge">{status === 'online' ? 'STARLINK' : status === 'degraded' ? 'ATENÇÃO' : status === 'offline' ? 'DOWN' : 'N/D'}</span></div>
     <div className="state-link-values"><span>Latência: <b>{stale ? '—' : formatLatencyMs(metrics['starlink.latency.ms'])}</b></span><span>Download: <b>{stale ? '—' : formatLinkRate(metrics['starlink.download.bps'])}</b></span><span>Upload: <b>{stale ? '—' : formatLinkRate(metrics['starlink.upload.bps'])}</b></span></div>
     <div className="starlink-card-note">Telemetria da antena · agente local</div>
     <div className="state-link-card-meta"><span>{unit.code} · {unit.city}</span><small>{stale ? 'SEM TELEMETRIA' : 'COLETOR STARLINK'}</small></div>
@@ -559,12 +593,12 @@ function LinkAnalysisPanel({ unit, link, alerts, diagnosticLatencyMs, onClose, o
     .slice(0, 8);
   return <div className="link-analysis-backdrop" role="presentation" onMouseDown={onClose}>
     <section className="link-analysis-dialog" role="dialog" aria-modal="true" aria-label={`Análise detalhada de ${link?.equipment_name ?? unit.name}`} onMouseDown={(event) => event.stopPropagation()}>
-      <header className="link-analysis-header"><div><p className="eyebrow">ANÁLISE DETALHADA · LINK</p><h2>{link?.equipment_name ?? unit.name}</h2><small>{unit.code} · {unit.name} · {unit.city}/{unit.state_code}</small></div><button onClick={onClose} aria-label="Fechar análise">×</button></header>
+      <header className="link-analysis-header"><div><p className="eyebrow">ANÁLISE DETALHADA · LINK</p><h2>{link?.equipment_name ?? unit.name}</h2><small>{unit.code} · {unit.name} · {unit.city}/{unit.state_code}</small></div><button className="icon-button clear-filters-button" onClick={onClose} aria-label="Fechar análise"><CloseIcon /></button></header>
       <div className="link-analysis-content">
-        <article className={`link-analysis-identity ${stale ? 'unknown' : unit.operational_status}`}><div className="link-analysis-title"><div><span>LINK MONITORADO</span><strong>{link?.equipment_name ?? unit.name}</strong><small>Unidade {unit.code}</small></div><i /></div><div className="link-analysis-status-grid"><div><span>STATUS ATUAL</span><strong>{stale ? 'Sem telemetria' : statusLabel[unit.operational_status]}</strong></div><div><span>{effectiveDiagnosticLatency === undefined ? 'ÚLTIMA AMOSTRA' : 'ÚLTIMO PING'}</span><strong>{effectiveDiagnosticLatency !== undefined ? `${formatLatencyMs(effectiveDiagnosticLatency)} · medição manual` : stale ? 'Telemetria zerada' : link?.observed_at ? new Date(link.observed_at).toLocaleString('pt-BR') : 'Sem telemetria'}</strong></div></div>{stale && <div className="link-analysis-zero-warning">⚠ {link?.telemetry_error ?? 'Telemetria zerada: sem comunicação recente.'}</div>}<button onClick={onOpenInventory}>Abrir inventário completo</button></article>
-        <article className="link-analysis-chart"><div className="link-analysis-section-head"><div><h3>Latência (ms)</h3><small>{effectiveDiagnosticLatency === undefined ? 'AMOSTRAS RECENTES DO ZABBIX · passe o mouse nos pontos' : 'ÚLTIMO PING LOCAL · MEDIÇÃO MANUAL'}</small></div><strong>{formatLatencyMs(hoveredLatency?.value ?? latency)}</strong></div><div className="link-chart-stage"><span>{formatLatencyMs(maximum)}</span><span>0 ms</span><svg viewBox="0 0 680 210" preserveAspectRatio="none" onMouseLeave={() => setHoveredLatency(null)}><line x1="0" y1="35" x2="680" y2="35" /><line x1="0" y1="87" x2="680" y2="87" /><line x1="0" y1="139" x2="680" y2="139" /><line x1="0" y1="190" x2="680" y2="190" /><polyline className={stale ? 'unknown' : unit.operational_status} points={chartPoints} />{chartHistory.map((point, index) => { const x = (index / Math.max(1, chartHistory.length - 1)) * 680; const y = 190 - (point.value / maximum) * 155; const showTooltip = (event: ReactMouseEvent<SVGCircleElement>) => { const stage = event.currentTarget.ownerSVGElement?.parentElement; if (!stage) return; const bounds = stage.getBoundingClientRect(); setHoveredLatency({ value: point.value, observedAt: point.observed_at, left: Math.max(74, Math.min(bounds.width - 74, event.clientX - bounds.left)), top: Math.max(52, event.clientY - bounds.top) }); }; return <circle className="link-chart-point" key={`${point.observed_at}-${index}`} cx={x} cy={y} r="5" onMouseEnter={showTooltip} onMouseMove={showTooltip}><title>{`${formatLatencyMs(point.value)} · ${new Date(point.observed_at).toLocaleString('pt-BR')}`}</title></circle>; })}</svg>{hoveredLatency && <div className="link-chart-tooltip" style={{ left: hoveredLatency.left, top: hoveredLatency.top }}><strong>{formatLatencyMs(hoveredLatency.value)}</strong><small>{new Date(hoveredLatency.observedAt).toLocaleString('pt-BR')}</small></div>}{chartHistory.length < 2 && effectiveDiagnosticLatency === undefined && <div className="link-chart-empty">{stale ? 'Telemetria zerada: aguardando comunicação' : 'Aguardando histórico da coleta rápida'}</div>}</div></article>
-        <div className="link-analysis-metrics"><article><span>PERDA DE PACOTES</span><strong>{loss === undefined ? '—' : `${loss.toFixed(2)}%`}</strong><small>última amostra válida</small></article><article><span>DOWNLOAD ATUAL</span><strong>{formatLinkRate(inbound)}</strong><small>tráfego recebido na interface WAN</small></article><article><span>UPLOAD ATUAL</span><strong>{formatLinkRate(outbound)}</strong><small>tráfego enviado pela interface WAN</small></article><article><span>VELOCIDADE CONTRATADA</span><strong>↓ {formatContractedMbps(link?.contracted_download_mbps)}<br />↑ {formatContractedMbps(link?.contracted_upload_mbps)}</strong><small>download e upload cadastrados</small></article></div>
-        <article className="link-error-history"><div className="link-error-history-head"><div><span>HISTÓRICO DE ERROS</span><strong>Ocorrências do link</strong></div><small>{linkErrors.length + (stale ? 1 : 0)} registro(s)</small></div>{stale && <div className="link-error-row severity-4 telemetry-zero-error"><span className="link-error-indicator" /><div><strong>Telemetria zerada: sem comunicação</strong><small>{link?.telemetry_error ?? 'Nenhuma amostra válida recebida nos últimos 30 segundos.'}</small></div><span className="status offline">Ativo</span></div>}{linkErrors.length === 0 && !stale ? <div className="link-error-empty"><i>✓</i><div><strong>Nenhum erro registrado</strong><small>Alertas do Zabbix vinculados a este link aparecerão aqui.</small></div></div> : linkErrors.length > 0 && <div className="link-error-list">{linkErrors.map((alert) => <div className={`link-error-row severity-${alert.severity}`} key={alert.id}><span className="link-error-indicator" /><div><strong>{alert.title}</strong><small>{new Date(alert.opened_at).toLocaleString('pt-BR')}{alert.resolved_at ? ` · resolvido em ${new Date(alert.resolved_at).toLocaleString('pt-BR')}` : ''}</small></div><span className={`status ${alert.status === 'resolved' ? 'online' : alert.status === 'acknowledged' ? 'degraded' : 'offline'}`}>{alert.status === 'resolved' ? 'Resolvido' : alert.status === 'acknowledged' ? 'Reconhecido' : 'Ativo'}</span></div>)}</div>}</article>
+        <article className={`link-analysis-identity ${unit.operational_status}`}><div className="link-analysis-title"><div><span>LINK MONITORADO</span><strong>{link?.equipment_name ?? unit.name}</strong><small>Unidade {unit.code}</small></div><i /></div><div className="link-analysis-status-grid"><div><span>STATUS ATUAL</span><strong>{statusLabel[unit.operational_status]}</strong></div><div><span>{effectiveDiagnosticLatency === undefined ? 'ÚLTIMA AMOSTRA' : 'ÚLTIMO PING'}</span><strong>{effectiveDiagnosticLatency !== undefined ? `${formatLatencyMs(effectiveDiagnosticLatency)} · medição manual` : stale ? 'Telemetria zerada' : link?.observed_at ? new Date(link.observed_at).toLocaleString('pt-BR') : 'Sem telemetria'}</strong></div></div>{stale && <div className="link-analysis-zero-warning"><WarningIcon /> {link?.telemetry_error ?? 'Telemetria zerada: sem comunicação recente.'}</div>}<button onClick={onOpenInventory}>Abrir inventário completo</button></article>
+        <article className="link-analysis-chart"><div className="link-analysis-section-head"><div><h3>Latência (ms)</h3><small>{effectiveDiagnosticLatency === undefined ? 'AMOSTRAS RECENTES DO ZABBIX · passe o mouse nos pontos' : 'ÚLTIMO PING LOCAL · MEDIÇÃO MANUAL'}</small></div><strong>{formatLatencyMs(hoveredLatency?.value ?? latency)}</strong></div><div className="link-chart-stage"><span>{formatLatencyMs(maximum)}</span><span>0 ms</span><svg viewBox="0 0 680 210" preserveAspectRatio="none" onMouseLeave={() => setHoveredLatency(null)}><line x1="0" y1="35" x2="680" y2="35" /><line x1="0" y1="87" x2="680" y2="87" /><line x1="0" y1="139" x2="680" y2="139" /><line x1="0" y1="190" x2="680" y2="190" /><polyline className={unit.operational_status} points={chartPoints} />{chartHistory.map((point, index) => { const x = (index / Math.max(1, chartHistory.length - 1)) * 680; const y = 190 - (point.value / maximum) * 155; const showTooltip = (event: ReactMouseEvent<SVGCircleElement>) => { const stage = event.currentTarget.ownerSVGElement?.parentElement; if (!stage) return; const bounds = stage.getBoundingClientRect(); setHoveredLatency({ value: point.value, observedAt: point.observed_at, left: Math.max(74, Math.min(bounds.width - 74, event.clientX - bounds.left)), top: Math.max(52, event.clientY - bounds.top) }); }; return <circle className="link-chart-point" key={`${point.observed_at}-${index}`} cx={x} cy={y} r="5" onMouseEnter={showTooltip} onMouseMove={showTooltip}><title>{`${formatLatencyMs(point.value)} · ${new Date(point.observed_at).toLocaleString('pt-BR')}`}</title></circle>; })}</svg>{hoveredLatency && <div className="link-chart-tooltip" style={{ left: hoveredLatency.left, top: hoveredLatency.top }}><strong>{formatLatencyMs(hoveredLatency.value)}</strong><small>{new Date(hoveredLatency.observedAt).toLocaleString('pt-BR')}</small></div>}{chartHistory.length < 2 && effectiveDiagnosticLatency === undefined && <div className="link-chart-empty">{stale ? 'Telemetria zerada: aguardando comunicação' : 'Aguardando histórico da coleta rápida'}</div>}</div></article>
+        <div className="link-analysis-metrics"><article><span>PERDA DE PACOTES</span><strong>{formatPercent(loss, 2)}</strong><small>última amostra válida</small></article><article><span>DOWNLOAD ATUAL</span><strong>{formatLinkRate(inbound)}</strong><small>tráfego recebido na interface WAN</small></article><article><span>UPLOAD ATUAL</span><strong>{formatLinkRate(outbound)}</strong><small>tráfego enviado pela interface WAN</small></article><article><span>VELOCIDADE CONTRATADA</span><strong>↓ {formatContractedMbps(link?.contracted_download_mbps)}<br />↑ {formatContractedMbps(link?.contracted_upload_mbps)}</strong><small>download e upload cadastrados</small></article></div>
+        <article className="link-error-history"><div className="link-error-history-head"><div><span>HISTÓRICO DE ERROS</span><strong>Ocorrências do link</strong></div><small>{linkErrors.length + (stale ? 1 : 0)} registro(s)</small></div>{stale && <div className="link-error-row severity-4 telemetry-zero-error"><span className="link-error-indicator" /><div><strong>Telemetria zerada: sem comunicação</strong><small>{link?.telemetry_error ?? 'Nenhuma amostra válida recebida nos últimos 30 segundos.'}</small></div><span className="status offline">Aberto</span></div>}{linkErrors.length === 0 && !stale ? <div className="link-error-empty"><i>✓</i><div><strong>Nenhum erro registrado</strong><small>Alertas do Zabbix vinculados a este link aparecerão aqui.</small></div></div> : linkErrors.length > 0 && <div className="link-error-list">{linkErrors.map((alert) => <div className={`link-error-row severity-${alert.severity}`} key={alert.id}><span className="link-error-indicator" /><div><strong>{alert.title}</strong><small>{new Date(alert.opened_at).toLocaleString('pt-BR')}{alert.resolved_at ? ` · resolvido em ${new Date(alert.resolved_at).toLocaleString('pt-BR')}` : ''}</small></div><span className={`status ${alert.status === 'resolved' ? 'online' : alert.status === 'acknowledged' ? 'degraded' : 'offline'}`}>{alert.status === 'resolved' ? 'Resolvido' : alert.status === 'acknowledged' ? 'Reconhecido' : 'Aberto'}</span></div>)}</div>}</article>
       </div>
     </section>
   </div>;
@@ -631,7 +665,7 @@ function StateLocationMap({ stateCode, units, telemetry = [], alerts = [], onClo
   };
   return <div className="state-map-backdrop" role="presentation" onMouseDown={onClose}>
     <section className="state-map-dialog" role="dialog" aria-modal="true" aria-label={`Localização das unidades em ${stateNameByCode[stateCode] ?? stateCode}`} onMouseDown={(event) => event.stopPropagation()}>
-      <header className="state-map-header"><div><p className="eyebrow">VISÃO GEOGRÁFICA · {stateCode}</p><h2>{stateNameByCode[stateCode] ?? stateCode}</h2><small>{units.length} unidade(s) no estado · {locatedUnits.length} georreferenciada(s)</small></div><div className="state-map-header-actions"><div className="map-theme-switch" role="group" aria-label="Tema do mapa"><button className={mapTheme === 'dark' ? 'active' : ''} onClick={() => changeMapTheme('dark')} aria-pressed={mapTheme === 'dark'}>☾ Dark</button><button className={mapTheme === 'light' ? 'active' : ''} onClick={() => changeMapTheme('light')} aria-pressed={mapTheme === 'light'}>☀ Claro</button></div><button className="state-map-close" onClick={onClose} aria-label="Fechar mapa">×</button></div></header>
+      <header className="state-map-header"><div><p className="eyebrow">VISÃO GEOGRÁFICA · {stateCode}</p><h2>{stateNameByCode[stateCode] ?? stateCode}</h2><small>{units.length} unidade(s) no estado · {locatedUnits.length} georreferenciada(s)</small></div><div className="state-map-header-actions"><div className="map-theme-switch" role="group" aria-label="Tema do mapa"><span className={`map-theme-thumb ${mapTheme}`} /><button className={mapTheme === 'dark' ? 'active' : ''} onClick={() => changeMapTheme('dark')} aria-pressed={mapTheme === 'dark'}><MoonIcon /> Dark</button><button className={mapTheme === 'light' ? 'active' : ''} onClick={() => changeMapTheme('light')} aria-pressed={mapTheme === 'light'}><SunIcon /> Claro</button></div><button className="state-map-close" onClick={onClose} aria-label="Fechar mapa"><CloseIcon /></button></div></header>
       <div className="state-map-body">
         <div className={`state-map-canvas ${mapTheme === 'light' ? 'map-theme-light' : ''}`}>
           <Map ref={mapRef} key={`${stateCode}-${mapTheme}-${mapFallback ? 'raster' : 'vector'}`} initialViewState={{ longitude, latitude, zoom: locatedUnits.length > 1 ? 8 : locatedUnits.length === 1 ? 12 : 6 }} mapStyle={mapFallback ? (mapTheme === 'dark' ? mapRasterFallbackStyle : mapRasterLightFallbackStyle) : (mapTheme === 'dark' ? 'https://tiles.openfreemap.org/styles/dark' : 'https://tiles.openfreemap.org/styles/bright')} onLoad={(event) => { setMapReady(true); if (mapBounds) { event.target.fitBounds([[mapBounds.minLng, mapBounds.minLat], [mapBounds.maxLng, mapBounds.maxLat]], { padding: 90, maxZoom: 12, duration: 0 }); } else if (locatedUnits.length === 1) { event.target.setZoom(12); } }} onIdle={() => setMapReady(true)} onError={() => setMapFallback(true)} attributionControl>
@@ -640,14 +674,14 @@ function StateLocationMap({ stateCode, units, telemetry = [], alerts = [], onClo
             {selectedUnit && <Popup longitude={Number(selectedUnit.longitude)} latitude={Number(selectedUnit.latitude)} anchor="bottom" closeButton={false} offset={18} onClose={() => setSelectedUnit(null)}><div className="unit-map-popup"><span className={`status ${selectedUnit.operational_status}`}>{statusLabel[selectedUnit.operational_status]}</span><strong>{selectedUnit.name}</strong><small>{selectedUnit.code} · {selectedUnit.city}/{selectedUnit.state_code}</small><button onClick={() => setDetailUnit(selectedUnit)}>Abrir unidade</button></div></Popup>}
           </Map>
           {!mapReady && <div className="state-map-loading" role="status"><span className="loading-pulse" /> Preparando mapa operacional…</div>}
-          {!locatedUnits.length && <div className="state-map-empty">{pendingUnits[0] ? <button type="button" className="state-map-empty-action" aria-label="Adicionar localização" onClick={() => { onClose(); onLocateUnit(pendingUnits[0].unit_id); }}>+</button> : <span>+</span>}<strong>Localização ainda não informada</strong><small>Cadastre latitude e longitude nas unidades para exibir os pontos exatos.</small></div>}
+          {!locatedUnits.length && <div className="state-map-empty">{pendingUnits[0] ? <button type="button" className="state-map-empty-action" aria-label="Adicionar localização" onClick={() => { onClose(); onLocateUnit(pendingUnits[0].unit_id); }}><PlusIcon /></button> : <span><PlusIcon /></span>}<strong>Localização ainda não informada</strong><small>Cadastre latitude e longitude nas unidades para exibir os pontos exatos.</small></div>}
           {mapFallback && <div className="state-map-provider-note">Mapa {mapTheme === 'dark' ? 'dark' : 'claro'} otimizado · carregamento rápido</div>}
         </div>
         <aside className="state-map-units state-links-panel"><div className="state-links-heading"><h3>Links Ativos</h3><span>{units.filter((unit) => unit.operational_status === 'online').length}/{units.length}</span></div>{units.length === 0 ? <div className="state-map-list-empty">Nenhuma unidade cadastrada.</div> : units.map((unit) => { const located = locatedUnits.includes(unit); return <LinkTelemetryCard key={unit.unit_id} unit={unit} link={telemetryByUnit.get(unit.unit_id)?.[0]} located={located} diagnosticLatencyMs={diagnosticLatencyByUnit[unit.unit_id]} onView={() => located ? setSelectedUnit(unit) : (onClose(), onLocateUnit(unit.unit_id))} onContext={(event) => { event.preventDefault(); event.stopPropagation(); setUnitContext({ unit, x: Math.max(12, Math.min(event.clientX, window.innerWidth - 250)), y: Math.max(12, Math.min(event.clientY, window.innerHeight - 210)) }); }} />; })}{pendingUnits.length > 0 && <p className="state-map-pending-note">Use LOCAL para adicionar as coordenadas da unidade.</p>}</aside>
       </div>
       <footer className="state-map-footer"><span><i className="legend-dot online" /> Operacional</span><span><i className="legend-dot degraded" /> Atenção</span><span><i className="legend-dot offline" /> Indisponível</span><span><i className="legend-dot unknown" /> Sem telemetria</span><small>Mapa {mapTheme === 'dark' ? 'dark' : 'claro'} · OpenFreeMap / OpenStreetMap</small></footer>
-      {unitContext && <div className="map-context-card map-unit-context-card" style={{ left: unitContext.x, top: unitContext.y }} onMouseDown={(event) => event.stopPropagation()}><button className="map-context-close" aria-label="Fechar menu" onClick={() => setUnitContext(null)}>×</button><p>AÇÃO RÁPIDA · UNIDADE</p><strong>{unitContext.unit.name}</strong><small>{unitContext.unit.code} · {unitContext.unit.city}/{unitContext.unit.state_code}</small><button className="context-action" onClick={() => void runDiagnostic(unitContext.unit, 'ping')}>⌁ Ping</button><button className="context-action" onClick={() => void runDiagnostic(unitContext.unit, 'tracert')}>↝ Tracert</button><button className="primary compact" onClick={() => { setUnitContext(null); onAddEquipment(unitContext.unit); }}>+ Adicionar equipamento</button></div>}
-      {diagnostic && <div className="diagnostic-float" role="status"><div className="diagnostic-float-head"><div><p className="eyebrow">DIAGNÓSTICO EM TEMPO REAL · {diagnostic.action === 'ping' ? 'PING' : 'TRACERT'}</p><strong>{diagnostic.unit.name}</strong><small>{diagnostic.unit.code} · alvo {diagnostic.result?.target ?? 'endereço de gerenciamento'}</small></div><button aria-label="Fechar diagnóstico" onClick={() => setDiagnostic(null)}>×</button></div><div className={`diagnostic-state ${diagnostic.status}`}>{diagnostic.status === 'running' ? 'Executando diagnóstico… aguardando resposta do equipamento.' : diagnostic.status === 'error' ? diagnostic.message : diagnostic.result?.success ? 'Concluído com resposta positiva.' : 'Concluído; o alvo não respondeu.'}</div>{diagnostic.status !== 'running' && <pre>{diagnostic.result?.output ?? diagnostic.message}</pre>}<button className="diagnostic-close" onClick={() => setDiagnostic(null)}>Fechar painel</button></div>}
+      {unitContext && <div className="map-context-card map-unit-context-card" style={{ left: unitContext.x, top: unitContext.y }} onMouseDown={(event) => event.stopPropagation()}><button className="map-context-close" aria-label="Fechar menu" onClick={() => setUnitContext(null)}><CloseIcon /></button><p>AÇÃO RÁPIDA · UNIDADE</p><strong>{unitContext.unit.name}</strong><small>{unitContext.unit.code} · {unitContext.unit.city}/{unitContext.unit.state_code}</small><button className="context-action" onClick={() => void runDiagnostic(unitContext.unit, 'ping')}><PingIcon /> Ping</button><button className="context-action" onClick={() => void runDiagnostic(unitContext.unit, 'tracert')}><TracertIcon /> Tracert</button><button className="primary compact" onClick={() => { setUnitContext(null); onAddEquipment(unitContext.unit); }}><PlusIcon /> Adicionar equipamento</button></div>}
+      {diagnostic && <div className="diagnostic-float" role="status"><div className="diagnostic-float-head"><div><p className="eyebrow">DIAGNÓSTICO EM TEMPO REAL · {diagnostic.action === 'ping' ? 'PING' : 'TRACERT'}</p><strong>{diagnostic.unit.name}</strong><small>{diagnostic.unit.code} · alvo {diagnostic.result?.target ?? 'endereço de gerenciamento'}</small></div><button className="icon-button clear-filters-button" aria-label="Fechar diagnóstico" onClick={() => setDiagnostic(null)}><CloseIcon /></button></div><div className={`diagnostic-state ${diagnostic.status}`}>{diagnostic.status === 'running' ? 'Executando diagnóstico… aguardando resposta do equipamento.' : diagnostic.status === 'error' ? diagnostic.message : diagnostic.result?.success ? 'Concluído com resposta positiva.' : 'Concluído; o alvo não respondeu.'}</div>{diagnostic.status !== 'running' && <pre>{diagnostic.result?.output ?? diagnostic.message}</pre>}<button className="diagnostic-close" onClick={() => setDiagnostic(null)}>Fechar painel</button></div>}
       {detailUnit && <LinkAnalysisPanel unit={detailUnit} link={telemetryByUnit.get(detailUnit.unit_id)?.[0]} alerts={alerts} diagnosticLatencyMs={diagnosticLatencyByUnit[detailUnit.unit_id]} onClose={() => setDetailUnit(null)} onOpenInventory={() => { onClose(); onSelectUnit(detailUnit.unit_id); }} />}
     </section>
   </div>;
@@ -678,12 +712,12 @@ function OperationalOverview({ units, equipment, alerts, resolvedAlerts, summary
     <div className="panel-heading">
       <div><p className="eyebrow">{card.eyebrow}</p><h2>{card.title}</h2><small>{card.subtitle}</small></div>
       <div className="overview-heading-actions">
-        <span className={`problem-count ${card.id === 'history' ? 'overview-count' : ''}`}>{card.id === 'ranking' ? `${alerts.length} em alerta` : card.id === 'history' ? `${historyAlerts.length} registrados` : `${equipment.length} ativos`}</span>
+        <span className={`problem-count ${card.id === 'history' ? 'resolved-count' : card.id === 'coverage' ? 'neutral-count' : ''}`}>{card.id === 'ranking' ? `${alerts.length} em alerta` : card.id === 'history' ? `${historyAlerts.length} registrados` : `${equipment.length} ativos`}</span>
         <div className="overview-switcher" aria-label="Navegar entre cards operacionais"><button className="overview-nav-button" onClick={() => setCardIndex((index) => (index - 1 + cards.length) % cards.length)} aria-label="Card anterior">&lt;</button><span>{cardIndex + 1}/{cards.length}</span><button className="overview-nav-button" onClick={() => setCardIndex((index) => (index + 1) % cards.length)} aria-label="Próximo card">&gt;</button></div>
       </div>
     </div>
-    {card.id === 'ranking' && <div className="problem-list">{alerts.length === 0 ? <div className="ranking-empty"><span>✓</span><strong>Operação estável</strong><small>Nenhum problema ativo requer ação.</small></div> : alerts.slice(0, 5).map((alert, index) => { const linkedUnit = units.find((unit) => unit.code === alert.unit_code); return <button className={`problem-row severity-${alert.severity}`} key={alert.id} onClick={() => linkedUnit && onSelectUnit(linkedUnit.unit_id)}><span className="problem-rank">#{index + 1}</span><div><strong>{alert.title}</strong><small>{alert.unit_code ?? 'Unidade não associada'} · {alert.equipment_name ?? 'Equipamento não informado'}</small></div><span className={`status ${alert.status === 'acknowledged' ? 'degraded' : 'offline'}`}>{alert.status === 'acknowledged' ? 'Reconhecido' : 'Crítico'}</span></button>})}</div>}
-    {card.id === 'history' && <div className="history-card-body"><div className="history-toolbar"><span>Janela móvel · limpa automaticamente a cada 30 min</span><button className="secondary-button compact clear-filters-button" onClick={() => setHistoryClearedAt(Date.now())}><ClearFilterIcon /> Limpar lista</button></div><div className="problem-list history-list">{historyAlerts.length === 0 ? <div className="ranking-empty"><span>✓</span><strong>Nenhum problema registrado</strong><small>Problemas resolvidos aparecerão nesta janela.</small></div> : historyAlerts.slice(0, 5).map((alert, index) => { const linkedUnit = units.find((unit) => unit.code === alert.unit_code); return <button className={`problem-row history-row severity-${alert.severity}`} key={alert.id} onClick={() => linkedUnit && onSelectUnit(linkedUnit.unit_id)}><span className="problem-rank">#{index + 1}</span><div><strong>{alert.title}</strong><small>{alert.unit_code ?? 'Unidade não associada'} · {alert.equipment_name ?? 'Equipamento não informado'} · {new Date(alert.resolved_at ?? alert.opened_at).toLocaleTimeString('pt-BR')}</small></div><span className="status online">Resolvido</span></button>})}</div></div>}
+    {card.id === 'ranking' && <div className="problem-list">{alerts.length === 0 ? <div className="ranking-empty"><span><CheckIcon /></span><strong>Operação estável</strong><small>Nenhum problema ativo requer ação.</small></div> : alerts.slice(0, 5).map((alert, index) => { const linkedUnit = units.find((unit) => unit.code === alert.unit_code); const sev = severityConfig[alert.severity as keyof typeof severityConfig] ?? severityConfig[0]; const tone = alert.severity >= 4 ? 'offline' : alert.severity >= 2 ? 'degraded' : 'unknown'; return <button className={`problem-row severity-${alert.severity}`} key={alert.id} onClick={() => linkedUnit && onSelectUnit(linkedUnit.unit_id)}><span className="problem-rank">#{index + 1}</span><div><strong>{alert.title}</strong><small>{alert.unit_code ?? 'Unidade não associada'} · {alert.equipment_name ?? 'Equipamento não informado'}</small></div><span className={`status ${tone}`}>{sev.label}</span></button>})}</div>}
+    {card.id === 'history' && <div className="history-card-body"><div className="history-toolbar"><span>Janela móvel · limpa automaticamente a cada 30 min</span><button className="secondary-button compact clear-filters-button" onClick={() => setHistoryClearedAt(Date.now())}><ClearFilterIcon /> Limpar lista</button></div><div className="problem-list history-list">{historyAlerts.length === 0 ? <div className="ranking-empty"><span><CheckIcon /></span><strong>Nenhum problema registrado</strong><small>Problemas resolvidos aparecerão nesta janela.</small></div> : historyAlerts.slice(0, 5).map((alert, index) => { const linkedUnit = units.find((unit) => unit.code === alert.unit_code); return <button className={`problem-row history-row severity-${alert.severity}`} key={alert.id} onClick={() => linkedUnit && onSelectUnit(linkedUnit.unit_id)}><span className="problem-rank">#{index + 1}</span><div><strong>{alert.title}</strong><small>{alert.unit_code ?? 'Unidade não associada'} · {alert.equipment_name ?? 'Equipamento não informado'} · {new Date(alert.resolved_at ?? alert.opened_at).toLocaleTimeString('pt-BR')}</small></div><span className="status online">Resolvido</span></button>})}</div></div>}
     {card.id === 'coverage' && <div className="overview-card-body"><OverviewStatusRow label="Ativos cadastrados" value={equipment.length} total={totalEquipment} tone="online" note="equipamentos no inventário" /><OverviewStatusRow label="Com telemetria" value={equipment.filter((item) => item.operational_status !== 'unknown').length} total={totalEquipment} tone="cyan" note="com leitura operacional" /><OverviewStatusRow label="Sem telemetria" value={equipment.filter((item) => item.operational_status === 'unknown').length} total={totalEquipment} tone="unknown" note="aguardando coleta válida" /><OverviewStatusRow label="Unidades operacionais" value={summary.online} total={totalUnits} tone={summary.online ? 'online' : 'unknown'} note={summary.online ? 'respondendo normalmente' : 'nenhuma unidade operacional'} /></div>}
   </article>;
 }
@@ -714,15 +748,16 @@ function InventoryActions({ token, units, selectedUnit, onRefresh, onError, onTo
   return <>{!selectedUnit && <div className="admin-toolbar"><div><p className="eyebrow">ADMINISTRAÇÃO DE INVENTÁRIO</p><strong>Cadastre a estrutura antes de vincular ao Zabbix.</strong></div><button className="primary compact" onClick={() => setMode('unit')}><PlusIcon /> Cadastrar unidade</button></div>}{selectedUnit && <div className="admin-toolbar"><div><p className="eyebrow">UNIDADE SELECIONADA · {selectedUnit.code}</p><strong>{selectedUnit.name}</strong></div><button className="primary compact" onClick={() => setMode('equipment')}><PlusIcon /> Cadastrar equipamento</button></div>}{mode === 'unit' && <UnitForm token={token} onCreated={async () => { setMode(null); await onRefresh(); }} onCancel={() => setMode(null)} onError={onError} onToast={onToast} />}{mode === 'equipment' && selectedUnit && <EquipmentForm token={token} unit={selectedUnit} onCreated={async () => { setMode(null); await onRefresh(); }} onCancel={() => setMode(null)} onError={onError} onToast={onToast} />}</>;
 }
 
-function ConfirmDialog({ title, message, confirmLabel = 'Confirmar', confirmIcon = <TrashIcon />, busy = false, onConfirm, onCancel }: { title: string; message: string; confirmLabel?: string; confirmIcon?: ReactNode; busy?: boolean; onConfirm: () => void; onCancel: () => void }) {
+function ConfirmDialog({ title, message, confirmLabel = 'Confirmar', confirmIcon = <TrashIcon />, tone = 'danger', busy = false, onConfirm, onCancel }: { title: string; message: string; confirmLabel?: string; confirmIcon?: ReactNode; tone?: 'danger' | 'warning' | 'positive'; busy?: boolean; onConfirm: () => void; onCancel: () => void }) {
   useEffect(() => { const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') onCancel(); }; window.addEventListener('keydown', closeOnEscape); return () => window.removeEventListener('keydown', closeOnEscape); }, [onCancel]);
+  const toneClass = tone === 'warning' ? 'warning-button' : tone === 'positive' ? 'positive-button' : 'danger-button';
   return <div className="form-modal-backdrop" role="presentation" onMouseDown={onCancel}>
     <article className="form-card confirm-dialog" role="alertdialog" aria-modal="true" aria-label={title} onMouseDown={(event) => event.stopPropagation()}>
       <div className="panel-title"><div><p className="eyebrow">CONFIRMAÇÃO NECESSÁRIA</p><h3>{title}</h3></div><button className="icon-button clear-filters-button" onClick={onCancel} aria-label="Fechar">{<CloseIcon />}</button></div>
       <p className="confirm-dialog-message">{message}</p>
       <div className="form-actions">
         <button type="button" className="secondary-button clear-filters-button" onClick={onCancel} disabled={busy}><CloseIcon /> Cancelar</button>
-        <button type="button" className="danger-button" onClick={onConfirm} disabled={busy}>{confirmIcon} {busy ? 'Processando…' : confirmLabel}</button>
+        <button type="button" className={toneClass} onClick={onConfirm} disabled={busy}>{confirmIcon} {busy ? 'Processando…' : confirmLabel}</button>
       </div>
     </article>
   </div>;
@@ -777,8 +812,9 @@ function UnitForm({ token, initialStateCode = '', onCreated, onCancel, onError =
     <label><span className="field-label">Nome <b>*</b></span><input required className={validationRequested && unitValidation.name ? 'field-invalid' : ''} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex.: Unidade Móvel Manaus" />{validationRequested && unitValidation.name && <small className="field-error">Informe o nome da unidade.</small>}</label>
     <label><span className="field-label">UF <b>*</b></span><GlassCombobox value={form.stateCode} options={brazilStateCodes.map((code) => ({ value: code, label: stateNameByCode[code] }))} onChange={(value) => setForm({ ...form, stateCode: value.toUpperCase().slice(0, 2), city: '' })} placeholder="Escolha ou digite a UF" invalid={validationRequested && unitValidation.stateCode} compact />{validationRequested && unitValidation.stateCode && <small className="field-error">Selecione ou informe uma UF válida.</small>}</label>
     <label><span className="field-label">Cidade <b>*</b></span><GlassCombobox value={form.city} options={cities.map((city) => ({ value: city, label: city }))} onChange={(value) => setForm({ ...form, city: value })} placeholder={loadingCities ? 'Carregando cidades…' : 'Escolha ou digite a cidade'} invalid={validationRequested && unitValidation.city} disabled={!validState || loadingCities} />{validationRequested && unitValidation.city ? <small className="field-error">Selecione ou informe a cidade.</small> : <small className="field-hint">{loadingCities ? 'Consultando municípios da UF…' : cities.length ? `${cities.length} cidades disponíveis para ${form.stateCode}` : 'Informe uma UF válida para carregar as cidades.'}</small>}</label>
-    <div className="location-fields" style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}><label><span className="field-label">Latitude <em>opcional</em></span><input inputMode="decimal" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} placeholder="-3.1186" />{validationRequested && unitValidation.coordinates && <small className="field-error">Informe latitude entre -90 e 90.</small>}</label><label><span className="field-label">Longitude <em>opcional</em></span><input inputMode="decimal" value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} placeholder="-60.0217" />{validationRequested && unitValidation.coordinates && <small className="field-error">Informe longitude entre -180 e 180.</small>}</label></div>
-    <small className="field-hint location-hint">Você pode informar a localização agora ou adicioná-la depois pelo mapa.</small>
+    <label><span className="field-label">Latitude <em>opcional</em></span><input inputMode="decimal" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} placeholder="-3.1186" />{validationRequested && unitValidation.coordinates && <small className="field-error">Informe latitude entre -90 e 90.</small>}</label>
+    <label><span className="field-label">Longitude <em>opcional</em></span><input inputMode="decimal" value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} placeholder="-60.0217" />{validationRequested && unitValidation.coordinates && <small className="field-error">Informe longitude entre -180 e 180.</small>}</label>
+    <small className="field-hint location-hint" style={{ gridColumn: '1 / -1' }}>Você pode informar a localização agora ou adicioná-la depois pelo mapa.</small>
     <div className="form-actions"><button type="button" className="secondary-button clear-filters-button" onClick={onCancel}><CloseIcon /> Cancelar</button><button className="primary" disabled={saving}>{saving ? 'Salvando…' : <><PlusIcon /> Cadastrar unidade</>}</button></div>
   </form></FormCard>;
 }
@@ -931,12 +967,12 @@ function ZabbixStatusPanel({ status, onRefresh }: { status: ZabbixSyncStatus | n
   const lastAttempt = status?.last_attempt_at ? new Date(status.last_attempt_at).getTime() : 0;
   const seconds = Math.ceil(Math.max(0, 60_000 - (Date.now() - lastAttempt)) / 1000);
   return <article className={`zabbix-status-panel ${health}`}>
-    <div className="zabbix-status-heading"><span className="connection-logo">Z</span><div><p className="eyebrow">STATUS DE CONEXÕES</p><h3>{syncStatusLabel(status)}</h3><small>Última coleta válida · {lastSuccess}</small></div><span className={`health-indicator ${health}`} /><button className="secondary-button compact" onClick={() => void onRefresh()}>Atualizar</button></div>
+    <div className="zabbix-status-heading"><span className="connection-logo">Z</span><div><p className="eyebrow">STATUS DE CONEXÕES</p><h3>{syncStatusLabel(status)}</h3><small>Última coleta válida · {lastSuccess}</small></div><span className={`health-indicator ${health}`} /><button className="secondary-button compact" onClick={() => void onRefresh()}><RefreshIcon /> Atualizar</button></div>
     <div className="zabbix-status-metrics"><div><span>Hosts encontrados</span><strong>{status?.hosts_seen ?? 0}</strong></div><div><span>Hosts vinculados</span><strong>{status?.mapped_hosts ?? 0}</strong></div><div><span>Problemas recebidos</span><strong>{status?.problems_seen ?? 0}</strong></div><div><span>Próxima sincronização</span><strong>{lastAttempt ? `${seconds}s` : 'aguardando'}</strong></div></div>
   </article>;
 }
 
-function ZabbixIntegration({ candidates, integrationStatus, units, loading, onRefresh, onStatusRefresh, onInventoryRefresh, onAlertsRefresh, onError, token }: { candidates: ZabbixCandidates | null; integrationStatus: ZabbixSyncStatus | null; units: Unit[]; loading: boolean; onRefresh: () => Promise<void>; onStatusRefresh: () => Promise<void>; onInventoryRefresh: () => Promise<void>; onAlertsRefresh: () => Promise<void>; onError: (message: string) => void; token: string }) {
+function ZabbixIntegration({ candidates, integrationStatus, units, loading, onRefresh, onStatusRefresh, onInventoryRefresh, onAlertsRefresh, onError, onToast = () => undefined, token }: { candidates: ZabbixCandidates | null; integrationStatus: ZabbixSyncStatus | null; units: Unit[]; loading: boolean; onRefresh: () => Promise<void>; onStatusRefresh: () => Promise<void>; onInventoryRefresh: () => Promise<void>; onAlertsRefresh: () => Promise<void>; onError: (message: string) => void; onToast?: (toast: Omit<Toast, 'id'>) => void; token: string }) {
   const [hostSearch, setHostSearch] = useState(''); const [selectedHost, setSelectedHost] = useState(''); const [selectedEquipment, setSelectedEquipment] = useState(''); const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const mappings = candidates?.mappings ?? []; const filteredHosts = (candidates?.hosts ?? []).filter((host) => `${host.name} ${host.host} ${host.hostid}`.toLowerCase().includes(hostSearch.toLowerCase()));
@@ -965,28 +1001,37 @@ function ZabbixIntegration({ candidates, integrationStatus, units, loading, onRe
     else setSelectedEquipment(suggestedEquipment?.id ?? '');
   }, [selectedHost, currentMapping?.equipment_id, suggestedEquipment?.id]);
   const unchanged = Boolean(currentMapping && currentMapping.equipment_id === selectedEquipment);
+  const [confirmMove, setConfirmMove] = useState(false);
+  const [confirmUnlink, setConfirmUnlink] = useState(false);
   async function refreshAfterChange() { await Promise.all([onRefresh(), onInventoryRefresh()]); }
   async function link() {
     if (!selectedHost || !selectedEquipment || unchanged) return;
-    if (selectedEquipmentMapping && selectedEquipmentMapping.zabbix_host_id !== selectedHost) {
-      const confirmed = window.confirm(`O equipamento já está ligado ao host "${selectedEquipmentHost?.name ?? selectedEquipmentMapping.zabbix_host_id}". Deseja mover o vínculo para "${currentHost?.name ?? selectedHost}"?`);
-      if (!confirmed) return;
+    if (selectedEquipmentMapping && selectedEquipmentMapping.zabbix_host_id !== selectedHost && !confirmMove) {
+      setConfirmMove(true);
+      return;
     }
+    setConfirmMove(false);
     setSaving(true); onError('');
+    const wasMove = Boolean(selectedEquipmentMapping && selectedEquipmentMapping.zabbix_host_id !== selectedHost);
+    const equipmentName = candidates?.equipment.find((item) => item.id === selectedEquipment)?.name ?? 'equipamento selecionado';
     try {
       await api('/v1/integrations/zabbix/mappings', token, { method: 'POST', body: JSON.stringify({ zabbixHostId: selectedHost, equipmentId: selectedEquipment }) });
       await refreshAfterChange();
+      onToast({ type: 'success', title: wasMove ? 'Vínculo movido' : 'Host vinculado', detail: `${currentHost?.name ?? selectedHost} agora está vinculado a ${equipmentName}.` });
     } catch (reason) { onError(reason instanceof Error ? reason.message : 'Falha ao salvar vínculo.'); }
     finally { setSaving(false); }
   }
   async function unlink() {
     if (!selectedHost || !currentMapping) return;
-    if (!window.confirm(`Desvincular o host "${currentHost?.name ?? selectedHost}" de "${currentEquipment?.name ?? 'seu equipamento'}"? O histórico será preservado.`)) return;
+    if (!confirmUnlink) { setConfirmUnlink(true); return; }
+    setConfirmUnlink(false);
     setSaving(true); onError('');
+    const hostName = currentHost?.name ?? selectedHost;
     try {
       await api(`/v1/integrations/zabbix/mappings/${encodeURIComponent(selectedHost)}`, token, { method: 'DELETE' });
       setSelectedEquipment('');
       await refreshAfterChange();
+      onToast({ type: 'success', title: 'Host desvinculado', detail: `${hostName} não está mais vinculado a nenhum equipamento.` });
     } catch (reason) { onError(reason instanceof Error ? reason.message : 'Falha ao desvincular host.'); }
     finally { setSaving(false); }
   }
@@ -1002,13 +1047,13 @@ function ZabbixIntegration({ candidates, integrationStatus, units, loading, onRe
   }
   return <section className="integration-page">
     <ZabbixStatusPanel status={integrationStatus} onRefresh={onStatusRefresh} />
-    <div className="section-heading"><div><p className="eyebrow">INTEGRAÇÃO · ZABBIX</p><h2>Hosts e vínculos operacionais</h2><small>Associe cada host a um equipamento cadastrado e mantenha a unidade rastreável.</small></div><div className="section-actions"><button className="secondary-button" onClick={() => void onRefresh()}>{loading ? 'Atualizando…' : 'Atualizar hosts'}</button><button className="primary compact" disabled={syncing} onClick={() => void synchronizeNow()}>{syncing ? 'Sincronizando…' : 'Sincronizar agora'}</button></div></div>
-    {!candidates && <div className="empty-state compact-empty"><span className="empty-glyph">↻</span><h3>{loading ? 'Consultando Zabbix…' : 'Nenhum catálogo carregado'}</h3><button className="primary" onClick={() => void onRefresh()}>Carregar hosts</button></div>}
+    <div className="section-heading"><div><p className="eyebrow">INTEGRAÇÃO · ZABBIX</p><h2>Hosts e vínculos operacionais</h2><small>Associe cada host a um equipamento cadastrado e mantenha a unidade rastreável.</small></div><div className="section-actions"><button className="secondary-button compact" onClick={() => void onRefresh()}>{loading ? 'Atualizando…' : <><RefreshIcon /> Atualizar hosts</>}</button><button className="primary compact" disabled={syncing} onClick={() => void synchronizeNow()}>{syncing ? 'Sincronizando…' : <><SyncIcon /> Sincronizar agora</>}</button></div></div>
+    {!candidates && <div className="empty-state compact-empty"><span className="empty-glyph"><RefreshIcon /></span><h3>{loading ? 'Consultando Zabbix…' : 'Nenhum catálogo carregado'}</h3><button className="primary" onClick={() => void onRefresh()}><RefreshIcon /> Carregar hosts</button></div>}
     {candidates && <>
       <div className="integration-stats"><Metric label="Hosts encontrados" value={candidates.hosts.length} tone="neutral" /><Metric label="Já vinculados" value={mappings.length} tone="ok" /><Metric label="Pendentes" value={Math.max(candidates.hosts.length - mappings.length, 0)} tone="warn" /></div>
-      <div className="host-bridge-heading"><div><p className="eyebrow">PONTE DE HOSTS</p><h3>Catálogo Zabbix e vínculos</h3><small>Selecione um host, escolha o equipamento correspondente e mantenha a unidade rastreável.</small></div><span>{mappings.length} vinculados</span></div>
+      <div className="host-bridge-heading"><div><p className="eyebrow">PONTE DE HOSTS</p><h3>Catálogo Zabbix e vínculos</h3><small>Selecione um host, escolha o equipamento correspondente e mantenha a unidade rastreável.</small></div><span className="problem-count neutral-count">{mappings.length} vinculados</span></div>
       <div className="integration-grid">
-        <article className="host-panel"><div className="panel-title"><div><p className="eyebrow">INVENTÁRIO DO ZABBIX</p><h3>Selecione um host</h3></div><strong>{filteredHosts.length}</strong></div><input className="search-input" value={hostSearch} onChange={(e) => setHostSearch(e.target.value)} placeholder="Buscar por nome ou ID…" /><div className="host-list">{filteredHosts.map((host) => { const hasCoordinates = Number.isFinite(Number(host.inventory?.location_lat)) && Number.isFinite(Number(host.inventory?.location_lon)); return <button key={host.hostid} className={`host-row ${selectedHost === host.hostid ? 'selected' : ''}`} onClick={() => setSelectedHost(host.hostid)}><span className={`host-status ${Number(host.status) === 0 ? 'online' : 'offline'}`} /><div><strong>{host.name || host.host}</strong><small>{host.host} · ID {host.hostid}{host.interfaces?.[0]?.ip ? ` · ${host.interfaces[0].ip}` : ''}{hasCoordinates ? ' · localização no inventário' : ''}</small></div><span className={`link-state ${linkedEquipment.has(host.hostid) ? 'linked' : ''}`}>{linkedEquipment.has(host.hostid) ? 'Vinculado' : 'Pendente'}</span></button>; })}</div></article>
+        <article className="host-panel"><div className="panel-title"><div><p className="eyebrow">INVENTÁRIO DO ZABBIX</p><h3>Selecione um host</h3></div><strong>{filteredHosts.length}</strong></div><div className="search-input-wrap"><SearchIcon /><input className="search-input" value={hostSearch} onChange={(e) => setHostSearch(e.target.value)} placeholder="Buscar por nome ou ID…" /></div><div className="host-list">{filteredHosts.map((host) => { const hasCoordinates = Number.isFinite(Number(host.inventory?.location_lat)) && Number.isFinite(Number(host.inventory?.location_lon)); return <button key={host.hostid} className={`host-row ${linkedEquipment.has(host.hostid) ? 'linked' : 'pending'} ${selectedHost === host.hostid ? 'selected' : ''}`} onClick={() => setSelectedHost(host.hostid)}><span className={`host-status ${Number(host.status) === 0 ? 'online' : 'offline'}`} /><div><strong>{host.name || host.host}</strong><small>{host.host} · ID {host.hostid}{host.interfaces?.[0]?.ip ? ` · ${host.interfaces[0].ip}` : ''}{hasCoordinates ? ' · localização no inventário' : ''}</small></div><span className={`status ${linkedEquipment.has(host.hostid) ? 'online' : 'degraded'}`}>{linkedEquipment.has(host.hostid) ? 'Vinculado' : 'Pendente'}</span></button>; })}</div></article>
         <article className="link-panel">
           <div className="panel-title"><div><p className="eyebrow">DESTINO DO VÍNCULO</p><h3>Equipamento do HealthLink</h3></div></div>
           <p className="muted">O host é associado ao equipamento; a unidade é herdada automaticamente.</p>
@@ -1017,11 +1062,13 @@ function ZabbixIntegration({ candidates, integrationStatus, units, loading, onRe
           <AppDropdown className="link-select" placeholder="Selecione um equipamento" value={selectedEquipment} onChange={setSelectedEquipment} disabled={!selectedHost || saving} options={units.flatMap((unit) => candidates.equipment.filter((item) => item.unit_id === unit.unit_id).map((item) => ({ value: item.id, label: `${item.name} · ${item.equipment_type.replaceAll('_', ' ')}`, group: `${unit.code} · ${unit.name}` })))} />
           {selectedEquipmentMapping && selectedEquipmentMapping.zabbix_host_id !== selectedHost && <div className="mapping-warning"><strong>Este equipamento já possui um vínculo.</strong><small>Ao salvar, ele será movido do host {selectedEquipmentHost?.name ?? selectedEquipmentMapping.zabbix_host_id} para o host selecionado.</small></div>}
           <div className="link-context"><span>Host selecionado</span><strong>{selectedHost ? `${currentHost?.name ?? 'Host'}${currentHost?.interfaces?.[0]?.ip ? ` · ${currentHost.interfaces[0].ip}` : ''}` : 'Nenhum host selecionado'}</strong></div>
-          <div className="mapping-actions"><button className="primary wide" disabled={!selectedHost || !selectedEquipment || saving || unchanged} onClick={() => void link()}>{saving ? 'Processando…' : unchanged ? 'Vínculo atual confirmado' : currentMapping ? 'Trocar vínculo' : 'Vincular host ao equipamento'}</button>{currentMapping && <button className="danger-button" disabled={saving} onClick={() => void unlink()}>Desvincular host</button>}</div>
+          <div className="mapping-actions"><button className="primary wide" disabled={!selectedHost || !selectedEquipment || saving || unchanged} onClick={() => void link()}>{saving ? 'Processando…' : unchanged ? <><CheckIcon /> Vínculo atual confirmado</> : currentMapping ? <><CheckIcon /> Trocar vínculo</> : <><PlusIcon /> Vincular host ao equipamento</>}</button>{currentMapping && <button className="secondary-button warning-action-button wide" disabled={saving} onClick={() => void unlink()}><RejectIcon /> Desvincular host</button>}</div>
           <div className="link-help"><span>Fluxo seguro</span><small>Host Zabbix → Equipamento → Unidade móvel · alterações auditadas</small></div>
         </article>
       </div>
     </>}
+    {confirmMove && <ConfirmDialog title="Mover vínculo" message={`O equipamento já está ligado ao host "${selectedEquipmentHost?.name ?? selectedEquipmentMapping?.zabbix_host_id}". Deseja mover o vínculo para "${currentHost?.name ?? selectedHost}"?`} confirmLabel="Mover vínculo" confirmIcon={<CheckIcon />} tone="warning" busy={saving} onConfirm={() => void link()} onCancel={() => setConfirmMove(false)} />}
+    {confirmUnlink && <ConfirmDialog title="Desvincular host" message={`Desvincular o host "${currentHost?.name ?? selectedHost}" de "${currentEquipment?.name ?? 'seu equipamento'}"? O histórico será preservado.`} confirmLabel="Desvincular" confirmIcon={<RejectIcon />} tone="warning" busy={saving} onConfirm={() => void unlink()} onCancel={() => setConfirmUnlink(false)} />}
   </section>;
 }
 
@@ -1030,10 +1077,21 @@ function UnitsView({ units, selectedUnit, selectedEquipment, loading, summary, o
   const [contextMenu, setContextMenu] = useState<{ unit: Unit; x: number; y: number } | null>(null);
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
   const [addingEquipment, setAddingEquipment] = useState<Unit | null>(null);
+  const [nameFilter, setNameFilter] = useState('');
+  const [regionFilter, setRegionFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   useEffect(() => { const close = () => setContextMenu(null); window.addEventListener('mousedown', close); window.addEventListener('scroll', close, true); return () => { window.removeEventListener('mousedown', close); window.removeEventListener('scroll', close, true); }; }, []);
   const refresh = async () => { setEditing(null); setEditingUnit(null); setAddingEquipment(null); await onInventoryRefresh(); };
   const menuAction = (action: 'open' | 'edit' | 'equipment') => { if (!contextMenu) return; const unit = contextMenu.unit; setContextMenu(null); if (action === 'open') onSelectUnit(unit.unit_id); else if (action === 'edit') setEditingUnit(unit); else setAddingEquipment(unit); };
-  return <><div className="summary-grid"><Metric label="Unidades monitoradas" value={units.length} tone="neutral" /><Metric label="Operacionais" value={summary.online} tone="ok" /><Metric label="Em atenção" value={summary.attention} tone="warn" /><Metric label="Indisponíveis" value={summary.offline} tone="danger" /></div>{editingUnit && <UnitEditForm unit={editingUnit} token={token} onSaved={refresh} onCancel={() => setEditingUnit(null)} onToast={onToast} />}{addingEquipment && <EquipmentForm token={token} unit={addingEquipment} onCreated={refresh} onCancel={() => setAddingEquipment(null)} onToast={onToast} />}{selectedUnit ? <>{editing && <EquipmentEditForm equipment={editing} token={token} onSaved={refresh} onCancel={() => setEditing(null)} onToast={onToast} />}<UnitDetail unit={selectedUnit} equipment={selectedEquipment} onBack={onBack} onEdit={setEditing} onRefresh={refresh} onToast={onToast} /></> : <><div className="section-heading"><div><p className="eyebrow">FROTA E INFRAESTRUTURA</p><h2>Estado das unidades</h2></div><span>{loading ? 'Atualizando…' : `${summary.unknown} sem telemetria`}</span></div><div className="unit-grid">{units.map((unit) => <button className={`unit-card ${unit.operational_status}`} key={unit.unit_id} onClick={() => onSelectUnit(unit.unit_id)} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); setContextMenu({ unit, x: Math.min(event.clientX, window.innerWidth - 240), y: Math.min(event.clientY, window.innerHeight - 170) }); }}><div className="unit-card-head"><span className="unit-code">{unit.code}</span><span className={`status ${unit.operational_status}`}>{statusLabel[unit.operational_status]}</span></div><h3>{unit.name}</h3><p>{unit.city} · {unit.state_code}</p><div className="telemetry"><span><strong>{unit.offline_equipment}</strong> indisponíveis</span><span><strong>{unit.degraded_equipment}</strong> atenção</span></div><div className="signal-line"><i /><i /><i /><i /></div></button>)}</div></>}{contextMenu && <div className="unit-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} role="menu" onMouseDown={(event) => event.stopPropagation()}><p>{contextMenu.unit.code}</p><strong>{contextMenu.unit.name}</strong><button onClick={() => menuAction('open')}>Abrir unidade</button><button onClick={() => menuAction('edit')}><EditIcon /> Editar unidade</button><button onClick={() => menuAction('equipment')}>Cadastrar equipamento</button><button className="context-cancel" onClick={() => setContextMenu(null)}>Cancelar</button></div>}</>;
+  const regionOptions = Array.from(new Set(units.map((unit) => unit.state_code))).sort().map((state) => ({ value: state, label: state }));
+  const filteredUnits = units.filter((unit) => {
+    if (nameFilter.trim() && !unit.name.toLowerCase().includes(nameFilter.trim().toLowerCase()) && !unit.code.toLowerCase().includes(nameFilter.trim().toLowerCase())) return false;
+    if (regionFilter && unit.state_code !== regionFilter) return false;
+    if (statusFilter && unit.operational_status !== statusFilter) return false;
+    return true;
+  });
+  const clearUnitFilters = () => { setNameFilter(''); setRegionFilter(''); setStatusFilter(''); };
+  return <><div className="summary-grid"><Metric label="Unidades monitoradas" value={units.length} tone="neutral" /><Metric label="Operacionais" value={summary.online} tone="ok" /><Metric label="Em atenção" value={summary.attention} tone="warn" /><Metric label="Indisponíveis" value={summary.offline} tone="danger" /></div>{editingUnit && <UnitEditForm unit={editingUnit} token={token} onSaved={refresh} onCancel={() => setEditingUnit(null)} onToast={onToast} />}{addingEquipment && <EquipmentForm token={token} unit={addingEquipment} onCreated={refresh} onCancel={() => setAddingEquipment(null)} onToast={onToast} />}{selectedUnit ? <>{editing && <EquipmentEditForm equipment={editing} token={token} onSaved={refresh} onCancel={() => setEditing(null)} onToast={onToast} />}<UnitDetail unit={selectedUnit} equipment={selectedEquipment} onBack={onBack} onEdit={setEditing} onRefresh={refresh} onToast={onToast} /></> : <><div className="section-heading"><div><p className="eyebrow">FROTA E INFRAESTRUTURA</p><h2>Estado das unidades</h2></div><span className="problem-count neutral-count">{loading ? 'Atualizando…' : `${summary.unknown} sem telemetria`}</span></div><div className="unit-filters"><div className="search-input-wrap"><SearchIcon /><input className="search-input" placeholder="Pesquisar por nome ou código…" value={nameFilter} onChange={(e) => setNameFilter(e.target.value)} /></div><AppDropdown placeholder="Todas as regiões" value={regionFilter} onChange={setRegionFilter} options={[{ value: '', label: 'Todas as regiões' }, ...regionOptions]} /><AppDropdown placeholder="Todos os status" value={statusFilter} onChange={setStatusFilter} options={[{ value: '', label: 'Todos os status' }, { value: 'online', label: 'Operacional' }, { value: 'degraded', label: 'Atenção' }, { value: 'offline', label: 'Indisponível' }, { value: 'unknown', label: 'Sem telemetria' }]} />{(nameFilter || regionFilter || statusFilter) && <button type="button" className="secondary-button compact clear-filters-button" onClick={clearUnitFilters}><ClearFilterIcon /> Limpar</button>}</div>{filteredUnits.length === 0 ? <div className="empty-state compact-empty"><p>Nenhuma unidade encontrada.</p></div> : <div className="unit-grid">{filteredUnits.map((unit) => <button className={`unit-card ${unit.operational_status}`} key={unit.unit_id} onClick={() => onSelectUnit(unit.unit_id)} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); setContextMenu({ unit, x: Math.min(event.clientX, window.innerWidth - 240), y: Math.min(event.clientY, window.innerHeight - 170) }); }}><div className="unit-card-head"><span className="unit-code">{unit.code}</span><span className={`status ${unit.operational_status}`}>{statusLabel[unit.operational_status]}</span></div><h3>{unit.name}</h3><p>{unit.city} · {unit.state_code}</p><div className="telemetry"><span><strong>{unit.offline_equipment}</strong> indisponíveis</span><span><strong>{unit.degraded_equipment}</strong> atenção</span></div><div className="signal-line"><i /><i /><i /><i /></div></button>)}</div>}</>}{contextMenu && <div className="unit-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} role="menu" onMouseDown={(event) => event.stopPropagation()}><p>{contextMenu.unit.code}</p><strong>{contextMenu.unit.name}</strong><button onClick={() => menuAction('open')}>Abrir unidade</button><button onClick={() => menuAction('edit')}><EditIcon /> Editar unidade</button><button onClick={() => menuAction('equipment')}>Cadastrar equipamento</button><button className="context-cancel" onClick={() => setContextMenu(null)}>Cancelar</button></div>}</>;
 }
 
 function UnitsViewLegacy({ units, selectedUnit, selectedEquipment, loading, summary, onSelectUnit, onBack, onInventoryRefresh, token }: { units: Unit[]; selectedUnit?: Unit; selectedEquipment: Equipment[]; loading: boolean; summary: { online: number; attention: number; offline: number; unknown: number }; onSelectUnit: (unitId: string) => void; onBack: () => void; onInventoryRefresh: () => Promise<void>; token: string }) {
@@ -1041,7 +1099,7 @@ function UnitsViewLegacy({ units, selectedUnit, selectedEquipment, loading, summ
   const [showEquipmentForm, setShowEquipmentForm] = useState(false);
   const [editing, setEditing] = useState<Equipment | null>(null);
   const refresh = async () => { setEditing(null); await onInventoryRefresh(); };
-  return <><div className="summary-grid"><Metric label="Unidades monitoradas" value={units.length} tone="neutral" /><Metric label="Operacionais" value={summary.online} tone="ok" /><Metric label="Em atenção" value={summary.attention} tone="warn" /><Metric label="Indisponíveis" value={summary.offline} tone="danger" /></div>{selectedUnit ? <>{editing && <EquipmentEditForm equipment={editing} token={token} onSaved={refresh} onCancel={() => setEditing(null)} />}<UnitDetail unit={selectedUnit} equipment={selectedEquipment} onBack={onBack} onEdit={setEditing} onRefresh={refresh} /></> : <><div className="section-heading"><div><p className="eyebrow">FROTA E INFRAESTRUTURA</p><h2>Estado das unidades</h2></div><span>{loading ? 'Atualizando…' : `${summary.unknown} sem telemetria`}</span></div><div className="unit-grid">{units.map((unit) => <button className={`unit-card ${unit.operational_status}`} key={unit.unit_id} onClick={() => onSelectUnit(unit.unit_id)}><div className="unit-card-head"><span className="unit-code">{unit.code}</span><span className={`status ${unit.operational_status}`}>{statusLabel[unit.operational_status]}</span></div><h3>{unit.name}</h3><p>{unit.city} · {unit.state_code}</p><div className="telemetry"><span><strong>{unit.offline_equipment}</strong> indisponíveis</span><span><strong>{unit.degraded_equipment}</strong> atenção</span></div><div className="signal-line"><i /><i /><i /><i /></div></button>)}</div></>}</>;
+  return <><div className="summary-grid"><Metric label="Unidades monitoradas" value={units.length} tone="neutral" /><Metric label="Operacionais" value={summary.online} tone="ok" /><Metric label="Em atenção" value={summary.attention} tone="warn" /><Metric label="Indisponíveis" value={summary.offline} tone="danger" /></div>{selectedUnit ? <>{editing && <EquipmentEditForm equipment={editing} token={token} onSaved={refresh} onCancel={() => setEditing(null)} />}<UnitDetail unit={selectedUnit} equipment={selectedEquipment} onBack={onBack} onEdit={setEditing} onRefresh={refresh} /></> : <><div className="section-heading"><div><p className="eyebrow">FROTA E INFRAESTRUTURA</p><h2>Estado das unidades</h2></div><span className="problem-count neutral-count">{loading ? 'Atualizando…' : `${summary.unknown} sem telemetria`}</span></div><div className="unit-grid">{units.map((unit) => <button className={`unit-card ${unit.operational_status}`} key={unit.unit_id} onClick={() => onSelectUnit(unit.unit_id)}><div className="unit-card-head"><span className="unit-code">{unit.code}</span><span className={`status ${unit.operational_status}`}>{statusLabel[unit.operational_status]}</span></div><h3>{unit.name}</h3><p>{unit.city} · {unit.state_code}</p><div className="telemetry"><span><strong>{unit.offline_equipment}</strong> indisponíveis</span><span><strong>{unit.degraded_equipment}</strong> atenção</span></div><div className="signal-line"><i /><i /><i /><i /></div></button>)}</div></>}</>;
 }
 
 function UnitEditForm({ unit, token, onSaved, onCancel, onToast = () => undefined }: { unit: Unit; token: string; onSaved: () => Promise<void>; onCancel: () => void; onToast?: (toast: Omit<Toast, 'id'>) => void }) {
@@ -1068,8 +1126,9 @@ function UnitEditForm({ unit, token, onSaved, onCancel, onToast = () => undefine
     <label><span className="field-label">Nome <b>*</b></span><input className={validationRequested && unitValidation.name ? 'field-invalid' : ''} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />{validationRequested && unitValidation.name && <small className="field-error">Informe o nome da unidade.</small>}</label>
     <label><span className="field-label">UF <b>*</b></span><input className={validationRequested && unitValidation.stateCode ? 'field-invalid' : ''} maxLength={2} value={form.stateCode} onChange={(e) => setForm({ ...form, stateCode: e.target.value.toUpperCase() })} />{validationRequested && unitValidation.stateCode && <small className="field-error">Informe uma UF válida.</small>}</label>
     <label><span className="field-label">Cidade <b>*</b></span><input className={validationRequested && unitValidation.city ? 'field-invalid' : ''} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />{validationRequested && unitValidation.city && <small className="field-error">Informe a cidade.</small>}</label>
-    <div className="location-fields"><label><span className="field-label">Latitude <em>opcional</em></span><input inputMode="decimal" className={validationRequested && unitValidation.coordinates ? 'field-invalid' : ''} value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} placeholder="-3.1186" />{validationRequested && unitValidation.coordinates && <small className="field-error">Informe latitude entre -90 e 90.</small>}</label><label><span className="field-label">Longitude <em>opcional</em></span><input inputMode="decimal" className={validationRequested && unitValidation.coordinates ? 'field-invalid' : ''} value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} placeholder="-60.0217" />{validationRequested && unitValidation.coordinates && <small className="field-error">Informe longitude entre -180 e 180.</small>}</label></div>
-    <small className="field-hint location-hint">Informe as coordenadas para posicionar a unidade no mapa. Deixe ambas vazias para remover a localização.</small>
+    <label><span className="field-label">Latitude <em>opcional</em></span><input inputMode="decimal" className={validationRequested && unitValidation.coordinates ? 'field-invalid' : ''} value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} placeholder="-3.1186" />{validationRequested && unitValidation.coordinates && <small className="field-error">Informe latitude entre -90 e 90.</small>}</label>
+    <label><span className="field-label">Longitude <em>opcional</em></span><input inputMode="decimal" className={validationRequested && unitValidation.coordinates ? 'field-invalid' : ''} value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} placeholder="-60.0217" />{validationRequested && unitValidation.coordinates && <small className="field-error">Informe longitude entre -180 e 180.</small>}</label>
+    <small className="field-hint location-hint" style={{ gridColumn: '1 / -1' }}>Informe as coordenadas para posicionar a unidade no mapa. Deixe ambas vazias para remover a localização.</small>
     <div className="form-actions"><button type="button" className="secondary-button clear-filters-button" onClick={onCancel}><CloseIcon /> Cancelar</button><button className="primary" disabled={saving}>{saving ? 'Salvando…' : <><CheckIcon /> Salvar alterações</>}</button></div>
   </form></FormCard>;
 }
@@ -1085,26 +1144,6 @@ function UnitEditFormWithoutLocation({ unit, token, onSaved, onCancel }: { unit:
     finally { setSaving(false); }
   }
   return <FormCard title={`Editar unidade · ${unit.name}`} onCancel={onCancel}><form className="inline-form" onSubmit={submit}>{error && <div className="error-banner">{error}</div>}<label>Código<input required value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} /></label><label>Nome<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label><label>UF<input required maxLength={2} value={form.stateCode} onChange={(e) => setForm({ ...form, stateCode: e.target.value.toUpperCase() })} /></label><label>Cidade<input required value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></label><div className="form-actions"><button type="button" onClick={onCancel}>Cancelar</button><button className="primary" disabled={saving}>{saving ? 'Salvando…' : <><CheckIcon /> Salvar alterações</>}</button></div></form></FormCard>;
-}
-
-function InventoryLifecyclePanel({ unit, equipment, token, onRefresh }: { unit: Unit; equipment: Equipment[]; token: string; onRefresh: () => Promise<void> }) {
-  const [editingUnit, setEditingUnit] = useState(false);
-  const [processingId, setProcessingId] = useState<string | null>(null);
-  async function deactivate(item: Equipment) {
-    if (!window.confirm(`Desativar o equipamento "${item.name}"? Ele sairá da operação, mas o histórico será preservado.`)) return;
-    setProcessingId(item.equipment_id);
-    try { await api(`/v1/equipment/${item.equipment_id}`, token, { method: 'DELETE' }); await onRefresh(); }
-    catch (reason) { window.alert(reason instanceof Error ? reason.message : 'Falha ao desativar equipamento.'); }
-    finally { setProcessingId(null); }
-  }
-  async function remove(item: Equipment) {
-    if (!window.confirm(`Excluir definitivamente o equipamento "${item.name}"? Essa ação remove o cadastro e os vínculos e não pode ser desfeita.`)) return;
-    setProcessingId(item.equipment_id);
-    try { await api(`/v1/equipment/${item.equipment_id}/permanent`, token, { method: 'DELETE' }); await onRefresh(); }
-    catch (reason) { window.alert(reason instanceof Error ? reason.message : 'Falha ao excluir equipamento.'); }
-    finally { setProcessingId(null); }
-  }
-  return <article className="lifecycle-panel"><div className="panel-title"><div><p className="eyebrow">GESTÃO DO INVENTÁRIO</p><h3>Alterações controladas</h3></div><button className="secondary-button" onClick={() => setEditingUnit((value) => !value)}>{editingUnit ? 'Fechar edição' : <><EditIcon /> Editar unidade</>}</button></div><p className="muted">Desativar preserva histórico. Excluir remove definitivamente o cadastro e os vínculos.</p>{editingUnit && <UnitEditForm unit={unit} token={token} onSaved={async () => { setEditingUnit(false); await onRefresh(); }} onCancel={() => setEditingUnit(false)} />}<div className="lifecycle-list">{equipment.map((item) => <div className="lifecycle-row" key={item.equipment_id}><div><strong>{item.name}</strong><small>{item.equipment_type.replaceAll('_', ' ')} · {item.management_address ?? 'sem endereço'}</small></div><div className="lifecycle-actions"><button className="danger-button compact" disabled={processingId === item.equipment_id} onClick={() => void deactivate(item)}>{processingId === item.equipment_id ? 'Processando…' : 'Desativar'}</button><button className="delete-button compact" disabled={processingId === item.equipment_id} onClick={() => void remove(item)}><TrashIcon /> Excluir</button></div></div>)}</div></article>;
 }
 
 function EquipmentEditForm({ equipment, token, onSaved, onCancel, onToast = () => undefined }: { equipment: Equipment; token: string; onSaved: () => Promise<void>; onCancel: () => void; onToast?: (toast: Omit<Toast, 'id'>) => void }) {
@@ -1126,13 +1165,14 @@ const starlinkMetricLabels: Record<string, string> = {
 
 function formatStarlinkMetric(sample: { metric_key: string; value: number | string; unit: string }, zeroed = false): string {
   if (zeroed && (sample.metric_key.includes('latitude') || sample.metric_key.includes('longitude'))) return 'N/D';
-  if (zeroed) return sample.metric_key === 'starlink.download.bps' || sample.metric_key === 'starlink.upload.bps' ? '0 Mbps' : `0 ${sample.unit}`;
+  if (zeroed) return sample.metric_key === 'starlink.download.bps' || sample.metric_key === 'starlink.upload.bps' ? '0 Mbps' : sample.unit === '%' ? formatPercent(0, 2) : `0 ${sample.unit}`;
   const value = Number(sample.value);
   if (!Number.isFinite(value)) return 'N/D';
   if (sample.metric_key === 'starlink.download.bps' || sample.metric_key === 'starlink.upload.bps') return `${(value / 1_000_000).toFixed(2)} Mbps`;
   if (sample.metric_key === 'starlink.coverage.available') return value === 1 ? 'Disponível' : 'Indisponível';
   if (sample.metric_key.includes('latitude') || sample.metric_key.includes('longitude')) return value.toFixed(6);
-  return `${Number(value.toFixed(2))} ${sample.unit}`;
+  if (sample.unit === '%') return formatPercent(value, 2);
+  return `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(value)} ${sample.unit}`;
 }
 
 function starlinkSampleValue(metrics: StarlinkTelemetry['metrics'], key: string, stale: boolean): string {
@@ -1161,26 +1201,38 @@ function UnitDetail({ unit, equipment, onBack, onEdit, onRefresh, onToast = () =
   const token = (JSON.parse(sessionStorage.getItem('healthlink.session') ?? '{}') as { accessToken?: string }).accessToken ?? '';
   const [editingUnit, setEditingUnit] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
-  async function deactivate(item: Equipment) {
-    if (!window.confirm(`Desativar o equipamento "${item.name}"? Ele sairá da operação, mas o histórico será preservado.`)) return;
-    setProcessingId(item.equipment_id);
-    try { await api(`/v1/equipment/${item.equipment_id}`, token, { method: 'DELETE' }); window.location.reload(); }
-    catch (reason) { window.alert(reason instanceof Error ? reason.message : 'Falha ao desativar equipamento.'); setProcessingId(null); }
+  const [blockTarget, setBlockTarget] = useState<Equipment | null>(null);
+  const [unblockTarget, setUnblockTarget] = useState<Equipment | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Equipment | null>(null);
+  async function confirmDeactivate() {
+    if (!blockTarget) return;
+    setProcessingId(blockTarget.equipment_id);
+    try { await api(`/v1/equipment/${blockTarget.equipment_id}`, token, { method: 'DELETE' }); window.location.reload(); }
+    catch (reason) { onToast({ type: 'error', title: 'Falha ao bloquear equipamento', detail: reason instanceof Error ? reason.message : 'Tente novamente em instantes.' }); setProcessingId(null); setBlockTarget(null); }
   }
-  async function remove(item: Equipment) {
-    if (!window.confirm(`Excluir definitivamente o equipamento "${item.name}"? Esta ação não pode ser desfeita.`)) return;
-    setProcessingId(item.equipment_id);
-    try { await api(`/v1/equipment/${item.equipment_id}/permanent`, token, { method: 'DELETE' }); window.location.reload(); }
-    catch (reason) { window.alert(reason instanceof Error ? reason.message : 'Falha ao excluir equipamento.'); setProcessingId(null); }
+  async function confirmReactivate() {
+    if (!unblockTarget) return;
+    setProcessingId(unblockTarget.equipment_id);
+    try { await api(`/v1/equipment/${unblockTarget.equipment_id}/reactivate`, token, { method: 'POST' }); window.location.reload(); }
+    catch (reason) { onToast({ type: 'error', title: 'Falha ao desbloquear equipamento', detail: reason instanceof Error ? reason.message : 'Tente novamente em instantes.' }); setProcessingId(null); setUnblockTarget(null); }
+  }
+  async function confirmRemove() {
+    if (!deleteTarget) return;
+    setProcessingId(deleteTarget.equipment_id);
+    try { await api(`/v1/equipment/${deleteTarget.equipment_id}/permanent`, token, { method: 'DELETE' }); window.location.reload(); }
+    catch (reason) { onToast({ type: 'error', title: 'Falha ao excluir equipamento', detail: reason instanceof Error ? reason.message : 'Tente novamente em instantes.' }); setProcessingId(null); setDeleteTarget(null); }
   }
   return <section className="unit-detail">
     <button className="back-button" onClick={onBack}>← Voltar ao centro operacional</button>
     <div className="detail-hero"><div><p className="eyebrow">UNIDADE {unit.code} · {unit.state_code}</p><h2>{unit.name}</h2><p>{unit.city} · monitoramento de infraestrutura</p></div><div className="detail-hero-actions"><button className="secondary-button compact" onClick={() => setEditingUnit((current) => !current)}>{editingUnit ? 'Fechar edição' : <><EditIcon /> Editar unidade</>}</button><span className={`status large-status ${unit.operational_status}`}>{statusLabel[unit.operational_status]}</span></div></div>
     {editingUnit && <UnitEditForm unit={unit} token={token} onSaved={async () => { setEditingUnit(false); await onRefresh(); }} onCancel={() => setEditingUnit(false)} onToast={onToast} />}
     <div className="detail-grid"><article className="equipment-panel"><div className="panel-title"><div><p className="eyebrow">ATIVOS MONITORADOS</p><h3>Infraestrutura da unidade</h3></div><div className="panel-title-actions"><strong>{equipment.length}</strong></div></div>
-      <div className="equipment-list">{equipment.map((item) => <div className="equipment-row" key={item.equipment_id}><span className={`equipment-indicator ${item.operational_status}`} /><div><strong>{item.name}</strong><small>{item.equipment_type.replaceAll('_', ' ')} · {item.management_address ?? 'sem endereço'}</small></div><div className="equipment-state"><span className={`status ${item.operational_status}`}>{statusLabel[item.operational_status]}</span><small>{item.observed_at ? new Date(item.observed_at).toLocaleString('pt-BR') : 'aguardando coleta'}</small></div><div className="equipment-actions"><button className="secondary-button compact" onClick={() => onEdit(item)}><EditIcon /> Editar</button><button className="danger-button compact" disabled={processingId === item.equipment_id} onClick={() => void deactivate(item)}>Desativar</button><button className="delete-button compact" disabled={processingId === item.equipment_id} onClick={() => void remove(item)}><TrashIcon /> Excluir</button></div></div>)}</div>
+      <div className="equipment-list">{equipment.map((item) => { const blocked = item.active === false; return <div className={`equipment-row ${blocked ? 'blocked' : ''}`} key={item.equipment_id}><span className={`equipment-indicator ${blocked ? 'blocked' : item.operational_status}`} /><div><strong>{item.name}</strong><small>{item.equipment_type.replaceAll('_', ' ')} · {item.management_address ?? 'sem endereço'}</small></div><div className="equipment-state"><span className={`status ${blocked ? 'blocked' : item.operational_status}`}>{blocked ? 'Bloqueado' : statusLabel[item.operational_status]}</span><small>{blocked ? 'telemetria desativada' : item.observed_at ? new Date(item.observed_at).toLocaleString('pt-BR') : 'aguardando coleta'}</small></div><div className="equipment-actions"><button className="secondary-button compact" onClick={() => onEdit(item)}><EditIcon /> Editar</button>{blocked ? <button className="secondary-button compact" disabled={processingId === item.equipment_id} onClick={() => setUnblockTarget(item)}><UnblockIcon /> Desbloquear</button> : <button className="secondary-button compact warning-action-button" disabled={processingId === item.equipment_id} onClick={() => setBlockTarget(item)}><BlockIcon /> Bloquear</button>}<button className="secondary-button compact clear-filters-button" disabled={processingId === item.equipment_id} onClick={() => setDeleteTarget(item)}><TrashIcon /> Excluir</button></div></div>; })}</div>
     </article><aside className="readiness-panel"><p className="eyebrow">PRONTIDÃO OPERACIONAL</p><div className="readiness-score"><strong>{equipment.filter((item) => item.operational_status === 'online').length}</strong><span>de {equipment.length}<small>ativos confirmados</small></span></div><div className="readiness-line"><i style={{ width: `${equipment.length ? equipment.filter((item) => item.operational_status === 'online').length / equipment.length * 100 : 0}%` }} /></div><dl><div><dt>Indisponíveis</dt><dd>{equipment.filter((item) => item.operational_status === 'offline').length}</dd></div><div><dt>Em atenção</dt><dd>{equipment.filter((item) => item.operational_status === 'degraded').length}</dd></div><div><dt>Sem telemetria</dt><dd>{equipment.filter((item) => item.operational_status === 'unknown').length}</dd></div></dl></aside></div>
     <StarlinkTelemetryPanel unit={unit} equipment={equipment} token={token} />
+    {blockTarget && <ConfirmDialog title="Bloquear equipamento" message={`Bloquear o equipamento "${blockTarget.name}"? Ele para de contar para o status da unidade e para de receber telemetria, assim como um usuário bloqueado. O histórico será preservado.`} confirmLabel="Bloquear" confirmIcon={<BlockIcon />} tone="warning" busy={processingId === blockTarget.equipment_id} onConfirm={() => void confirmDeactivate()} onCancel={() => setBlockTarget(null)} />}
+    {unblockTarget && <ConfirmDialog title="Desbloquear equipamento" message={`Desbloquear o equipamento "${unblockTarget.name}"? Ele volta a contar para o status da unidade e a receber telemetria normalmente.`} confirmLabel="Desbloquear" confirmIcon={<UnblockIcon />} tone="positive" busy={processingId === unblockTarget.equipment_id} onConfirm={() => void confirmReactivate()} onCancel={() => setUnblockTarget(null)} />}
+    {deleteTarget && <ConfirmDialog title="Excluir equipamento" message={`Excluir definitivamente o equipamento "${deleteTarget.name}"? Esta ação não pode ser desfeita.`} confirmLabel="Excluir" confirmIcon={<TrashIcon />} busy={processingId === deleteTarget.equipment_id} onConfirm={() => void confirmRemove()} onCancel={() => setDeleteTarget(null)} />}
   </section>;
 }
 
@@ -1190,7 +1242,6 @@ function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onTo
   const editingIsGlobalAdmin = editing ? users.find((user) => user.id === editing)?.roles.includes('global_administrator') ?? false : false;
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [localError, setLocalError] = useState('');
   const [approvalOpen, setApprovalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ManagedUser | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -1198,6 +1249,26 @@ function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onTo
   const [blocking, setBlocking] = useState(false);
   const [unblockTarget, setUnblockTarget] = useState<ManagedUser | null>(null);
   const [unblocking, setUnblocking] = useState(false);
+  const [nameFilter, setNameFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
+
+  const filteredUsers = users.filter((user) => {
+    if (nameFilter.trim() && !user.display_name.toLowerCase().includes(nameFilter.trim().toLowerCase())) return false;
+    if (statusFilter === 'active' && !user.active) return false;
+    if (statusFilter === 'inactive' && user.active) return false;
+    return true;
+  });
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedUsers = filteredUsers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  function clearUserFilters() {
+    setNameFilter('');
+    setStatusFilter('');
+    setPage(1);
+  }
 
   async function confirmDelete() {
     if (!deleteTarget) return;
@@ -1221,7 +1292,7 @@ function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onTo
   }
 
   async function submit(event: FormEvent) {
-    event.preventDefault(); setSubmitted(true); setLocalError('');
+    event.preventDefault(); setSubmitted(true);
     if (!form.displayName.trim() || !form.email.trim() || (!editingIsGlobalAdmin && !form.role) || (!editing && !form.cpf.trim()) || (!editing && !form.password)) {
       return;
     }
@@ -1233,7 +1304,7 @@ function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onTo
       setForm({ displayName: '', email: '', password: '', role: '', cpf: '', coligada: 'HealthLink Sentinel', active: true });
       setEditing(null); setSubmitted(false); await onRefresh();
       onToast({ type: 'success', title: wasEditing ? 'Usuário atualizado' : 'Usuário criado', detail: wasEditing ? 'As alterações foram salvas com sucesso.' : 'O novo usuário foi cadastrado e receberá a senha por e-mail.' });
-    } catch (reason) { setLocalError(reason instanceof Error ? reason.message : 'Falha ao salvar usuário.'); }
+    } catch (reason) { onToast({ type: 'error', title: editing ? 'Falha ao atualizar usuário' : 'Falha ao criar usuário', detail: friendlyMessage(reason, 'Não foi possível salvar o usuário. Tente novamente.') }); }
     finally { setSaving(false); }
   }
 
@@ -1252,8 +1323,8 @@ function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onTo
   return <section className="users-page">
     {approvalOpen && <ApprovalModal requests={requests} token={token} onClose={() => setApprovalOpen(false)} onRefresh={onRefresh} onToast={onToast} />}
     {deleteTarget && <ConfirmDialog title="Excluir usuário" message={`Excluir "${deleteTarget.display_name}" do tenant? O histórico global será preservado, mas ele não aparecerá mais nesta lista.`} confirmLabel="Excluir" busy={deleting} onConfirm={() => void confirmDelete()} onCancel={() => setDeleteTarget(null)} />}
-    {blockTarget && <ConfirmDialog title="Bloquear usuário" message={`Bloquear "${blockTarget.display_name}"? O acesso dele à plataforma será suspenso até que seja desbloqueado novamente.`} confirmLabel="Bloquear" confirmIcon={<BlockIcon />} busy={blocking} onConfirm={() => void confirmBlock()} onCancel={() => setBlockTarget(null)} />}
-    {unblockTarget && <ConfirmDialog title="Desbloquear usuário" message={`Desbloquear "${unblockTarget.display_name}"? O acesso dele à plataforma será restaurado imediatamente.`} confirmLabel="Desbloquear" confirmIcon={<UnblockIcon />} busy={unblocking} onConfirm={() => void confirmUnblock()} onCancel={() => setUnblockTarget(null)} />}
+    {blockTarget && <ConfirmDialog title="Bloquear usuário" message={`Bloquear "${blockTarget.display_name}"? O acesso dele à plataforma será suspenso até que seja desbloqueado novamente.`} confirmLabel="Bloquear" confirmIcon={<BlockIcon />} tone="warning" busy={blocking} onConfirm={() => void confirmBlock()} onCancel={() => setBlockTarget(null)} />}
+    {unblockTarget && <ConfirmDialog title="Desbloquear usuário" message={`Desbloquear "${unblockTarget.display_name}"? O acesso dele à plataforma será restaurado imediatamente.`} confirmLabel="Desbloquear" confirmIcon={<UnblockIcon />} tone="positive" busy={unblocking} onConfirm={() => void confirmUnblock()} onCancel={() => setUnblockTarget(null)} />}
     <div className="section-heading"><div><p className="eyebrow">GOVERNANÇA DE ACESSO</p><h2>Gerenciamento de usuários</h2><small>Controle de identidades, perfis e acesso ao cliente.</small></div></div>
     <button className="secondary-button approval-launch" onClick={() => setApprovalOpen(true)}>Aprovações {requests.length > 0 && <b className="nav-badge approval-count">{requests.length}</b>}</button>
     <div className="users-layout">
@@ -1274,7 +1345,7 @@ function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onTo
           </label>
           <label>
             <span className="field-label">E-mail <b className="req">*</b></span>
-            <input type="email" value={form.email} className={submitted && !form.email.trim() ? 'field-invalid' : ''} disabled={Boolean(editing)} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="nome@empresa.com" required />
+            <input type="text" inputMode="email" name="hl-account-email-field" autoComplete="off" data-lpignore="true" data-1p-ignore value={form.email} className={submitted && !form.email.trim() ? 'field-invalid' : ''} disabled={Boolean(editing)} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="nome@empresa.com" required />
             {submitted && !form.email.trim() && <span className="field-error-text">Informe o e-mail.</span>}
           </label>
           <label>
@@ -1300,20 +1371,31 @@ function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onTo
             <AppDropdown value={form.active ? 'active' : 'inactive'} onChange={(next) => setForm({ ...form, active: next === 'active' })} options={[{ value: 'active', label: 'Ativo' }, { value: 'inactive', label: 'Bloqueado' }]} />
           </label>
           <label>
-            {editing ? 'Nova senha (opcional)' : 'Senha *'}
-            <input type="password" minLength={8} value={form.password} className={submitted && !editing && !form.password ? 'field-invalid' : ''} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder={editing ? 'Deixe em branco para manter a atual' : 'Mínimo de 8 caracteres'} required={!editing} />
+            <span className="field-label">{editing ? 'Nova senha (opcional)' : <>Senha <b className="req">*</b></>}</span>
+            <input type="password" name="hl-new-account-password" autoComplete="new-password" data-lpignore="true" data-1p-ignore minLength={8} value={form.password} className={submitted && !editing && !form.password ? 'field-invalid' : ''} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder={editing ? 'Deixe em branco para manter a atual' : 'Mínimo de 8 caracteres'} required={!editing} />
             {submitted && !editing && !form.password && <span className="field-error-text">Informe uma senha para o usuário.</span>}
           </label>
         </div>
-        {localError && <div className="form-error">{localError}</div>}
         <div className="form-actions">
           <button type="button" className="secondary-button clear-filters-button" onClick={cancelEdit}>{editing ? <><CloseIcon /> Cancelar</> : <><ClearFilterIcon /> Limpar</>}</button>
           <button className="primary" disabled={saving}>{saving ? 'Salvando…' : editing ? <><CheckIcon /> Salvar alterações</> : <><PlusIcon /> Criar usuário</>}</button>
         </div>
       </form>
       <div className="users-list panel">
-        <div className="panel-title"><div><p className="eyebrow">USUÁRIOS DO CLIENTE</p><h3>{users.length} identidades</h3></div><button className="secondary-button compact action-refresh-button" onClick={() => void onRefresh()} disabled={loading} title="Recarregar lista de usuários"><RefreshIcon /> Atualizar</button></div>
-        {loading ? <div className="empty-state compact-empty"><p>Consultando diretório…</p></div> : users.length === 0 ? <div className="empty-state compact-empty"><p>Nenhum usuário cadastrado.</p></div> : <div className="user-table">{users.map((user) => <article className="user-row" key={user.id}><span className={`user-avatar ${user.active ? 'active' : 'blocked'}`}>{user.display_name.slice(0, 1).toUpperCase()}</span><div className="user-main"><strong>{user.display_name}</strong><small>{user.email}</small></div><div className="user-role"><span>{user.roles[0]?.replaceAll('_', ' ') ?? 'sem perfil'}</span><small>{user.active ? 'Ativo' : 'Bloqueado'}</small></div><div className="user-actions"><button className="secondary-button compact" onClick={() => startEdit(user)}><EditIcon /> Editar</button>{user.active ? <button className="secondary-button compact warning-action-button" onClick={() => setBlockTarget(user)}><BlockIcon /> Bloquear</button> : <button className="secondary-button compact" onClick={() => setUnblockTarget(user)}><UnblockIcon /> Desbloquear</button>}<button className="secondary-button compact clear-filters-button" onClick={() => setDeleteTarget(user)}><TrashIcon /> Excluir</button></div></article>)}</div>}
+        <div className="panel-title"><div><p className="eyebrow">USUÁRIOS DO CLIENTE</p><h3>{filteredUsers.length} identidades</h3></div><button className="secondary-button compact action-refresh-button" onClick={() => void onRefresh()} disabled={loading} title="Recarregar lista de usuários"><RefreshIcon /> Atualizar</button></div>
+        <div className="user-filters">
+          <div className="search-input-wrap"><SearchIcon /><input className="search-input" placeholder="Pesquisar por nome…" value={nameFilter} onChange={(e) => { setNameFilter(e.target.value); setPage(1); }} /></div>
+          <AppDropdown placeholder="Todos os status" value={statusFilter} onChange={(next) => { setStatusFilter(next); setPage(1); }} options={[{ value: '', label: 'Todos os status' }, { value: 'active', label: 'Ativo' }, { value: 'inactive', label: 'Bloqueado' }]} />
+          {(nameFilter || statusFilter) && <button type="button" className="secondary-button compact clear-filters-button" onClick={clearUserFilters}><ClearFilterIcon /> Limpar</button>}
+        </div>
+        {loading ? <div className="empty-state compact-empty"><p>Consultando diretório…</p></div> : filteredUsers.length === 0 ? <div className="empty-state compact-empty"><p>Nenhum usuário encontrado.</p></div> : <>
+          <div className="user-table">{pagedUsers.map((user) => <article className={`user-row ${user.active ? '' : 'blocked'}`} key={user.id}><span className={`user-avatar ${user.active ? 'active' : 'blocked'}`}>{user.display_name.slice(0, 1).toUpperCase()}</span><div className="user-main"><strong>{user.display_name}</strong><small>{user.email}</small></div><div className="user-role"><span>{user.roles[0]?.replaceAll('_', ' ') ?? 'sem perfil'}</span><span className={`status ${user.active ? 'online' : 'blocked'}`}>{user.active ? 'Ativo' : 'Bloqueado'}</span></div><div className="user-actions"><button className="secondary-button compact" onClick={() => startEdit(user)}><EditIcon /> Editar</button>{user.active ? <button className="secondary-button compact warning-action-button" onClick={() => setBlockTarget(user)}><BlockIcon /> Bloquear</button> : <button className="secondary-button compact" onClick={() => setUnblockTarget(user)}><UnblockIcon /> Desbloquear</button>}<button className="secondary-button compact clear-filters-button" onClick={() => setDeleteTarget(user)}><TrashIcon /> Excluir</button></div></article>)}</div>
+          {totalPages > 1 && <div className="pagination">
+            <button type="button" className="secondary-button compact" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Anterior</button>
+            <span>Página {currentPage} de {totalPages}</span>
+            <button type="button" className="secondary-button compact" disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)}>Próxima</button>
+          </div>}
+        </>}
       </div>
     </div>
   </section>;
@@ -1329,7 +1411,7 @@ function ApprovalModal({ requests, token, onClose, onRefresh, onToast }: { reque
       await onRefresh();
       onToast({ type: 'success', title: approve ? 'Solicitação aprovada' : 'Solicitação rejeitada', detail: approve ? 'O acesso foi liberado para o solicitante.' : 'A solicitação de cadastro foi recusada.' });
     } catch (reason) {
-      onToast({ type: 'error', title: approve ? 'Falha ao aprovar' : 'Falha ao rejeitar', detail: reason instanceof Error ? reason.message : 'Não foi possível concluir a ação.', sticky: true });
+      onToast({ type: 'error', title: approve ? 'Falha ao aprovar' : 'Falha ao rejeitar', detail: reason instanceof Error ? reason.message : 'Não foi possível concluir a ação.' });
     }
   }
 
@@ -1344,19 +1426,21 @@ function ApprovalModal({ requests, token, onClose, onRefresh, onToast }: { reque
   {rejectTarget && <ConfirmDialog title="Rejeitar solicitação" message={`Rejeitar o cadastro de "${rejectTarget.display_name}"? O solicitante não terá acesso à plataforma.`} confirmLabel="Rejeitar" confirmIcon={<RejectIcon />} busy={rejecting} onConfirm={() => void confirmReject()} onCancel={() => setRejectTarget(null)} />}</div>;
 }
 
+// Escala ascendente (padrão Zabbix): 0/1 = baixa gravidade, 5 = mais grave.
 const severityConfig = {
-  1: { label: 'CRÍTICO', cls: 'critical', color: 'var(--red)' },
-  2: { label: 'ALTO',    cls: 'high',     color: 'var(--red)' },
-  3: { label: 'MÉDIO',  cls: 'medium',   color: 'var(--amber)' },
-  4: { label: 'BAIXO',  cls: 'low',      color: '#8da3b7' },
-  5: { label: 'INFO',   cls: 'info',     color: '#8da3b7' },
+  0: { label: 'N/D',        cls: 'low',      color: '#8da3b7' },
+  1: { label: 'INFO',       cls: 'low',      color: '#8da3b7' },
+  2: { label: 'AVISO',      cls: 'medium',   color: 'var(--amber)' },
+  3: { label: 'MÉDIA',      cls: 'medium',   color: 'var(--amber)' },
+  4: { label: 'ALTA',       cls: 'high',     color: 'var(--red)' },
+  5: { label: 'CRÍTICA',    cls: 'critical', color: 'var(--red)' },
 } as const;
 
 function AlertSeverityBadge({ severity }: { severity: number }) {
   const cfg = severityConfig[severity as keyof typeof severityConfig] ?? { label: `S${severity}`, cls: 'info', color: '#8da3b7' };
   return (
     <div className={`alert-severity-badge sev-${cfg.cls}`}>
-      {severity <= 2 && <span className="sev-pulse" />}
+      {severity >= 4 && <span className="sev-pulse" />}
       <span className="sev-label">{cfg.label}</span>
       <span className="sev-num">S{severity}</span>
     </div>
@@ -1367,6 +1451,7 @@ function AlertRow({ alert, isHistory, onAction }: { alert: Alert; isHistory: boo
   const [busy, setBusy] = useState<'acknowledge' | 'resolve' | null>(null);
   const [rowFeedback, setRowFeedback] = useState<'success' | 'error' | null>(null);
   const [rowError, setRowError] = useState('');
+  const [pendingAction, setPendingAction] = useState<'acknowledge' | 'resolve' | null>(null);
 
   async function handleAction(action: 'acknowledge' | 'resolve') {
     setBusy(action);
@@ -1387,12 +1472,12 @@ function AlertRow({ alert, isHistory, onAction }: { alert: Alert; isHistory: boo
   const statusReadable = alert.status === 'resolved' ? 'Resolvido' : alert.status === 'acknowledged' ? 'Reconhecido' : 'Aberto';
 
   return (
-    <article className={`alert-row severity-${alert.severity}${rowFeedback === 'success' ? ' row-success' : rowFeedback === 'error' ? ' row-error' : ''}`}>
+    <article className={`alert-row severity-${alert.severity}${alert.status === 'resolved' ? ' resolved' : ''}${rowFeedback === 'success' ? ' row-success' : rowFeedback === 'error' ? ' row-error' : ''}`}>
       <AlertSeverityBadge severity={alert.severity} />
       <div className="alert-main">
         <strong>{alert.title}</strong>
         <small>{alert.unit_code ?? 'Unidade não associada'} · {alert.equipment_name ?? 'Equipamento não informado'}</small>
-        {rowFeedback === 'error' && <span className="alert-inline-error">⚠ {rowError}</span>}
+        {rowFeedback === 'error' && <span className="alert-inline-error"><WarningIcon /> {rowError}</span>}
       </div>
       <div className="alert-meta">
         <span className={`status ${statusTone}`}>{statusReadable}</span>
@@ -1402,24 +1487,26 @@ function AlertRow({ alert, isHistory, onAction }: { alert: Alert; isHistory: boo
       {!isHistory && (
         <div className="alert-actions">
           {alert.status === 'open' && (
-            <button className="alert-action-btn ack" onClick={() => void handleAction('acknowledge')} disabled={busy !== null} title="Reconhecer alerta">
-              {busy === 'acknowledge' ? <span className="btn-spinner" /> : '✓'} Reconhecer
+            <button className="alert-action-btn ack" onClick={() => setPendingAction('acknowledge')} disabled={busy !== null} title="Reconhecer alerta">
+              {busy === 'acknowledge' ? <span className="btn-spinner" /> : <EyeCheckIcon />} Reconhecer
             </button>
           )}
           {alert.status !== 'resolved' && (
-            <button className="alert-action-btn resolve" onClick={() => void handleAction('resolve')} disabled={busy !== null} title="Resolver incidente">
-              {busy === 'resolve' ? <span className="btn-spinner" /> : '⏺'} Resolver
+            <button className="alert-action-btn resolve" onClick={() => setPendingAction('resolve')} disabled={busy !== null} title="Resolver incidente">
+              {busy === 'resolve' ? <span className="btn-spinner" /> : <ResolveIcon />} Resolver
             </button>
           )}
         </div>
       )}
+      {pendingAction === 'acknowledge' && <ConfirmDialog title="Reconhecer alerta" message={`Reconhecer "${alert.title}"? Isso sinaliza que a equipe já está ciente do problema.`} confirmLabel="Reconhecer" confirmIcon={<EyeCheckIcon />} tone="warning" busy={busy === 'acknowledge'} onConfirm={() => { setPendingAction(null); void handleAction('acknowledge'); }} onCancel={() => setPendingAction(null)} />}
+      {pendingAction === 'resolve' && <ConfirmDialog title="Resolver incidente" message={`Marcar "${alert.title}" como resolvido? Ele sairá da lista de alertas ativos e irá para o histórico.`} confirmLabel="Resolver" confirmIcon={<ResolveIcon />} tone="positive" busy={busy === 'resolve'} onConfirm={() => { setPendingAction(null); void handleAction('resolve'); }} onCancel={() => setPendingAction(null)} />}
     </article>
   );
 }
 
 function AlertsCenter({ alerts, mode, loading, onModeChange, onAction, onRetry }: { alerts: Alert[]; mode: 'active' | 'history'; loading: boolean; onModeChange: (mode: 'active' | 'history') => void; onAction: (id: string, action: 'acknowledge' | 'resolve') => Promise<void>; onRetry: () => void }) {
   const isHistory = mode === 'history';
-  const criticalCount = !isHistory ? alerts.filter((a) => a.severity <= 2 && a.status !== 'resolved').length : 0;
+  const criticalCount = !isHistory ? alerts.filter((a) => a.severity >= 4 && a.status !== 'resolved').length : 0;
   return (
     <section className="alerts-center">
       <div className="alerts-center-header">
@@ -1443,7 +1530,7 @@ function AlertsCenter({ alerts, mode, loading, onModeChange, onAction, onRetry }
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           {loading && <span className="alerts-loading-indicator"><span className="btn-spinner" /> Carregando…</span>}
           <button className="secondary-button compact action-refresh-button" onClick={onRetry} disabled={loading} title="Recarregar lista de alertas"><RefreshIcon /> Atualizar</button>
-          <span style={{ font: '12px Arial', color: '#637b91' }}>{alerts.length} registro(s)</span>
+          <span className={`problem-count ${isHistory ? 'resolved-count' : ''}`}>{alerts.length} registro(s)</span>
         </div>
       </div>
       {loading && alerts.length === 0 ? (
@@ -1452,10 +1539,10 @@ function AlertsCenter({ alerts, mode, loading, onModeChange, onAction, onRetry }
         </div>
       ) : alerts.length === 0 ? (
         <div className="empty-state">
-          <span className="empty-glyph">{isHistory ? '📋' : '✓'}</span>
+          <span className="empty-glyph">{isHistory ? <ClipboardIcon /> : <CheckIcon />}</span>
           <h3>{isHistory ? 'Nenhum alerta resolvido' : 'Nenhum alerta requer ação'}</h3>
           <p>{isHistory ? 'Os incidentes resolvidos aparecerão aqui para auditoria operacional.' : 'O núcleo de monitoramento não identificou problemas ativos nas unidades.'}</p>
-          {!isHistory && <button className="secondary-button" style={{ marginTop: '16px' }} onClick={onRetry}>Verificar novamente</button>}
+          {!isHistory && <button className="secondary-button empty-state-action" onClick={onRetry}>Verificar novamente</button>}
         </div>
       ) : (
         <div className="alert-list">
@@ -1469,10 +1556,10 @@ function AlertsCenter({ alerts, mode, loading, onModeChange, onAction, onRetry }
 function ToastStack({ toasts }: { toasts: Toast[] }) {
   if (toasts.length === 0) return null;
   const iconMap: Record<Toast['type'], ReactNode> = {
-    error: '⛔',
-    warning: '⚠',
+    error: <ErrorIcon />,
+    warning: <WarningIcon />,
     success: <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path className="toast-check-mark" d="M5 12.5l4.5 4.5L19 7" /></svg>,
-    info: 'ℹ',
+    info: <InfoIcon />,
   };
   return (
     <div className="noc-toast-stack" role="log" aria-live="assertive" aria-label="Notificações do sistema">
@@ -1577,7 +1664,7 @@ function LoginWithRequest({ onSuccess, showLogoutToast = false }: { onSuccess: (
     if (!email.trim() || !password.trim()) return;
     try { const response = await fetch(`${apiBase}/v1/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, password }) }); if (!response.ok) throw new Error('E-mail ou senha inválidos.'); onSuccess(await response.json() as LoginResponse); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Falha de autenticação.'); }
   }
-  return <div className="login-page"><section className="login-context"><div className="brand large"><span className="brand-mark">HL</span><div><strong>HealthLink</strong><small>SENTINEL</small></div></div><div className="context-copy"><p className="eyebrow">PLATAFORMA DE MISSÃO CRÍTICA</p><h1>Visibilidade para proteger cada unidade em campo.</h1><p>Monitoramento contínuo de conectividade, infraestrutura e disponibilidade operacional.</p></div></section><section className="login-panel"><form onSubmit={submit} noValidate><p className="eyebrow">ACESSO RESTRITO</p><h2>Entrar no centro de comando</h2><p className="muted">Utilize sua identidade corporativa.</p><label>E-mail corporativo<input type="email" value={email} className={emailMissing ? 'field-invalid' : ''} onChange={(event) => setEmail(event.target.value)} autoFocus />{emailMissing && <span className="field-error-text">Informe o e-mail.</span>}</label><label>Senha<div className="password-field"><input type={showPassword ? 'text' : 'password'} value={password} className={passwordMissing ? 'field-invalid' : ''} onChange={(event) => setPassword(event.target.value)} /><button type="button" className="password-toggle" onClick={() => setShowPassword((prev) => !prev)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOffIcon /> : <EyeIcon />}</button></div>{passwordMissing && <span className="field-error-text">Informe a senha.</span>}</label>{error && <div className="form-error">{error}</div>}<button className="primary">Acessar plataforma</button><button type="button" className="request-access-link" onClick={() => setRequestOpen(true)}>Criar conta <span>(sujeito a aprovação)</span></button></form></section>{requestOpen && <RequestAccessModal onClose={() => setRequestOpen(false)} onToast={addToast} />}<ToastStack toasts={toasts} /></div>;
+  return <div className="login-page"><section className="login-context"><div className="brand large"><img className="brand-mark" src={brandIcon} alt="HealthLink Sentinel" width={46} height={46} /><div><strong>HealthLink</strong><small>SENTINEL</small></div></div><div className="context-copy"><p className="eyebrow">PLATAFORMA DE MISSÃO CRÍTICA</p><h1>Visibilidade para proteger cada unidade em campo.</h1><p>Monitoramento contínuo de conectividade, infraestrutura e disponibilidade operacional.</p></div></section><section className="login-panel"><form onSubmit={submit} noValidate><p className="eyebrow">ACESSO RESTRITO</p><h2>Entrar no centro de comando</h2><p className="muted">Utilize sua identidade corporativa.</p><label>E-mail corporativo<input type="email" value={email} className={emailMissing ? 'field-invalid' : ''} onChange={(event) => setEmail(event.target.value)} autoFocus />{emailMissing && <span className="field-error-text">Informe o e-mail.</span>}</label><label>Senha<div className="password-field"><input type={showPassword ? 'text' : 'password'} value={password} className={passwordMissing ? 'field-invalid' : ''} onChange={(event) => setPassword(event.target.value)} /><button type="button" className="password-toggle" onClick={() => setShowPassword((prev) => !prev)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOffIcon /> : <EyeIcon />}</button></div>{passwordMissing && <span className="field-error-text">Informe a senha.</span>}</label>{error && <div className="form-error">{error}</div>}<button className="primary">Acessar plataforma</button><button type="button" className="request-access-link" onClick={() => setRequestOpen(true)}>Criar conta <span>(sujeito a aprovação)</span></button></form></section>{requestOpen && <RequestAccessModal onClose={() => setRequestOpen(false)} onToast={addToast} />}<ToastStack toasts={toasts} /></div>;
 }
 
 function EyeIcon() {
@@ -1624,6 +1711,102 @@ function CheckIcon() {
   return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7" /></svg>;
 }
 
+function EyeCheckIcon() {
+  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" /><circle cx="12" cy="12" r="2.6" /></svg>;
+}
+
+function ResolveIcon() {
+  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="8.5" /><path d="M8.3 12.4l2.6 2.6 5-5.2" /></svg>;
+}
+
+function NavDashboardIcon() {
+  return <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3.5" y="3.5" width="7.5" height="7.5" rx="1.4" /><rect x="13" y="3.5" width="7.5" height="4.5" rx="1.4" /><rect x="13" y="10.5" width="7.5" height="10" rx="1.4" /><rect x="3.5" y="13.5" width="7.5" height="7" rx="1.4" /></svg>;
+}
+
+function NavTruckIcon() {
+  return <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="6.5" width="11" height="9" rx="1.2" /><path d="M13.5 10h4l3 3v2.5h-7z" /><circle cx="7" cy="17.5" r="1.7" /><circle cx="17" cy="17.5" r="1.7" /></svg>;
+}
+
+function NavBellIcon() {
+  return <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 10.5a6 6 0 0 1 12 0c0 4 1.5 5.5 1.5 5.5h-15S6 14.5 6 10.5z" /><path d="M10 19a2.2 2.2 0 0 0 4 0" /></svg>;
+}
+
+function NavActivityIcon() {
+  return <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12.5h4l2.2-7 4 15 2.2-8H21" /></svg>;
+}
+
+function NavUsersIcon() {
+  return <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="8" r="3.2" /><path d="M2.8 19.5c.8-3.4 3.2-5.3 6.2-5.3s5.4 1.9 6.2 5.3" /><circle cx="17.5" cy="8.8" r="2.5" /><path d="M15.8 14.6c2.4.2 4.2 1.9 4.9 4.9" /></svg>;
+}
+
+function NavReportIcon() {
+  return <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h9l4 4v14H6z" /><path d="M15 3v4h4" /><path d="M9 13v4M12.5 11v6M16 15v2" /></svg>;
+}
+
+function SyncIcon() {
+  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7.5h9.5a4.5 4.5 0 0 1 4.5 4.5v1" /><path d="M11 4l3.5 3.5L11 11" /><path d="M20 16.5h-9.5A4.5 4.5 0 0 1 6 12v-1" /><path d="M13 20l-3.5-3.5L13 13" /></svg>;
+}
+
+function SunIcon() {
+  return <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4.2" /><path d="M12 2.5v2.4M12 19.1v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7" /></svg>;
+}
+
+function SearchIcon() {
+  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4.3-4.3" /></svg>;
+}
+
+function HomeIcon() {
+  return <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11.5L12 4l8 7.5" /><path d="M6 10v9h12v-9" /><path d="M10 19v-5.5h4V19" /></svg>;
+}
+
+function BreadcrumbChevronIcon() {
+  return <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5l7 7-7 7" /></svg>;
+}
+
+function NavGeneralIcon() {
+  return <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="8.5" /><path d="M12 3.5c2.6 2.4 4 5.3 4 8.5s-1.4 6.1-4 8.5c-2.6-2.4-4-5.3-4-8.5s1.4-6.1 4-8.5z" /><path d="M3.8 9h16.4M3.8 15h16.4" /></svg>;
+}
+
+function NavLinkIcon() {
+  return <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 14.5l5-5" /><path d="M11 7.5l1.3-1.3a3.5 3.5 0 0 1 5 5L16 12.5" /><path d="M13 16.5l-1.3 1.3a3.5 3.5 0 0 1-5-5L8 11.5" /></svg>;
+}
+
+function NavVpnIcon() {
+  return <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l7 3v5.5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" /><path d="M9 12l2.2 2.2L15.5 9.5" /></svg>;
+}
+
+function NavServerIcon() {
+  return <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3.5" y="4" width="17" height="6.5" rx="1.4" /><rect x="3.5" y="13.5" width="17" height="6.5" rx="1.4" /><path d="M7 7.2h.01M7 16.7h.01" /></svg>;
+}
+
+function ClipboardIcon() {
+  return <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4.5" width="12" height="16" rx="2" /><rect x="9" y="3" width="6" height="3" rx="1" /><path d="M9 11h6M9 14.5h6M9 18h3.5" /></svg>;
+}
+
+function MoonIcon() {
+  return <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" stroke="none"><path d="M20.7 14.7A8.6 8.6 0 019.3 3.3a.7.7 0 00-.9-.9A10 10 0 1021.6 15.6a.7.7 0 00-.9-.9z" /></svg>;
+}
+
+function WarningIcon() {
+  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3.5l9.5 16.5H2.5z" /><path d="M12 9.5v4.5" /><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none" /></svg>;
+}
+
+function ErrorIcon() {
+  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M9 9l6 6M15 9l-6 6" /></svg>;
+}
+
+function InfoIcon() {
+  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 11v5.5" /><circle cx="12" cy="7.7" r="0.9" fill="currentColor" stroke="none" /></svg>;
+}
+
+function PingIcon() {
+  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="2.1" fill="currentColor" stroke="none" /><path d="M8.3 8.3a5.2 5.2 0 0 1 7.4 0" /><path d="M5.4 5.4a9.3 9.3 0 0 1 13.2 0" /></svg>;
+}
+
+function TracertIcon() {
+  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="6" r="1.8" /><circle cx="19" cy="18" r="1.8" /><path d="M5 8v3a4 4 0 0 0 4 4h6a4 4 0 0 1 4 4" /></svg>;
+}
+
 function TrashIcon() {
   return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16" /><path d="M9 7V4.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1V7" /><path d="M6 7l1 12.5a1.5 1.5 0 0 0 1.5 1.5h7a1.5 1.5 0 0 0 1.5-1.5L18 7" /><path d="M10 11v6" /><path d="M14 11v6" /></svg>;
 }
@@ -1651,12 +1834,16 @@ function RequestAccessModal({ onClose, onToast }: { onClose: () => void; onToast
     setSaving(true);
     try {
       const response = await fetch(`${apiBase}/v1/access-requests`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(form) });
-      if (!response.ok) throw new Error('Não foi possível enviar a solicitação.');
+      if (!response.ok) {
+        let detail = '';
+        try { const payload = await response.json() as { message?: string; error?: string }; detail = payload.message || payload.error || ''; } catch { /* resposta sem JSON */ }
+        throw new Error(detail || 'Não foi possível enviar a solicitação.');
+      }
       onToast({ type: 'success', title: 'Solicitação enviada', detail: 'Aguarde a aprovação do administrador.' });
       onClose();
-    } catch (reason) { onToast({ type: 'error', title: 'Falha ao solicitar acesso', detail: reason instanceof Error ? reason.message : 'Tente novamente em instantes.', sticky: true }); } finally { setSaving(false); }
+    } catch (reason) { onToast({ type: 'error', title: 'Falha ao solicitar acesso', detail: friendlyMessage(reason, 'Não foi possível enviar a solicitação. Tente novamente.') }); } finally { setSaving(false); }
   }
-  return <div className="approval-modal" role="dialog" aria-modal="true"><form className="request-access-modal panel" onSubmit={submit} noValidate><div className="panel-title"><div><p className="eyebrow">SOLICITAÇÃO DE ACESSO</p><h3>Criar conta</h3></div><button type="button" className="icon-button clear-filters-button" onClick={onClose} aria-label="Fechar"><CloseIcon /></button></div><p className="muted">Seu cadastro será analisado por um administrador.</p><label><span className="field-label">Nome completo <b className="req">*</b></span><input className={nameMissing ? 'field-invalid' : ''} value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} />{nameMissing && <span className="field-error-text">Informe o nome completo.</span>}</label><label><span className="field-label">E-mail corporativo <b className="req">*</b></span><input type="email" className={emailMissing ? 'field-invalid' : ''} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />{emailMissing && <span className="field-error-text">Informe o e-mail.</span>}</label><label><span className="field-label">Perfil solicitado <b className="req">*</b></span><AppDropdown value={form.role} onChange={(next) => setForm({ ...form, role: next })} options={[{ value: 'viewer', label: 'Visualizador' }, { value: 'supervisor', label: 'Supervisor' }, { value: 'noc_operator', label: 'Operador NOC' }]} /></label><label><span className="field-label">Senha <b className="req">*</b></span><input type="password" minLength={8} className={passwordMissing ? 'field-invalid' : ''} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />{passwordMissing && <span className="field-error-text">A senha deve ter ao menos 8 caracteres.</span>}</label><div className="form-actions request-access-actions"><button type="button" className="secondary-button clear-filters-button" onClick={onClose}><CloseIcon /> Cancelar</button><button className="primary" disabled={saving}>{saving ? 'Enviando…' : 'Solicitar Acesso'}</button></div></form></div>;
+  return <div className="approval-modal" role="dialog" aria-modal="true"><form className="request-access-modal panel" onSubmit={submit} noValidate><div className="panel-title"><div><p className="eyebrow">SOLICITAÇÃO DE ACESSO</p><h3>Criar conta</h3></div><button type="button" className="icon-button clear-filters-button" onClick={onClose} aria-label="Fechar"><CloseIcon /></button></div><p className="muted">Seu cadastro será analisado por um administrador.</p><label><span className="field-label">Nome completo <b className="req">*</b></span><input className={nameMissing ? 'field-invalid' : ''} value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} placeholder="Ex.: Nome" />{nameMissing && <span className="field-error-text">Informe o nome completo.</span>}</label><label><span className="field-label">E-mail corporativo <b className="req">*</b></span><input type="text" inputMode="email" name="hl-account-email-field" autoComplete="off" data-lpignore="true" data-1p-ignore className={emailMissing ? 'field-invalid' : ''} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="nome@empresa.com" />{emailMissing && <span className="field-error-text">Informe o e-mail.</span>}</label><label><span className="field-label">Perfil solicitado <b className="req">*</b></span><AppDropdown value={form.role} onChange={(next) => setForm({ ...form, role: next })} options={[{ value: 'viewer', label: 'Visualizador' }, { value: 'supervisor', label: 'Supervisor' }, { value: 'noc_operator', label: 'Operador NOC' }]} /></label><label><span className="field-label">Senha <b className="req">*</b></span><input type="password" name="hl-new-account-password" autoComplete="new-password" data-lpignore="true" data-1p-ignore minLength={8} className={passwordMissing ? 'field-invalid' : ''} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Mínimo de 8 caracteres" />{passwordMissing && <span className="field-error-text">A senha deve ter ao menos 8 caracteres.</span>}</label><div className="form-actions request-access-actions"><button type="button" className="secondary-button clear-filters-button" onClick={onClose}><CloseIcon /> Cancelar</button><button className="primary" disabled={saving}>{saving ? 'Enviando…' : 'Solicitar Acesso'}</button></div></form></div>;
 }
 
 function Login({ onSuccess }: { onSuccess: (session: LoginResponse) => void }) {
@@ -1675,7 +1862,7 @@ function Login({ onSuccess }: { onSuccess: (session: LoginResponse) => void }) {
     finally { setLoading(false); }
   }
   return <div className="login-page">
-    <section className="login-context"><div className="brand large"><span className="brand-mark">HL</span><div><strong>HealthLink</strong><small>SENTINEL</small></div></div><div className="context-copy"><p className="eyebrow">PLATAFORMA DE MISSÃO CRÍTICA</p><h1>Visibilidade para proteger cada unidade em campo.</h1><p>Monitoramento contínuo de conectividade, infraestrutura e disponibilidade operacional das unidades móveis de saúde.</p></div><div className="context-status"><span className="pulse" /> Núcleo de monitoramento disponível</div></section>
+    <section className="login-context"><div className="brand large"><img className="brand-mark" src={brandIcon} alt="HealthLink Sentinel" width={46} height={46} /><div><strong>HealthLink</strong><small>SENTINEL</small></div></div><div className="context-copy"><p className="eyebrow">PLATAFORMA DE MISSÃO CRÍTICA</p><h1>Visibilidade para proteger cada unidade em campo.</h1><p>Monitoramento contínuo de conectividade, infraestrutura e disponibilidade operacional das unidades móveis de saúde.</p></div><div className="context-status"><span className="pulse" /> Núcleo de monitoramento disponível</div></section>
     <section className="login-panel"><form onSubmit={submit}><p className="eyebrow">ACESSO RESTRITO</p><h2>Entrar no centro de comando</h2><p className="muted">Utilize sua identidade corporativa.</p><label>E-mail corporativo<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoFocus /></label><label>Senha<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label>{error && <div className="form-error">{error}</div>}<button className="primary" disabled={loading}>{loading ? 'Validando acesso…' : 'Acessar plataforma'}</button><small className="security-note">Sessão protegida · Acesso auditado</small></form></section>
   </div>;
 }

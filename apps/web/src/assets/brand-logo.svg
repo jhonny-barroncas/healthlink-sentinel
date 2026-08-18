@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 120" width="340" height="120">
+  <defs>
+    <style>
+      .bg { fill: #0b1220; }
+      .bracket { fill: none; stroke: #2fe0c4; stroke-width: 3; stroke-linecap: round; }
+      .hl { font-family: 'Helvetica Neue', Arial, sans-serif; font-weight: 700; font-size: 19px; fill: #e7ecf3; letter-spacing: 1px; }
+      .word { font-family: 'Helvetica Neue', Arial, sans-serif; font-weight: 700; font-size: 32px; fill: #f2f5f9; }
+      .sub { font-family: 'Helvetica Neue', Arial, sans-serif; font-weight: 600; font-size: 13px; fill: #2fe0c4; letter-spacing: 5px; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="340" height="120" rx="10"/>
+
+  <!-- Icon: viewfinder-style corner brackets (link/monitoring mark) -->
+  <g transform="translate(26,32)">
+    <!-- outer corner brackets, 56x56 -->
+    <path class="bracket" d="M0,16 V2 A2,2 0 0 1 2,0 H16"/>
+    <path class="bracket" d="M40,0 H54 A2,2 0 0 1 56,2 V16"/>
+    <path class="bracket" d="M56,40 V54 A2,2 0 0 1 54,56 H40"/>
+    <path class="bracket" d="M16,56 H2 A2,2 0 0 1 0,54 V40"/>
+
+    <text class="hl" x="28" y="35" text-anchor="middle" dominant-baseline="middle">HL</text>
+  </g>
+
+  <!-- Wordmark -->
+  <text class="word" x="104" y="60">HealthLink</text>
+  <text class="sub" x="106" y="86">SENTINEL</text>
+</svg>
