@@ -32,6 +32,10 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
   await database.query(`CREATE TABLE IF NOT EXISTS access_requests (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email citext NOT NULL, display_name text NOT NULL, password_hash text NOT NULL, requested_role text NOT NULL DEFAULT 'viewer', status text NOT NULL DEFAULT 'pending', reviewed_by uuid REFERENCES users(id), reviewed_at timestamptz, created_at timestamptz NOT NULL DEFAULT now())`);
   app.post('/v1/access-requests', async (request, reply) => {
     const input = userSchema.parse(request.body);
+    const existingUser = await database.query('SELECT 1 FROM users WHERE email = $1', [input.email]);
+    if (existingUser.rowCount) throw Object.assign(new Error('Já existe uma conta cadastrada com este e-mail.'), { statusCode: 409 });
+    const existingRequest = await database.query('SELECT 1 FROM access_requests WHERE email = $1 AND status = $2', [input.email, 'pending']);
+    if (existingRequest.rowCount) throw Object.assign(new Error('Já existe uma solicitação pendente para este e-mail. Aguarde a análise do administrador.'), { statusCode: 409 });
     await database.query('INSERT INTO access_requests (email, display_name, password_hash, requested_role) VALUES ($1, $2, $3, $4)', [input.email, input.displayName, await hashPassword(input.password), input.role]);
     return reply.code(201).send({ success: true });
   });
@@ -85,6 +89,8 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
   app.post('/v1/users', { preHandler: [app.authenticate] }, async (request, reply) => {
     requireManage(request);
     const input = userSchema.parse(request.body);
+    const existingUser = await database.query('SELECT 1 FROM users WHERE email = $1', [input.email]);
+    if (existingUser.rowCount) throw Object.assign(new Error('Já existe um usuário cadastrado com este e-mail.'), { statusCode: 409 });
     const passwordHash = await hashPassword(input.password);
     const created = await withTenant(request.auth.tenantId, async (client) => {
       const user = await client.query<{ id: string; email: string; display_name: string }>(
@@ -94,6 +100,9 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
       const roleId = await ensureRole(client, input.role, request.auth.tenantId);
       await client.query('INSERT INTO user_role_assignments (user_id, tenant_id, role_id) VALUES ($1, $2, $3)', [user.rows[0].id, request.auth.tenantId, roleId]);
       return user.rows[0];
+    }).catch((reason) => {
+      if (reason?.code === '23505') throw Object.assign(new Error('Já existe um usuário cadastrado com este e-mail.'), { statusCode: 409 });
+      throw reason;
     });
     return reply.code(201).send(created);
   });
