@@ -81,6 +81,7 @@ export async function listLinkTelemetry(client: PoolClient, tenantId: string) {
   const result = await client.query(`
     SELECT hu.id AS unit_id, hu.code AS unit_code, hu.name AS unit_name,
       e.id AS equipment_id, e.name AS equipment_name,
+      et.code AS equipment_type,
       e.contracted_download_mbps::float8, e.contracted_upload_mbps::float8,
       CASE WHEN s.observed_at IS NULL THEN 'unknown'
            WHEN (COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' OR COALESCE(s.source_payload->>'source', '') = 'zabbix_telemetry') AND s.observed_at < now() - interval '30 seconds' THEN 'unknown'
@@ -94,7 +95,7 @@ export async function listLinkTelemetry(client: PoolClient, tenantId: string) {
       SELECT metric_key, value, observed_at
       FROM metric_samples
       WHERE tenant_id = e.tenant_id AND equipment_id = e.id
-        AND metric_key IN ('network.latency.ms','network.loss.pct','network.in.bps','network.out.bps')
+        AND metric_key IN ('network.latency.ms','network.loss.pct','network.in.bps','network.out.bps','starlink.latency.ms','starlink.loss.pct','starlink.download.bps','starlink.upload.bps')
         AND observed_at >= now() - interval '24 hours'
         AND NOT (COALESCE(source_payload->>'itemKey', '') ~* '(discard|error|drop)'
           OR COALESCE(source_payload->>'itemName', '') ~* '(discard|error|drop)')
@@ -102,7 +103,7 @@ export async function listLinkTelemetry(client: PoolClient, tenantId: string) {
       LIMIT 60
     ) ms ON true
     WHERE hu.tenant_id = $1 AND hu.active = true
-      AND (lower(et.code) LIKE '%link%' OR lower(et.code) LIKE '%router%' OR lower(et.code) LIKE '%starlink%' OR lower(et.code) LIKE '%mikrotik%')
+      AND (lower(et.code) LIKE '%link%' OR lower(et.code) LIKE '%router%' OR lower(et.code) LIKE '%starlink%' OR lower(et.code) LIKE '%mikrotik%' OR lower(et.code) LIKE '%vpn%')
     ORDER BY hu.code, e.name, ms.observed_at DESC
   `, [tenantId]);
   const equipment = new Map<string, any>();
@@ -110,12 +111,13 @@ export async function listLinkTelemetry(client: PoolClient, tenantId: string) {
     const current = equipment.get(row.equipment_id) ?? {
       unit_id: row.unit_id, unit_code: row.unit_code, unit_name: row.unit_name,
       equipment_id: row.equipment_id, equipment_name: row.equipment_name,
+      equipment_type: row.equipment_type,
       contracted_download_mbps: row.contracted_download_mbps,
       contracted_upload_mbps: row.contracted_upload_mbps,
       operational_status: row.operational_status, observed_at: null, telemetry_stale: true, telemetry_error: 'Telemetria zerada: sem comunicação recente.', metrics: {}, latency_history: [],
     };
     if (row.metric_key && current.metrics[row.metric_key] === undefined) current.metrics[row.metric_key] = row.value;
-    if (row.metric_key === 'network.latency.ms' && current.latency_history.length < 14) current.latency_history.unshift({ value: row.value, observed_at: row.observed_at });
+    if ((row.metric_key === 'network.latency.ms' || row.metric_key === 'starlink.latency.ms') && current.latency_history.length < 14) current.latency_history.unshift({ value: row.value, observed_at: row.observed_at });
     if (row.observed_at && (!current.observed_at || row.observed_at > current.observed_at)) current.observed_at = row.observed_at;
     equipment.set(row.equipment_id, current);
   }

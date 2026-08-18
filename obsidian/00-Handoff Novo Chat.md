@@ -39,6 +39,12 @@ status: active
 
 > Atualização 2026-08-18: a mesma regra de ausência de comunicação foi aplicada à telemetria de links/Zabbix: após 30 segundos sem amostra, a projeção fica `unknown`, valores atuais são zerados e o painel registra aviso de telemetria zerada; dados históricos permanecem preservados.
 
+> Atualização 2026-08-18: o usuário agora pode escolher `Dark` ou `Claro` no mapa geográfico estadual. A preferência é salva no navegador e funciona também quando o mapa precisa usar o fallback raster; o mapa nacional continua dark.
+
+> Atualização 2026-08-18: os cards do mapa estadual foram separados por fonte: links com métricas de interface exibem latência/perda/tráfego, VPN/IPsec exibe apenas estado do túnel e Starlink possui card próprio com métricas específicas da antena quando disponíveis.
+
+> Correção 2026-08-18: ajustada a hierarquia visual da análise detalhada e do menu contextual do mapa. Ping manual bem-sucedido agora aparece como medição local mesmo quando o Zabbix não tem amostra recente, sem mascarar essa origem como telemetria do Zabbix.
+
 > Atualização 2026-08-13: o gráfico detalhado de latência possui tooltip próprio com valor em ms e horário da amostra; valores submilissegundo não são mais arredondados para zero. Ping manual e coleta automática permanecem fluxos distintos. Consulte [[03-Execucao/Tooltip e origem da latencia]].
 
 > Atualização 2026-08-13: corrigido o ranking de itens SNMP para hosts FortiGate com múltiplas interfaces. O `FW-LAV-IRANDUBA` foi validado usando `wan1 (LINK-ICOM-100Mb)`. Consulte [[03-Execucao/Correcao Telemetria SNMP FortiGate]].
