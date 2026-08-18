@@ -851,3 +851,18 @@ button, input, select, textarea { border-radius: 10px; }
 .link-chart-tooltip strong { color: var(--cyan); font: 12px Arial, Helvetica, 'Segoe UI', sans-serif; }
 .link-chart-tooltip small { margin-top: 4px; color: #7f97a9; font: 12px Arial, Helvetica, 'Segoe UI', sans-serif; white-space: nowrap; }
 
+/* Starlink telemetry detail */
+.starlink-telemetry-panel { margin-top: 14px; }
+.starlink-telemetry-panel .panel-title { margin-bottom: 18px; }
+.starlink-telemetry-card { border-top: 1px solid #14263a; padding-top: 15px; }
+.starlink-telemetry-card + .starlink-telemetry-card { margin-top: 15px; }
+.starlink-telemetry-card-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.starlink-telemetry-card-head strong { color: #dce8f4; font-size: 13px; }
+.starlink-telemetry-card-head small { color: #6d8498; font: 9px 'IBM Plex Mono'; }
+.starlink-telemetry-card-head small.starlink-stale { color: var(--amber); }
+.starlink-metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 9px; margin-top: 12px; }
+.starlink-metric { border: 1px solid #1b3448; background: rgba(6,18,30,.68); padding: 11px 12px; }
+.starlink-metric span, .starlink-metric strong { display: block; }
+.starlink-metric span { color: #6f879a; font: 9px 'IBM Plex Mono'; text-transform: uppercase; }
+.starlink-metric strong { color: var(--cyan); font: 15px 'IBM Plex Mono'; margin-top: 7px; }
+

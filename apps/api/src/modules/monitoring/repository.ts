@@ -46,7 +46,9 @@ export async function listEquipmentStatus(client: PoolClient, tenantId: string) 
     SELECT e.id AS equipment_id, e.unit_id, et.code AS equipment_type, e.name,
            e.serial_number, e.management_address,
            e.contracted_download_mbps::float8, e.contracted_upload_mbps::float8,
-           COALESCE(s.operational_status, 'unknown') AS operational_status,
+           CASE WHEN s.observed_at IS NULL THEN 'unknown'
+                WHEN COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' AND s.observed_at < now() - interval '30 seconds' THEN 'unknown'
+                ELSE s.operational_status END AS operational_status,
            s.observed_at
     FROM equipment e
     JOIN equipment_types et ON et.id = e.equipment_type_id
@@ -60,12 +62,12 @@ export async function listEquipmentStatus(client: PoolClient, tenantId: string) 
 export async function listUnitOperationalStatus(client: PoolClient, tenantId: string) {
   const result = await client.query(`
     SELECT hu.id AS unit_id, hu.code, hu.name, hu.state_code, hu.city, hu.latitude, hu.longitude,
-      CASE WHEN bool_or(COALESCE(s.operational_status, 'unknown') = 'offline') THEN 'offline'
-           WHEN bool_or(COALESCE(s.operational_status, 'unknown') = 'degraded') THEN 'degraded'
-           WHEN bool_and(COALESCE(s.operational_status, 'unknown') = 'online') THEN 'online'
+      CASE WHEN bool_or(CASE WHEN s.observed_at IS NULL THEN 'unknown' WHEN COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' AND s.observed_at < now() - interval '30 seconds' THEN 'unknown' ELSE COALESCE(s.operational_status, 'unknown') END = 'offline') THEN 'offline'
+           WHEN bool_or(CASE WHEN s.observed_at IS NULL THEN 'unknown' WHEN COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' AND s.observed_at < now() - interval '30 seconds' THEN 'unknown' ELSE COALESCE(s.operational_status, 'unknown') END = 'degraded') THEN 'degraded'
+           WHEN bool_and(CASE WHEN s.observed_at IS NULL THEN 'unknown' WHEN COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' AND s.observed_at < now() - interval '30 seconds' THEN 'unknown' ELSE COALESCE(s.operational_status, 'unknown') END = 'online') THEN 'online'
            ELSE 'unknown' END AS operational_status,
-      count(*) FILTER (WHERE COALESCE(s.operational_status, 'unknown') = 'offline')::int AS offline_equipment,
-      count(*) FILTER (WHERE COALESCE(s.operational_status, 'unknown') = 'degraded')::int AS degraded_equipment
+      count(*) FILTER (WHERE (CASE WHEN s.observed_at IS NULL THEN 'unknown' WHEN COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' AND s.observed_at < now() - interval '30 seconds' THEN 'unknown' ELSE COALESCE(s.operational_status, 'unknown') END) = 'offline')::int AS offline_equipment,
+      count(*) FILTER (WHERE (CASE WHEN s.observed_at IS NULL THEN 'unknown' WHEN COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' AND s.observed_at < now() - interval '30 seconds' THEN 'unknown' ELSE COALESCE(s.operational_status, 'unknown') END) = 'degraded')::int AS degraded_equipment
     FROM health_units hu
     LEFT JOIN equipment e ON e.unit_id = hu.id AND e.tenant_id = hu.tenant_id AND e.active = true
     LEFT JOIN equipment_status_snapshots s ON s.equipment_id = e.id AND s.tenant_id = hu.tenant_id
@@ -80,7 +82,9 @@ export async function listLinkTelemetry(client: PoolClient, tenantId: string) {
     SELECT hu.id AS unit_id, hu.code AS unit_code, hu.name AS unit_name,
       e.id AS equipment_id, e.name AS equipment_name,
       e.contracted_download_mbps::float8, e.contracted_upload_mbps::float8,
-      COALESCE(s.operational_status, 'unknown') AS operational_status,
+      CASE WHEN s.observed_at IS NULL THEN 'unknown'
+           WHEN COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' AND s.observed_at < now() - interval '30 seconds' THEN 'unknown'
+           ELSE s.operational_status END AS operational_status,
       ms.metric_key, ms.value::float8 AS value, ms.observed_at
     FROM health_units hu
     JOIN equipment e ON e.unit_id = hu.id AND e.tenant_id = hu.tenant_id AND e.active = true

@@ -10,6 +10,7 @@ type Alert = { id: string; title: string; severity: number; status: string; unit
 type Equipment = { equipment_id: string; unit_id: string; equipment_type: string; name: string; serial_number?: string | null; management_address?: string | null; contracted_download_mbps?: number | null; contracted_upload_mbps?: number | null; operational_status: 'online' | 'degraded' | 'offline' | 'unknown'; observed_at?: string };
 type LatencyPoint = { value: number; observed_at: string };
 type LinkTelemetry = { unit_id: string; unit_code: string; unit_name: string; equipment_id: string; equipment_name: string; contracted_download_mbps: number | null; contracted_upload_mbps: number | null; operational_status: Unit['operational_status']; observed_at: string | null; metrics: Record<string, number>; latency_history: LatencyPoint[] };
+type StarlinkTelemetry = { equipmentId: string; equipmentName: string; observedAt: string | null; collectorStatus?: 'online' | 'offline'; collectorError?: string | null; metrics: Array<{ metric_key: string; value: number; unit: string; observed_at: string }> };
 type ZabbixHost = { hostid: string; host: string; name: string; status: string | number; interfaces?: Array<{ ip?: string; dns?: string; port?: string }>; tags?: Array<{ tag: string; value: string }>; inventory?: { location?: string; location_lat?: string; location_lon?: string } };
 type ZabbixMapping = { id: string; zabbix_host_id: string; equipment_id: string };
 type ZabbixCandidates = { integrationId: string; hosts: ZabbixHost[]; equipment: Array<{ id: string; unit_id: string; name: string; equipment_type: string }>; mappings: ZabbixMapping[] };
@@ -1056,6 +1057,38 @@ function EquipmentEditForm({ equipment, token, onSaved, onCancel, onToast = () =
   return <FormCard title={`Editar equipamento · ${equipment.name}`} onCancel={onCancel}><form className="inline-form validated-form" noValidate onSubmit={submit}><div className="required-fields-note"><strong>Dados do equipamento</strong><small>Os campos marcados com <b>*</b> são obrigatórios.</small></div>{error && <div className="error-banner">{error}</div>}<label><span className="field-label">Tipo <b>*</b></span><AppDropdown value={form.equipmentTypeCode} onChange={(next) => setForm({ ...form, equipmentTypeCode: next })} options={[{ value: 'linux_server', label: 'Servidor Linux' }, { value: 'mikrotik', label: 'Mikrotik' }, { value: 'starlink', label: 'Starlink' }, { value: 'vpn', label: 'VPN' }, { value: 'internet_link', label: 'Link de internet' }]} /></label><label><span className="field-label">Nome <b>*</b></span><input className={validationRequested && equipmentValidation.name ? 'field-invalid' : ''} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />{validationRequested && equipmentValidation.name && <small className="field-error">Informe o nome do equipamento.</small>}</label><label><span className="field-label">Endereço de gerenciamento <em>opcional</em></span><input value={form.managementAddress} onChange={(e) => setForm({ ...form, managementAddress: e.target.value })} /></label><label><span className="field-label">Número de série <em>opcional</em></span><input value={form.serialNumber} onChange={(e) => setForm({ ...form, serialNumber: e.target.value })} /></label>{linkFieldsVisible && <><div className="bandwidth-fields-note"><strong>Plano contratado</strong><small>Campos vazios são apresentados como N/D e nunca preenchidos pela telemetria.</small></div><label><span className="field-label">Download contratado <em>Mbps · opcional</em></span><input type="number" min="0.001" max="1000000" step="0.001" className={validationRequested && equipmentValidation.contractedDownloadMbps ? 'field-invalid' : ''} value={form.contractedDownloadMbps} onChange={(e) => setForm({ ...form, contractedDownloadMbps: e.target.value })} placeholder="Ex.: 500" />{validationRequested && equipmentValidation.contractedDownloadMbps && <small className="field-error">Informe um valor maior que zero.</small>}</label><label><span className="field-label">Upload contratado <em>Mbps · opcional</em></span><input type="number" min="0.001" max="1000000" step="0.001" className={validationRequested && equipmentValidation.contractedUploadMbps ? 'field-invalid' : ''} value={form.contractedUploadMbps} onChange={(e) => setForm({ ...form, contractedUploadMbps: e.target.value })} placeholder="Ex.: 250" />{validationRequested && equipmentValidation.contractedUploadMbps && <small className="field-error">Informe um valor maior que zero.</small>}</label></>}<div className="form-actions"><button type="button" className="secondary-button clear-filters-button" onClick={onCancel}><CloseIcon /> Cancelar</button><button className="primary" disabled={saving}>{saving ? 'Salvando…' : <><CheckIcon /> Salvar alterações</>}</button></div></form></FormCard>;
 }
 
+const starlinkMetricLabels: Record<string, string> = {
+  'starlink.latency.ms': 'Latência', 'starlink.loss.pct': 'Perda', 'starlink.download.bps': 'Download', 'starlink.upload.bps': 'Upload',
+  'starlink.obstruction.pct': 'Obstrução', 'starlink.signal.snr': 'SNR', 'starlink.temperature.c': 'Temperatura', 'starlink.alerts.active': 'Alertas ativos',
+  'starlink.location.latitude': 'Latitude', 'starlink.location.longitude': 'Longitude', 'starlink.coverage.available': 'Cobertura',
+};
+
+function formatStarlinkMetric(sample: { metric_key: string; value: number | string; unit: string }): string {
+  const value = Number(sample.value);
+  if (!Number.isFinite(value)) return 'N/D';
+  if (sample.metric_key === 'starlink.download.bps' || sample.metric_key === 'starlink.upload.bps') return `${(value / 1_000_000).toFixed(2)} Mbps`;
+  if (sample.metric_key === 'starlink.coverage.available') return value === 1 ? 'Disponível' : 'Indisponível';
+  if (sample.metric_key.includes('latitude') || sample.metric_key.includes('longitude')) return value.toFixed(6);
+  return `${Number(value.toFixed(2))} ${sample.unit}`;
+}
+
+function StarlinkTelemetryPanel({ equipment, token }: { equipment: Equipment[]; token: string }) {
+  const starlinks = equipment.filter((item) => item.equipment_type === 'starlink');
+  const [telemetry, setTelemetry] = useState<StarlinkTelemetry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  async function refresh() {
+    if (!starlinks.length) { setTelemetry([]); return; }
+    setLoading(true); setError('');
+    try { setTelemetry(await Promise.all(starlinks.map((item) => api<StarlinkTelemetry>(`/v1/integrations/starlink/telemetry/${item.equipment_id}`, token)))); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'Falha ao consultar a telemetria Starlink.'); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { void refresh(); const timer = window.setInterval(() => void refresh(), 15_000); return () => window.clearInterval(timer); }, [equipment, token]);
+  if (!starlinks.length) return null;
+  return <section className="starlink-telemetry-panel panel"><div className="panel-title"><div><p className="eyebrow">TELEMETRIA STARLINK</p><h3>Métricas da antena</h3></div><button className="secondary-button compact" onClick={() => void refresh()} disabled={loading}>{loading ? 'Atualizando…' : 'Atualizar'}</button></div>{error && <div className="error-banner">{error}</div>}{telemetry.map((item) => { const stale = !item.observedAt || Date.now() - new Date(item.observedAt).getTime() > 30_000; return <article className="starlink-telemetry-card" key={item.equipmentId}><div className="starlink-telemetry-card-head"><strong>{item.equipmentName}</strong><small className={stale ? 'starlink-stale' : ''}>{stale ? 'Sem comunicação recente' : `Última amostra · ${new Date(item.observedAt as string).toLocaleString('pt-BR')}`}</small></div>{(item.collectorError || stale) && <div className="error-banner starlink-collector-error">{item.collectorError ?? 'Agente Starlink sem comunicação recente.'}</div>}{item.metrics.length ? <div className="starlink-metric-grid">{item.metrics.map((sample) => <div className="starlink-metric" key={sample.metric_key}><span>{starlinkMetricLabels[sample.metric_key] ?? sample.metric_key}</span><strong>{stale ? 'N/D' : formatStarlinkMetric(sample)}</strong></div>)}</div> : <p className="muted">Nenhuma métrica disponível. Exibindo N/D até a próxima coleta.</p>}</article>; })}</section>;
+}
+
 function UnitDetail({ unit, equipment, onBack, onEdit, onRefresh, onToast = () => undefined }: { unit: Unit; equipment: Equipment[]; onBack: () => void; onEdit: (equipment: Equipment) => void; onRefresh: () => Promise<void>; onToast?: (toast: Omit<Toast, 'id'>) => void }) {
   const token = (JSON.parse(sessionStorage.getItem('healthlink.session') ?? '{}') as { accessToken?: string }).accessToken ?? '';
   const [editingUnit, setEditingUnit] = useState(false);
@@ -1079,6 +1112,7 @@ function UnitDetail({ unit, equipment, onBack, onEdit, onRefresh, onToast = () =
     <div className="detail-grid"><article className="equipment-panel"><div className="panel-title"><div><p className="eyebrow">ATIVOS MONITORADOS</p><h3>Infraestrutura da unidade</h3></div><div className="panel-title-actions"><strong>{equipment.length}</strong></div></div>
       <div className="equipment-list">{equipment.map((item) => <div className="equipment-row" key={item.equipment_id}><span className={`equipment-indicator ${item.operational_status}`} /><div><strong>{item.name}</strong><small>{item.equipment_type.replaceAll('_', ' ')} · {item.management_address ?? 'sem endereço'}</small></div><div className="equipment-state"><span className={`status ${item.operational_status}`}>{statusLabel[item.operational_status]}</span><small>{item.observed_at ? new Date(item.observed_at).toLocaleString('pt-BR') : 'aguardando coleta'}</small></div><div className="equipment-actions"><button className="secondary-button compact" onClick={() => onEdit(item)}><EditIcon /> Editar</button><button className="danger-button compact" disabled={processingId === item.equipment_id} onClick={() => void deactivate(item)}>Desativar</button><button className="delete-button compact" disabled={processingId === item.equipment_id} onClick={() => void remove(item)}><TrashIcon /> Excluir</button></div></div>)}</div>
     </article><aside className="readiness-panel"><p className="eyebrow">PRONTIDÃO OPERACIONAL</p><div className="readiness-score"><strong>{equipment.filter((item) => item.operational_status === 'online').length}</strong><span>de {equipment.length}<small>ativos confirmados</small></span></div><div className="readiness-line"><i style={{ width: `${equipment.length ? equipment.filter((item) => item.operational_status === 'online').length / equipment.length * 100 : 0}%` }} /></div><dl><div><dt>Indisponíveis</dt><dd>{equipment.filter((item) => item.operational_status === 'offline').length}</dd></div><div><dt>Em atenção</dt><dd>{equipment.filter((item) => item.operational_status === 'degraded').length}</dd></div><div><dt>Sem telemetria</dt><dd>{equipment.filter((item) => item.operational_status === 'unknown').length}</dd></div></dl></aside></div>
+    <StarlinkTelemetryPanel equipment={equipment} token={token} />
   </section>;
 }
 
@@ -1120,13 +1154,13 @@ function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onTo
 
   async function submit(event: FormEvent) {
     event.preventDefault(); setSubmitted(true); setLocalError('');
-    if (!form.displayName.trim() || !form.email.trim() || (!editingIsGlobalAdmin && !form.role) || (!editing && !form.cpf.trim())) {
+    if (!form.displayName.trim() || !form.email.trim() || (!editingIsGlobalAdmin && !form.role) || (!editing && !form.cpf.trim()) || (!editing && !form.password)) {
       return;
     }
     setSaving(true);
     try {
       if (editing) await api(`/v1/users/${editing}`, token, { method: 'PATCH', body: JSON.stringify({ displayName: form.displayName, password: form.password || undefined, role: editingIsGlobalAdmin ? undefined : form.role, active: form.active }) });
-      else await api('/v1/users', token, { method: 'POST', body: JSON.stringify({ displayName: form.displayName, email: form.email, password: form.password || 'Sentinel@2026', role: form.role }) });
+      else await api('/v1/users', token, { method: 'POST', body: JSON.stringify({ displayName: form.displayName, email: form.email, password: form.password, role: form.role }) });
       const wasEditing = Boolean(editing);
       setForm({ displayName: '', email: '', password: '', role: '', cpf: '', coligada: 'HealthLink Sentinel', active: true });
       setEditing(null); setSubmitted(false); await onRefresh();
@@ -1197,13 +1231,11 @@ function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onTo
             <span className="field-label">Status <b className="req">*</b></span>
             <AppDropdown value={form.active ? 'active' : 'inactive'} onChange={(next) => setForm({ ...form, active: next === 'active' })} options={[{ value: 'active', label: 'Ativo' }, { value: 'inactive', label: 'Bloqueado' }]} />
           </label>
-          <div className="form-info-callout">
-            <span>ⓘ</span>
-            <div>
-              <strong>Senha enviada por e-mail</strong>
-              <span style={{ fontSize: '10px', color: '#7a94a8' }}>A senha inicial será criada automaticamente e enviada para o e-mail informado. Ela não é exibida neste formulário.</span>
-            </div>
-          </div>
+          <label>
+            {editing ? 'Nova senha (opcional)' : 'Senha *'}
+            <input type="password" minLength={8} value={form.password} className={submitted && !editing && !form.password ? 'field-invalid' : ''} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder={editing ? 'Deixe em branco para manter a atual' : 'Mínimo de 8 caracteres'} required={!editing} />
+            {submitted && !editing && !form.password && <span className="field-error-text">Informe uma senha para o usuário.</span>}
+          </label>
         </div>
         {localError && <div className="form-error">{localError}</div>}
         <div className="form-actions">
