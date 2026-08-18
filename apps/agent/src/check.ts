@@ -20,9 +20,14 @@ try {
   }
   console.log(`[starlink-check] interface detectada: ${selectedInterface.name} (${selectedInterface.address})`);
   const status = await client.getStatus();
+  const location = await client.getLocation();
   console.log(`[starlink-check] conexão OK: ${host}:${port}`);
   const latency = typeof status.popPingLatencyMs === 'number' && status.popPingLatencyMs >= 0 ? `${status.popPingLatencyMs}ms` : 'N/D';
   console.log(`[starlink-check] estado=${status.state ?? 'N/D'} latência=${latency}`);
+  const lat = location.lla?.lat;
+  const lon = location.lla?.lon;
+  if (typeof lat === 'number' && Number.isFinite(lat) && typeof lon === 'number' && Number.isFinite(lon)) console.log(`[starlink-check] localização=${lat},${lon}`);
+  else console.warn('[starlink-check] localização=N/D; a antena não retornou latitude/longitude válidas.');
 } catch (error) {
   console.error(`[starlink-check] falha: ${(error as Error).message}`);
   process.exitCode = 1;
