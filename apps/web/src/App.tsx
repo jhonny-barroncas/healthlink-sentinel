@@ -25,10 +25,7 @@ const apiBase = `http://${window.location.hostname}:3000`;
 async function api<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, { ...init, headers: { ...(init?.body ? { 'content-type': 'application/json' } : {}), authorization: `Bearer ${token}`, ...init?.headers } });
   if (!response.ok) {
-    if (response.status === 401) {
-      window.dispatchEvent(new Event('healthlink:session-expired'));
-      throw new Error('Sessão expirada. Entre novamente.');
-    }
+    if (response.status === 401) throw new Error('Sessão expirada. Entre novamente.');
     let detail = '';
     try {
       const payload = await response.json() as { message?: string; error?: string };
@@ -68,16 +65,6 @@ export function App() {
   const [usersLoading, setUsersLoading] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
-
-  useEffect(() => {
-    const expireSession = () => {
-      sessionStorage.removeItem('healthlink.session');
-      setSession(null);
-      setError('');
-    };
-    window.addEventListener('healthlink:session-expired', expireSession);
-    return () => window.removeEventListener('healthlink:session-expired', expireSession);
-  }, []);
 
   useEffect(() => {
     if (!userMenuOpen) return;
@@ -275,7 +262,7 @@ export function App() {
     setUnits(nextUnits); setEquipment(nextEquipment);
   }
 
-  if (!session) return <LoginWithRequest showLogoutToast={justLoggedOut} onSuccess={(next) => { sessionStorage.setItem('healthlink.session', JSON.stringify(next)); setError(''); setJustLoggedOut(false); setSession(next); addToast({ type: 'success', title: 'Acesso confirmado', detail: `Bem-vindo(a) de volta, ${next.user.displayName.split(' ')[0] || 'operador'}.` }); }} />;
+  if (!session) return <LoginWithRequest showLogoutToast={justLoggedOut} onSuccess={(next) => { sessionStorage.setItem('healthlink.session', JSON.stringify(next)); setJustLoggedOut(false); setSession(next); addToast({ type: 'success', title: 'Acesso confirmado', detail: `Bem-vindo(a) de volta, ${next.user.displayName.split(' ')[0] || 'operador'}.` }); }} />;
 
   return (
     <div className="app-shell">
