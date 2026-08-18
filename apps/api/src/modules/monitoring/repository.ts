@@ -43,17 +43,18 @@ export async function ingestEvent(client: PoolClient, tenantId: string, input: M
 
 export async function listEquipmentStatus(client: PoolClient, tenantId: string) {
   const result = await client.query(`
-    SELECT e.id AS equipment_id, e.unit_id, et.code AS equipment_type, e.name,
+    SELECT e.id AS equipment_id, e.unit_id, et.code AS equipment_type, e.name, e.active,
            e.serial_number, e.management_address,
            e.contracted_download_mbps::float8, e.contracted_upload_mbps::float8,
-           CASE WHEN s.observed_at IS NULL THEN 'unknown'
+           CASE WHEN NOT e.active THEN 'unknown'
+                WHEN s.observed_at IS NULL THEN 'unknown'
                 WHEN (COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' OR COALESCE(s.source_payload->>'source', '') = 'zabbix_telemetry') AND s.observed_at < now() - interval '30 seconds' THEN 'unknown'
                 ELSE s.operational_status END AS operational_status,
            s.observed_at
     FROM equipment e
     JOIN equipment_types et ON et.id = e.equipment_type_id
     LEFT JOIN equipment_status_snapshots s ON s.equipment_id = e.id AND s.tenant_id = e.tenant_id
-    WHERE e.tenant_id = $1 AND e.active = true
+    WHERE e.tenant_id = $1
     ORDER BY e.unit_id, e.name
   `, [tenantId]);
   return result.rows;

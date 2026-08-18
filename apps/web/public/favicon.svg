@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96">
+  <defs>
+    <style>
+      .bg { fill: #0b1220; }
+      .bracket { fill: none; stroke: #2fe0c4; stroke-width: 4; stroke-linecap: round; }
+      .hl { font-family: 'Helvetica Neue', Arial, sans-serif; font-weight: 700; font-size: 26px; fill: #e7ecf3; letter-spacing: 1px; }
+    </style>
+  </defs>
+  <rect class="bg" x="0" y="0" width="96" height="96" rx="16"/>
+  <g transform="translate(16,16)">
+    <path class="bracket" d="M0,20 V4 A4,4 0 0 1 4,0 H20"/>
+    <path class="bracket" d="M44,0 H60 A4,4 0 0 1 64,4 V20"/>
+    <path class="bracket" d="M64,44 V60 A4,4 0 0 1 60,64 H44"/>
+    <path class="bracket" d="M20,64 H4 A4,4 0 0 1 0,60 V44"/>
+    <text class="hl" x="32" y="34" text-anchor="middle" dominant-baseline="middle">HL</text>
+  </g>
+</svg>

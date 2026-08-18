@@ -4,7 +4,7 @@ import { promisify } from 'node:util';
 import { z } from 'zod';
 import { hasPermission, permission } from '../../platform/authorization.js';
 import { withTenant } from '../../platform/database.js';
-import { createEquipment, deactivateEquipment, deleteEquipment, listEquipment, updateEquipment, writeEquipmentAudit, type EquipmentInput } from './repository.js';
+import { createEquipment, deactivateEquipment, deleteEquipment, listEquipment, reactivateEquipment, updateEquipment, writeEquipmentAudit, type EquipmentInput } from './repository.js';
 
 const paramsSchema = z.object({ unitId: z.string().uuid() });
 const equipmentParamsSchema = z.object({ id: z.string().uuid() });
@@ -111,6 +111,25 @@ export const equipmentRoutes: FastifyPluginAsync = async (app) => {
     });
     if (!deactivated) throw Object.assign(new Error('Equipamento não encontrado ou já desativado.'), { statusCode: 404 });
     return { success: true, deactivated: true };
+  });
+
+  app.post('/v1/equipment/:id/reactivate', { preHandler: [app.authenticate] }, async (request) => {
+    requireEquipmentPermission(request, permission.unitsManage);
+    const { id } = equipmentParamsSchema.parse(request.params);
+    const reactivated = await withTenant(request.auth.tenantId, async (client) => {
+      const changed = await reactivateEquipment(client, request.auth.tenantId, id);
+      if (changed) {
+        await client.query(`
+          UPDATE equipment_status_snapshots
+          SET operational_status = 'unknown', observed_at = now(), source_payload = '{"reason":"equipment_reactivated"}'::jsonb
+          WHERE tenant_id = $1 AND equipment_id = $2
+        `, [request.auth.tenantId, id]);
+        await writeEquipmentAudit(client, request.auth.tenantId, request.auth.userId, 'equipment.reactivated', id);
+      }
+      return changed;
+    });
+    if (!reactivated) throw Object.assign(new Error('Equipamento não encontrado ou já ativo.'), { statusCode: 404 });
+    return { success: true, reactivated: true };
   });
 
   app.delete('/v1/equipment/:id/permanent', { preHandler: [app.authenticate] }, async (request) => {
