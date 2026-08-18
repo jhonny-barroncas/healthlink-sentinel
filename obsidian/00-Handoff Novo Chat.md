@@ -37,6 +37,8 @@ status: active
 
 > Atualização 2026-08-17: a branch remota `frontend-padronizacao` foi incorporada à `main` local a partir do merge publicado no GitHub. A padronização de UI foi combinada manualmente com o painel Starlink, autenticação de usuário de serviço e regras de telemetria stale.
 
+> Atualização 2026-08-18: a mesma regra de ausência de comunicação foi aplicada à telemetria de links/Zabbix: após 30 segundos sem amostra, a projeção fica `unknown`, valores atuais são zerados e o painel registra aviso de telemetria zerada; dados históricos permanecem preservados.
+
 > Atualização 2026-08-13: o gráfico detalhado de latência possui tooltip próprio com valor em ms e horário da amostra; valores submilissegundo não são mais arredondados para zero. Ping manual e coleta automática permanecem fluxos distintos. Consulte [[03-Execucao/Tooltip e origem da latencia]].
 
 > Atualização 2026-08-13: corrigido o ranking de itens SNMP para hosts FortiGate com múltiplas interfaces. O `FW-LAV-IRANDUBA` foi validado usando `wan1 (LINK-ICOM-100Mb)`. Consulte [[03-Execucao/Correcao Telemetria SNMP FortiGate]].

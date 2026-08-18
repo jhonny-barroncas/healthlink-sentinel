@@ -274,12 +274,14 @@ export const zabbixRoutes: FastifyPluginAsync = async (app) => {
       let autoLocated = 0;
       const affectedEquipment = new Set<string>();
 
-       const metricCandidates = selectLinkMetricCandidates(items);
+      const metricCandidates = selectLinkMetricCandidates(items);
 
       for (const mapping of context.mappings) {
+        let telemetryCollected = false;
         for (const metricKey of ['network.latency.ms', 'network.loss.pct', 'network.in.bps', 'network.out.bps'] as LinkMetric[]) {
           const selected = metricCandidates.get(`${mapping.zabbix_host_id}:${metricKey}`);
           if (!selected || !Number(selected.item.lastclock)) continue;
+          telemetryCollected = true;
           await db.query(`
             INSERT INTO metric_samples (tenant_id, equipment_id, metric_key, value, unit, observed_at, source_payload)
             SELECT $1,$2,$3,$4,$5,to_timestamp($6),$7
@@ -290,6 +292,13 @@ export const zabbixRoutes: FastifyPluginAsync = async (app) => {
           `, [request.auth.tenantId, mapping.equipment_id, metricKey, selected.metric.value,
             metricKey.endsWith('.ms') ? 'ms' : metricKey.endsWith('.pct') ? '%' : 'bps', Number(selected.item.lastclock),
             { source: 'zabbix_item', itemId: selected.item.itemid, itemName: selected.item.name, itemKey: selected.item.key_ }]);
+        }
+        if (telemetryCollected) {
+          await db.query(`
+            UPDATE equipment_status_snapshots
+            SET observed_at = now(), source_payload = source_payload || jsonb_build_object('source', 'zabbix_telemetry')
+            WHERE equipment_id = $1 AND tenant_id = $2
+          `, [mapping.equipment_id, request.auth.tenantId]);
         }
       }
 
