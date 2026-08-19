@@ -39,6 +39,10 @@ status: active
 
 > Atualização 2026-08-18: a mesma regra de ausência de comunicação foi aplicada à telemetria de links/Zabbix: após 30 segundos sem amostra, a projeção fica `unknown`, valores atuais são zerados e o painel registra aviso de telemetria zerada; dados históricos permanecem preservados.
 
+> Atualização 2026-08-19: corrigido o cadastro de usuários para não exigir CPF/coligada fora do contrato atual da API; senha é obrigatória apenas na criação e o backend bloqueia tentativa de auto-bloqueio. Consulte [[03-Execucao/Painel de gerenciamento de usuarios]].
+
+> Atualização 2026-08-19: fluxo Docker validado com `docker compose up -d --build`; migrations executadas pelo serviço `migrate`, frontend/API servidos na porta `5174` e `GET /health` respondendo 200. Corrigido o wildcard duplicado do Fastify ao servir a SPA. Consulte `README.md` e `docs/DEPLOYMENT.md`.
+
 > Atualização 2026-08-18: o usuário agora pode escolher `Dark` ou `Claro` no mapa geográfico estadual. A preferência é salva no navegador e funciona também quando o mapa precisa usar o fallback raster; o mapa nacional continua dark.
 
 > Atualização 2026-08-18: os cards do mapa estadual foram separados por fonte: links com métricas de interface exibem latência/perda/tráfego, VPN/IPsec exibe apenas estado do túnel e Starlink possui card próprio com métricas específicas da antena quando disponíveis.

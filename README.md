@@ -54,24 +54,27 @@ Se Zabbix for utilizado, preencha também `ZABBIX_API_URL` e `ZABBIX_API_TOKEN` 
 
 ## Banco e infraestrutura
 
-Suba PostgreSQL e Redis:
+### Docker Compose (fluxo recomendado)
 
-```powershell
-docker compose up -d postgres redis
-```
-
-Para produção, o Compose também pode construir e iniciar a aplicação na porta única `5174`, aplicar as migrations e manter PostgreSQL/Redis sem portas públicas:
+O ambiente está adaptado para Docker Compose: o serviço `migrate` aguarda o PostgreSQL, aplica as migrations uma única vez e só então inicia a aplicação. O container `healthlink` serve o frontend compilado, a API e o health check na mesma porta `5174`.
 
 ```powershell
 Copy-Item .env.example .env
 notepad .env
 docker compose up -d --build
 docker compose ps
+Invoke-WebRequest http://localhost:5174/health
 ```
 
-O endereço externo será `https://aplicacao.gbringel.com:5174`. Consulte [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) antes de usar em produção.
+O retorno esperado do health check é `{"status":"ok","service":"healthlink-sentinel"}`. PostgreSQL e Redis permanecem internos ao Compose; somente `5174` é publicada no host. O endereço externo de produção será `https://aplicacao.gbringel.com:5174`. Consulte [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) antes de usar em produção.
 
-Aplique as migrations na ordem numérica. No PowerShell:
+Para subir somente as dependências durante o desenvolvimento com API/frontend fora do Docker:
+
+```powershell
+docker compose up -d postgres redis
+```
+
+Quando a aplicação completa estiver rodando pelo Compose, não é necessário aplicar migrations manualmente. Para um ambiente legado sem o serviço `migrate`, aplique-as na ordem numérica:
 
 ```powershell
 Get-ChildItem apps/api/database/migrations/*.sql | Sort-Object Name | ForEach-Object {
@@ -79,7 +82,7 @@ Get-ChildItem apps/api/database/migrations/*.sql | Sort-Object Name | ForEach-Ob
 }
 ```
 
-Confira a API:
+Confira a API fora do Compose:
 
 ```powershell
 Invoke-WebRequest http://localhost:3000/health

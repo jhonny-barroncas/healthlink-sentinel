@@ -41,3 +41,9 @@ Validação concluída com `npm run typecheck` e `npm run build:web`.
 ## Ajuste do cabeçalho (10/08/2026)
 
 Removido o botão visual de troca de tema do cabeçalho para manter o produto em modo escuro corporativo e evitar o ícone solto no topo. O perfil do usuário permanece disponível.
+
+## Correção do cadastro e auto-bloqueio (19/08/2026)
+
+O formulário deixou de exigir CPF e coligada, pois esses campos não fazem parte do contrato atual da API e impediam o cadastro de usuários válidos. A mensagem de sucesso também foi ajustada para refletir que a senha é definida diretamente no formulário. A API agora impede que o usuário logado bloqueie a própria conta, mantendo a proteção já existente contra autoexclusão.
+
+Foi adicionada validação automatizada para o formulário, cobrindo criação sem campos desconectados do modelo e senha obrigatória apenas no cadastro.

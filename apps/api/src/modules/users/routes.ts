@@ -111,6 +111,7 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
     requireManage(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const input = updateSchema.parse(request.body);
+    if (input.active === false && id === request.auth.userId) throw Object.assign(new Error('Não é possível bloquear o próprio usuário.'), { statusCode: 400 });
     return withTenant(request.auth.tenantId, async (client) => {
       const membership = await client.query('SELECT 1 FROM user_tenants WHERE user_id = $1 AND tenant_id = $2', [id, request.auth.tenantId]);
       if (!membership.rowCount) throw Object.assign(new Error('Usuário não encontrado neste cliente.'), { statusCode: 404 });

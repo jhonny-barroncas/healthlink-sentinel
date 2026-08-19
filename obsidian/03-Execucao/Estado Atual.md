@@ -46,6 +46,10 @@ phase: foundation
 
 > Atualização 2026-08-18: o painel Starlink passou a mostrar explicitamente a unidade vinculada e sua cidade/UF junto das métricas da antena, incluindo coordenadas e obstrução quando fornecidas pelo agente.
 
+> Atualização 2026-08-19: o painel de usuários deixou de exigir CPF/coligada não suportados pela API, passou a validar senha somente no cadastro e a API impede o auto-bloqueio do usuário logado. Teste dedicado, typecheck e build web aprovados.
+
+> Atualização 2026-08-19: ambiente Docker Compose validado de ponta a ponta. O serviço `migrate` aplica as migrations, a aplicação sobe na porta única `5174` e o health check retorna 200. O registro do fallback SPA foi isolado para evitar rota wildcard duplicada no Fastify.
+
 > **Atualização vigente:** o texto histórico abaixo foi preservado. Para o estado canônico mais recente, consulte [[../00-Índice e Contexto Atual]].
 
 ## Atualização — 2026-08-07
