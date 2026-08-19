@@ -123,6 +123,16 @@ docker compose logs -f healthlink
 
 O serviço `migrate` aguarda o PostgreSQL ficar saudável e aplica as migrations antes de iniciar o `healthlink`. O PostgreSQL e o Redis ficam sem publicação de portas no host; somente `5174` é publicada pelo Compose.
 
+O container está preparado para o fluxo completo de produção: o build executa `typecheck` e `build:web`, o runtime inicia a API Fastify e os arquivos compilados do frontend compartilham a mesma origem. O fallback da SPA é registrado sem duplicar o wildcard do `@fastify/static`, evitando falha de inicialização do Fastify em versões atuais.
+
+Validação local realizada em 19/08/2026:
+
+```text
+docker compose up -d --build
+GET http://localhost:5174/health -> 200
+{"status":"ok","service":"healthlink-sentinel"}
+```
+
 Para parar sem remover os dados:
 
 ```bash

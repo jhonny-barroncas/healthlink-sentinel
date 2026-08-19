@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import fastifyStatic from '@fastify/static';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import authPlugin from './modules/auth/plugin.js';
@@ -14,6 +13,7 @@ import { zabbixRoutes } from './modules/integrations/zabbix/routes.js';
 import { starlinkRoutes } from './modules/integrations/starlink/routes.js';
 import { userRoutes } from './modules/users/routes.js';
 import { env } from './platform/env.js';
+import { registerWebAssets } from './web-assets.js';
 
 const app = Fastify({ logger: true });
 await app.register(cors, {
@@ -33,8 +33,7 @@ await app.register(userRoutes);
 
 const webRoot = resolve(process.cwd(), 'dist/web');
 if (existsSync(webRoot)) {
-  await app.register(fastifyStatic, { root: webRoot, prefix: '/' });
-  app.get('/*', async (_request, reply) => reply.sendFile('index.html'));
+  await registerWebAssets(app, webRoot);
 }
 
 await app.listen({ port: env.PORT, host: '0.0.0.0' });

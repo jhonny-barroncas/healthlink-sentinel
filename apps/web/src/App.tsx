@@ -4,6 +4,7 @@ import brazilMap from '@svg-maps/brazil';
 import Map, { Marker, NavigationControl, Popup, type MapRef } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import brandIcon from './assets/brand-icon.svg';
+import { validateManagedUserForm } from './user-form.js';
 
 type LoginResponse = { accessToken: string; user: { id: string; displayName: string; email: string }; tenant: { name: string } };
 type Unit = { unit_id: string; code: string; name: string; state_code: string; city: string; latitude: number | string | null; longitude: number | string | null; operational_status: 'online' | 'degraded' | 'offline' | 'unknown'; offline_equipment: number; degraded_equipment: number };
@@ -1293,7 +1294,7 @@ function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onTo
 
   async function submit(event: FormEvent) {
     event.preventDefault(); setSubmitted(true);
-    if (!form.displayName.trim() || !form.email.trim() || (!editingIsGlobalAdmin && !form.role) || (!editing && !form.cpf.trim()) || (!editing && !form.password)) {
+    if (validateManagedUserForm({ displayName: form.displayName, email: form.email, role: editingIsGlobalAdmin ? 'global_administrator' : form.role, password: form.password, editing: Boolean(editing) }).length > 0) {
       return;
     }
     setSaving(true);
@@ -1303,7 +1304,7 @@ function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onTo
       const wasEditing = Boolean(editing);
       setForm({ displayName: '', email: '', password: '', role: '', cpf: '', coligada: 'HealthLink Sentinel', active: true });
       setEditing(null); setSubmitted(false); await onRefresh();
-      onToast({ type: 'success', title: wasEditing ? 'Usuário atualizado' : 'Usuário criado', detail: wasEditing ? 'As alterações foram salvas com sucesso.' : 'O novo usuário foi cadastrado e receberá a senha por e-mail.' });
+      onToast({ type: 'success', title: wasEditing ? 'Usuário atualizado' : 'Usuário criado', detail: wasEditing ? 'As alterações foram salvas com sucesso.' : 'O novo usuário foi cadastrado com a senha definida no formulário.' });
     } catch (reason) { onToast({ type: 'error', title: editing ? 'Falha ao atualizar usuário' : 'Falha ao criar usuário', detail: friendlyMessage(reason, 'Não foi possível salvar o usuário. Tente novamente.') }); }
     finally { setSaving(false); }
   }
@@ -1349,22 +1350,12 @@ function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onTo
             {submitted && !form.email.trim() && <span className="field-error-text">Informe o e-mail.</span>}
           </label>
           <label>
-            <span className="field-label">CPF <b className="req">*</b></span>
-            <input value={form.cpf} className={submitted && !form.cpf.trim() ? 'field-invalid' : ''} onChange={(e) => setForm({ ...form, cpf: e.target.value })} placeholder="000.000.000-00" required />
-            {submitted && !form.cpf.trim() && <span className="field-error-text">Informe o CPF.</span>}
-          </label>
-          <label>
             <span className="field-label">Perfil <b className="req">*</b></span>
             {editingIsGlobalAdmin
               ? <AppDropdown placeholder="Administrador global" value="" disabled onChange={() => undefined} options={[]} />
               : <AppDropdown placeholder="Selecione um perfil" invalid={submitted && !form.role} value={form.role} onChange={(next) => setForm({ ...form, role: next })} options={[{ value: 'tenant_administrator', label: 'Administrador' }, { value: 'supervisor', label: 'Supervisor' }, { value: 'noc_operator', label: 'Operador NOC' }, { value: 'service_agent', label: 'Agente de integração' }, { value: 'viewer', label: 'Visualizador' }]} />}
             {editingIsGlobalAdmin && <span className="field-hint">O perfil de administrador global não pode ser alterado por este formulário.</span>}
             {!editingIsGlobalAdmin && submitted && !form.role && <span className="field-error-text">Selecione o perfil.</span>}
-          </label>
-          <label>
-            <span className="field-label">Coligada <b className="req">*</b></span>
-            <AppDropdown placeholder="Selecione uma coligada" invalid={submitted && !form.coligada} value={form.coligada} onChange={(next) => setForm({ ...form, coligada: next })} options={[{ value: 'HealthLink Sentinel', label: 'HealthLink Sentinel (Matriz)' }, { value: 'Filial 01', label: 'Filial 01 - Operações' }]} />
-            {submitted && !form.coligada && <span className="field-error-text">Selecione uma coligada.</span>}
           </label>
           <label>
             <span className="field-label">Status <b className="req">*</b></span>
