@@ -107,6 +107,8 @@ Use esta nota como ponto de entrada ao migrar para outro chat do Codex. O projet
 
 ## Correções mais recentes
 
+- O painel geográfico estadual agora agrupa os ativos por unidade e preserva todos os links retornados pela API; equipamentos sem telemetria também aparecem na lateral, em vez de somente o primeiro link de cada unidade. A seleção de um link mantém a análise detalhada específica.
+- O modal desktop de cadastro de equipamento deixou de criar rolagem vertical ao abrir o seletor de tipo: o card usa a altura disponível sem limitar o conteúdo e o dropdown fica visível como sobreposição. Em telas móveis, a rolagem de segurança foi preservada.
 - Corrigido SQL da listagem de usuários: `ut.active` foi incluído no `GROUP BY`; usuários bloqueados continuam visíveis.
 - Botão Excluir usuário agora remove apenas a associação ao tenant (`DELETE FROM user_tenants`), preservando usuário global/histórico; bloquear continua sendo ação distinta.
 - Botão Excluir possui confirmação no frontend.
@@ -150,6 +152,35 @@ Se a porta 3000 já estiver ocupada, não iniciar uma segunda API; verificar o p
 ## Próximo foco recomendado
 
 Revisar a gestão de usuários ponta a ponta (listagem de bloqueados, aprovação, edição e exclusão) diretamente no navegador, confirmar os endpoints com a API reiniciada e depois consolidar a tela de detalhe da unidade para não duplicar equipamentos entre monitoramento e inventário.
+
+Em 2026-08-19 foram provisionados no tenant `default` os acessos solicitados para infraestrutura (`tenant_administrator`) e técnico de unidade móvel (`supervisor`). As senhas não são registradas neste vault; o script idempotente está em `apps/api/src/scripts/seed-requested-users.ts` e foi executado dentro do Docker.
+
+Regra visual reforçada em 2026-08-19: modais flutuantes devem aumentar para acomodar o formulário e não criar scrollbar interna quando houver espaço disponível. O modal de edição de usuário foi ajustado para crescer sem `max-height`/`overflow: auto`, com regressão coberta por `apps/web/src/user-modal-layout.test.ts`.
+
+No mapa geográfico, os ativos laterais agora podem ser recolhidos/expandidos por unidade usando um controle acessível com chevron animado. A unidade selecionada pelo mapa abre automaticamente; as demais começam recolhidas para manter a lateral limpa.
+
+Em 2026-08-19, o card de unidade foi alinhado ao card de link: botão lateral de 34px com seta, resumo compacto de links totais/operacionais/em atenção e detalhe expandido apenas para a unidade selecionada. Ao fechar a seleção do mapa, a unidade é recolhida novamente.
+
+Diagnósticos do mapa corrigidos em 2026-08-19: Ping/Tracert agora usam um equipamento da própria unidade com endereço de gerenciamento, com alvo selecionável no menu de ação rápida. Equipamentos sem endereço não são enviados ao comando; a seleção é coberta por `apps/web/src/diagnostic-target.test.ts`.
+
+Interação dos ativos do mapa refinada em 2026-08-19: o clique em cada link/equipamento preserva o `equipment_id` exato como alvo dos comandos; links abrem a análise com Ping/Tracert do próprio ativo, equipamentos sem telemetria abrem a ação rápida já selecionada e unidades sem ativos exibem o cadastro vinculado à unidade. A seleção e o estado vazio são cobertos por `apps/web/src/state-map-interactions.test.ts`.
+
+Em 2026-08-19, a área de ativos do mapa passou a oferecer “Adicionar unidade”, reutilizando o formulário com a UF do mapa atual. A política de frescor da telemetria também foi separada por fonte: Zabbix tolera até 90s para acomodar o intervalo real dos itens, enquanto o agente Starlink mantém 30s; o estado operacional do host Zabbix é preservado quando apenas a métrica detalhada está atrasada. Teste dedicado em `apps/api/src/modules/monitoring/telemetry-freshness.test.ts`.
+
+Correção adicional do mapa em 2026-08-19: o card da unidade intercepta o botão direito e abre o menu rápido com “Adicionar equipamento”; o popup do marcador no mapa também oferece essa ação diretamente, além de “Abrir unidade”.
+
+Ajuste solicitado em 2026-08-19: removido o botão global “Adicionar unidade” do cabeçalho da lateral do mapa. O card da unidade (ex.: SEDE) continua sendo o ponto contextual para clique direito e cadastro de equipamento, enquanto o cadastro de nova unidade permanece disponível no fluxo próprio de administração/mapa estadual.
+
+Correção de fechamento em 2026-08-19: o menu rápido flutuante da unidade agora é limpo ao recolher o card ou fechar a seleção/popup do mapa; não fica mais aberto sobre a lateral depois que o contexto é encerrado.
+
+Correção de cadastro no mapa em 2026-08-19: falhas da API ao cadastrar uma unidade agora aparecem dentro do próprio modal “Nova unidade móvel”, em vez de somente no banner da tela que fica atrás do mapa.
+
+Correção do mapa/serviço em 2026-08-19: o build Docker passou a copiar os módulos oficiais `maplibre-gl-worker.mjs` e `maplibre-gl-shared.mjs` para os assets públicos, incluindo alias `.js` para clientes antigos. Rotas `/assets/*` inexistentes agora retornam 404 em texto, sem mascarar a ausência com `index.html`/MIME `text/html`.
+
+Também em 2026-08-19, a imagem Linux do Docker passou a instalar `iputils-ping` e `traceroute`, que estavam ausentes no container e impediam a execução mesmo com o alvo correto.
+
+Atualização 2026-08-19: o filtro do Centro Operacional `VPN` foi substituído por `Agentes`. A API `GET /v1/monitoring/agents` projeta, por unidade móvel, vínculo de fonte `local_agent`, versão, última amostra e estado `Agente em execução`/`Agente parado`/`Sem agente vinculado`. O frontend usa frescor de 30 segundos e cobre a regra em `apps/web/src/agent-status.test.ts`. O painel Starlink agora oferece `Vincular agente local` e `Desvincular agente`, sem comando manual. A Integração Zabbix também ganhou catálogo de artefatos Windows/Linux (`1.0.0` inicial), publicação autenticada com SHA-256 e download por versão.
+Nova nota: `obsidian/03-Execucao/Agente - Atualizacao Automatica e Versao 1.0.md` documenta a atualização automática por plataforma, validação SHA-256, substituição atômica e a pendência de homologar os serviços Windows/systemd.
 
 ## Documentação relacionada
 
