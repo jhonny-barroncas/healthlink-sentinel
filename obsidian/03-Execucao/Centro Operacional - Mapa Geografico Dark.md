@@ -107,6 +107,7 @@ O card **Localização ainda não informada** mantém apenas o botão circular l
 
 ## Telemetria de links no painel lateral - 2026-08-11
 
+- Correção 2026-08-19: a lateral deixou de usar apenas o primeiro registro (`[0]`) da telemetria por unidade. O frontend agrupa todos os links por `unit_id`, mantém um único ponto visual no mapa e exibe também os equipamentos cadastrados que ainda não possuem telemetria, encapsulados no card da unidade. Cada link continua abrindo sua própria análise detalhada.
 - A lista simples de unidades foi redesenhada como cards operacionais inspirados na referência NET-OPS fornecida pelo produto.
 - Cada card apresenta estado `OPR`, `ATN`, `DWN` ou `N/D`, latência, perda, tráfego de entrada e saída, capacidade nominal quando disponível e uma linha histórica de latência.
 - Os valores vêm do endpoint multi-tenant `GET /v1/monitoring/link-telemetry`; o frontend mostra `Sem telemetria de desempenho` e travessões quando o Zabbix não fornece os itens necessários.

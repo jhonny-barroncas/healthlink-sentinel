@@ -44,11 +44,17 @@ phase: foundation
 
 # Estado Atual
 
+> Atualização 2026-08-19: o Centro Operacional passou a ter a visão **Agentes** no lugar de VPN. A visão lista as unidades móveis e diferencia agente em execução (heartbeat até 30s), agente parado e unidade sem agente vinculado; a API agrega a fonte `local_agent`, última amostra e versão sem expor segredos.
+> Atualização 2026-08-19: a aba **Integração Zabbix** passou a ter o repositório de versões do agente, separado por Windows/Linux. A migração `010_agent_versions.sql` cria o catálogo inicial `1.0.0` para os dois sistemas; a interface publica o arquivo, calcula SHA-256 no servidor e disponibiliza download autenticado para atualização.
+> Pendência para amanhã: homologar o agente `1.0.0` como serviço Windows e `systemd` Linux, validar reinício, coleta contínua, atualização automática e rollback.
+
 > Atualização 2026-08-18: o painel Starlink passou a mostrar explicitamente a unidade vinculada e sua cidade/UF junto das métricas da antena, incluindo coordenadas e obstrução quando fornecidas pelo agente.
 
 > Atualização 2026-08-19: o painel de usuários deixou de exigir CPF/coligada não suportados pela API, passou a validar senha somente no cadastro e a API impede o auto-bloqueio do usuário logado. Teste dedicado, typecheck e build web aprovados.
 
 > Atualização 2026-08-19: ambiente Docker Compose validado de ponta a ponta. O serviço `migrate` aplica as migrations, a aplicação sobe na porta única `5174` e o health check retorna 200. O registro do fallback SPA foi isolado para evitar rota wildcard duplicada no Fastify.
+
+> Correção 2026-08-19: o modal desktop de novo equipamento não cria mais rolagem vertical quando o seletor de tipo é aberto. O dropdown fica sobreposto ao card e a rolagem continua disponível somente como proteção em telas móveis. Testes, typecheck, build web e rebuild do serviço Docker aprovados.
 
 > **Atualização vigente:** o texto histórico abaixo foi preservado. Para o estado canônico mais recente, consulte [[../00-Índice e Contexto Atual]].
 
@@ -95,6 +101,34 @@ Os itens abaixo descrevem o ponto de partida histórico e não representam o est
 - Validação real identificou 29 hosts autorizados, 2 vínculos ativos e saúde `healthy`.
 
 ## Riscos e pendências
+
+- Em 2026-08-19, o painel geográfico passou a agrupar a lateral por unidade, renderizar todos os links da unidade e listar equipamentos sem telemetria. A regressão de múltiplos links foi coberta por `apps/web/src/state-map-telemetry.test.ts`; testes, typecheck e build foram aprovados.
+
+- Em 2026-08-19, foram provisionados no tenant `default` os dois acessos solicitados: infraestrutura (`tenant_administrator`) e técnico de unidade móvel (`supervisor`). O provisionamento é idempotente e executado no container por `apps/api/src/scripts/seed-requested-users.ts`; senhas não são documentadas.
+
+- Em 2026-08-19, o modal de edição de usuário deixou de limitar a altura e criar scrollbar interna quando há espaço disponível. A largura foi ampliada e a regra foi coberta por `apps/web/src/user-modal-layout.test.ts`; o dropdown mantém rolagem própria somente quando sua lista exceder o limite.
+
+- Em 2026-08-19, a lateral do mapa geográfico recebeu expansão/recolhimento por unidade com chevron animado e `aria-expanded`; a unidade escolhida no mapa é aberta automaticamente e as demais ficam recolhidas por padrão. A regressão foi coberta por `apps/web/src/state-unit-collapse.test.ts`; 12 testes, typecheck e build foram aprovados dentro do Docker.
+
+- Em 2026-08-19, o card de unidade foi refinado para usar o mesmo botão lateral de 34px dos cards de link, com resumo básico dos links (total, operacionais e em atenção). A seleção do marcador abre somente aquela unidade e o fechamento do popup limpa a expansão.
+
+- Em 2026-08-19, Ping/Tracert do menu rápido passaram a selecionar explicitamente um equipamento da unidade com endereço de gerenciamento. O frontend não usa mais o primeiro equipamento arbitrariamente; sem endereço válido, os comandos ficam desabilitados e a interface orienta o cadastro. Foram validados 14 testes, typecheck e build dentro do Docker.
+
+- Em 2026-08-19, a interação dos cards do mapa foi corrigida para manter o ativo clicado como alvo real: links abrem sua análise com ações Ping/Tracert específicas, equipamentos sem telemetria abrem a ação rápida já selecionada e unidades sem ativos oferecem “Cadastrar equipamento” no próprio card. A regressão foi coberta por `apps/web/src/state-map-interactions.test.ts`.
+
+- Em 2026-08-19, a área lateral de ativos recebeu o botão “Adicionar unidade”, que abre o cadastro já contextualizado na UF do mapa. A oscilação visual de telemetria foi corrigida com janela de frescor por fonte: 90s para amostras Zabbix e 30s para agente Starlink; quando só a métrica detalhada do Zabbix atrasa, o estado operacional do host permanece visível. Teste dedicado e suíte completa aprovados no Docker.
+
+- Em 2026-08-19, o menu de unidade foi completado: botão direito no card agora abre “Adicionar equipamento” sem o menu nativo do navegador, e o popup aberto ao clicar no marcador do mapa oferece a mesma ação diretamente. Build, typecheck e suíte completa foram validados no Docker.
+
+- Em 2026-08-19, o botão global “Adicionar unidade” foi removido do cabeçalho da lateral do mapa conforme o fluxo solicitado. O cadastro de equipamento permanece contextual ao card da unidade via clique direito/menu flutuante; o cadastro de nova unidade segue no fluxo administrativo próprio.
+
+- Em 2026-08-19, o menu rápido flutuante da unidade passou a ser fechado junto com o recolhimento do card e com o fechamento do popup/seleção do mapa. A regressão foi coberta em `apps/web/src/state-unit-collapse.test.ts`.
+
+- Em 2026-08-19, erros retornados pela API durante o cadastro de unidade aberto pelo mapa passaram a ser exibidos dentro do próprio modal, sem depender do banner da tela de fundo. A regressão foi coberta em `apps/web/src/form-modal-layout.test.ts`.
+
+- Em 2026-08-19, o worker do MapLibre foi incluído no bundle público do Docker (`maplibre-gl-worker.mjs`, `maplibre-gl-shared.mjs` e alias `.js`), evitando que o fallback SPA devolvesse HTML com MIME incorreto. Assets ausentes passaram a responder 404; a API foi rebuildada e o health check retornou 200.
+
+- A imagem runtime do Docker foi atualizada para instalar `iputils-ping` e `traceroute`; a presença de `/usr/bin/ping` e `/usr/bin/traceroute` foi conferida no container após o rebuild.
 
 - O gráfico de latência exibe tooltip por amostra; itens Zabbix de descarte/erro não são mais aceitos como download/upload, aguardando itens de tráfego válidos quando o host não os fornecer.
 

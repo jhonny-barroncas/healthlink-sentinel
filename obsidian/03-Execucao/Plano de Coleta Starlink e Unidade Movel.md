@@ -108,6 +108,8 @@ Adicionar fila local idempotente, ingestão em lote, origem/timestamp/qualidade/
 
 Exibir saúde da Starlink, servidor e MikroTik em cards separados, origem e idade da amostra, estado do agente, histórico e diagnóstico de falhas.
 
+Implementação inicial concluída em 2026-08-19: a visão **Agentes** do Centro Operacional consulta `GET /v1/monitoring/agents` e mostra, por unidade móvel, vínculo `local_agent`, versão, última coleta e estado operacional com frescor de 30 segundos.
+
 ## Critérios de aceite
 
 - Unidade sem MikroTik continua monitorável pela Starlink e servidor.

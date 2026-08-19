@@ -2,6 +2,7 @@ import { collectStarlink, type TelemetryBatch } from './collector.js';
 import { loadConfig } from './config.js';
 import { loadQueue, saveQueue } from './queue.js';
 import { HealthLinkAuth } from './healthlink-auth.js';
+import { checkForAgentUpdate } from './agent-updater.js';
 
 async function sendBatch(batch: TelemetryBatch, config: ReturnType<typeof loadConfig>, auth: HealthLinkAuth): Promise<void> {
   const response = await auth.fetch(`${config.apiUrl}/v1/integrations/starlink/telemetry`, {
@@ -39,5 +40,9 @@ const config = loadConfig();
 const auth = new HealthLinkAuth(config);
 const once = process.argv.includes('--once');
 console.log(`[starlink-agent] iniciado; dish=${config.starlinkHost}:${config.starlinkPort}; intervalo=${config.pollIntervalMs}ms`);
+try { await checkForAgentUpdate(config, auth); } catch (error) { console.warn(`[starlink-agent] atualização automática indisponível: ${(error as Error).message}`); }
 await cycle(config, auth);
-if (!once) setInterval(() => void cycle(config, auth), config.pollIntervalMs);
+if (!once) {
+  setInterval(() => void cycle(config, auth), config.pollIntervalMs);
+  setInterval(() => void checkForAgentUpdate(config, auth).catch((error) => console.warn(`[starlink-agent] atualização automática indisponível: ${(error as Error).message}`)), 10 * 60_000);
+}

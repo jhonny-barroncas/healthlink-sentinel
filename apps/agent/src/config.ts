@@ -29,6 +29,9 @@ export type AgentConfig = {
   pollIntervalMs: number;
   timeoutMs: number;
   queuePath: string;
+  platform: 'windows' | 'linux';
+  agentVersion: string;
+  agentPath: string;
 };
 
 export function loadConfig(): AgentConfig {
@@ -50,5 +53,8 @@ export function loadConfig(): AgentConfig {
     pollIntervalMs: numberEnv('STARLINK_POLL_INTERVAL_MS', 15_000, 5_000),
     timeoutMs: numberEnv('STARLINK_TIMEOUT_MS', 3_000, 500),
     queuePath: process.env.STARLINK_QUEUE_PATH?.trim() || '.healthlink-starlink-queue.json',
+    platform: process.env.HEALTHLINK_AGENT_PLATFORM === 'windows' ? 'windows' : 'linux',
+    agentVersion: process.env.HEALTHLINK_AGENT_VERSION?.trim() || '1.0.0',
+    agentPath: process.env.HEALTHLINK_AGENT_PATH?.trim() || process.argv[1],
   };
 }
