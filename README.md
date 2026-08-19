@@ -106,7 +106,15 @@ npm.cmd run dev:web
 
 Acesse [http://localhost:5173](http://localhost:5173). A API ficará em [http://localhost:3000](http://localhost:3000).
 
-O frontend usa automaticamente a API na porta `3000` do mesmo computador. Para acessar de outro computador da rede, abra a porta no firewall e use o endereço IP da máquina que executa a API/frontend.
+Nesse fluxo de dois terminais, o frontend e a API rodam em portas diferentes, então é preciso informar ao Vite onde está a API. Copie `apps/web/.env.local.example` para `apps/web/.env.local` (não é versionado):
+
+```powershell
+Copy-Item apps/web/.env.local.example apps/web/.env.local
+```
+
+Sem esse arquivo, o login e as demais chamadas falham porque o frontend tenta usar a própria origem (`localhost:5173`) como base da API. Para acessar de outro computador da rede, abra as portas no firewall e troque `localhost` pelo IP da máquina que executa a API/frontend.
+
+Esse ajuste só é necessário nesse fluxo de desenvolvimento local com dois terminais. No fluxo do Docker Compose (recomendado, ver seção acima), frontend e API são servidos juntos na mesma porta e nenhuma variável extra é necessária.
 
 ## Primeiro acesso
 
