@@ -1,0 +1,214 @@
+{"kind":"deck","id":"pr/4ia0a3","name":"Deck"}
+{"kind":"layout","layoutId":"023766db-e59a-4c31-b0eb-e8553b5fa666","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"b9b049d4-942f-4202-aefc-37395988a5fe","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/ta7913","slide":1,"title":"HEALTHLINK","textShapes":9}
+{"kind":"shape","id":"sh/nyp8b2xk","slide":1,"bbox":[0,0,1280,720]}
+{"kind":"shape","id":"sh/ozypk7y5","slide":1,"bbox":[0,0,18,720]}
+{"kind":"textbox","id":"sh/p07qdcfq","slide":1,"text":"HEALTHLINK","textPreview":"HEALTHLINK","textChars":10,"textLines":1,"bbox":[72,82,620,72]}
+{"kind":"textbox","id":"sh/a1g7mhgv","slide":1,"text":"SENTINEL","textPreview":"SENTINEL","textChars":8,"textLines":1,"bbox":[72,148,620,72]}
+{"kind":"textbox","id":"sh/b298f2xg","slide":1,"text":"Uma camada operacional para transformar telemetria em decisão.","textPreview":"Uma camada operacional para transformar telemetria em decisão.","textChars":62,"textLines":1,"bbox":[76,250,760,42]}
+{"kind":"shape","id":"sh/w3ipo7y1","slide":1,"bbox":[800,90,360,420]}
+{"kind":"textbox","id":"sh/x4rqhcfm","slide":1,"text":"DOIS MÓDULOS","textPreview":"DOIS MÓDULOS","textChars":12,"textLines":1,"bbox":[836,130,250,26]}
+{"kind":"textbox","id":"sh/q5w7adgr","slide":1,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[836,190,80,50]}
+{"kind":"textbox","id":"sh/r65o3ixc","slide":1,"text":"Monitoramento\nde infraestrutura","textPreview":"Monitoramento | de infraestrutura","textChars":31,"textLines":2,"bbox":[836,242,260,70]}
+{"kind":"shape","id":"sh/ru90zil8","slide":1,"bbox":[836,334,274,0]}
+{"kind":"textbox","id":"sh/qt0zqx43","slide":1,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[836,365,80,50]}
+{"kind":"textbox","id":"sh/dwri1s3e","slide":1,"text":"Links de unidades\nmóveis + suporte","textPreview":"Links de unidades | móveis + suporte","textChars":34,"textLines":2,"bbox":[836,417,260,70]}
+{"kind":"textbox","id":"sh/svihsnmt","slide":1,"text":"Apresentação executiva  |  2026","textPreview":"Apresentação executiva  |  2026","textChars":31,"textLines":1,"bbox":[76,612,400,25]}
+{"kind":"notes","id":"nt/ta7913","slide":1,"text":""}
+{"kind":"slide","id":"sl/l8563u","slide":2,"title":"A OPORTUNIDADE","textShapes":12}
+{"kind":"textbox","id":"sh/z6do7u14","slide":2,"text":"A OPORTUNIDADE","textPreview":"A OPORTUNIDADE","textChars":14,"textLines":1,"bbox":[72,48,700,22]}
+{"kind":"textbox","id":"sh/07650zip","slide":2,"text":"O Zabbix coleta muito. A operação precisa entender rápido.","textPreview":"O Zabbix coleta muito. A operação precisa entender rápido.","textChars":58,"textLines":1,"bbox":[72,88,1120,72]}
+{"kind":"textbox","id":"sh/18f694ja","slide":2,"text":"O HealthLink Sentinel organiza o dado técnico no contexto da unidade, do link e da missão.","textPreview":"O HealthLink Sentinel organiza o dado técnico no contexto da unidade, do link e da missão.","textChars":90,"textLines":1,"bbox":[72,166,1060,36]}
+{"kind":"shape","id":"sh/q14nup0n","slide":2,"bbox":[72,260,330,210]}
+{"kind":"shape","id":"sh/r2do3u18","slide":2,"bbox":[96,286,14,14]}
+{"kind":"textbox","id":"sh/s3m5wzid","slide":2,"text":"O que existe","textPreview":"O que existe","textChars":12,"textLines":1,"bbox":[122,280,260,30]}
+{"kind":"textbox","id":"sh/d4v65kjy","slide":2,"text":"Métricas, hosts, itens, triggers e eventos distribuídos em uma camada técnica.","textPreview":"Métricas, hosts, itens, triggers e eventos distribuídos em uma camada técnica.","textChars":78,"textLines":1,"bbox":[96,326,282,128]}
+{"kind":"shape","id":"sh/idknq50b","slide":2,"bbox":[475,260,330,210]}
+{"kind":"shape","id":"sh/3etoza1w","slide":2,"bbox":[499,286,14,14]}
+{"kind":"textbox","id":"sh/vqpgbuho","slide":2,"text":"O que falta","textPreview":"O que falta","textChars":11,"textLines":1,"bbox":[525,280,260,30]}
+{"kind":"textbox","id":"sh/upgfip03","slide":2,"text":"Contexto operacional: qual unidade está comprometida, por quê e qual ação vem agora.","textPreview":"Contexto operacional: qual unidade está comprometida, por quê e qual ação vem agora.","textChars":84,"textLines":1,"bbox":[499,326,282,128]}
+{"kind":"shape","id":"sh/hs7yd4zu","slide":2,"bbox":[878,260,330,210]}
+{"kind":"shape","id":"sh/gryxkzi9","slide":2,"bbox":[902,286,14,14]}
+{"kind":"textbox","id":"sh/3u9gfehk","slide":2,"text":"O que muda","textPreview":"O que muda","textChars":10,"textLines":1,"bbox":[928,280,260,30]}
+{"kind":"textbox","id":"sh/it0fm90z","slide":2,"text":"Uma visão executiva e operacional, com estado consolidado, mapa, alerta e histórico.","textPreview":"Uma visão executiva e operacional, com estado consolidado, mapa, alerta e histórico.","textChars":84,"textLines":1,"bbox":[902,326,282,128]}
+{"kind":"textbox","id":"sh/5wryh4zq","slide":2,"text":"Zabbix permanece como motor de coleta. A inteligência operacional pertence ao HealthLink.","textPreview":"Zabbix permanece como motor de coleta. A inteligência operacional pertence ao HealthLink.","textChars":89,"textLines":1,"bbox":[72,554,1100,44]}
+{"kind":"textbox","id":"sh/4vixoji5","slide":2,"text":"HEALTHLINK SENTINEL  /  VISÃO CORPORATIVA","textPreview":"HEALTHLINK SENTINEL  /  VISÃO CORPORATIVA","textChars":41,"textLines":1,"bbox":[72,678,500,20]}
+{"kind":"textbox","id":"sh/jy5w3a1g","slide":2,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1160,678,48,20]}
+{"kind":"notes","id":"nt/l8563u","slide":2,"text":""}
+{"kind":"slide","id":"sl/vilpf0","slide":3,"title":"POSICIONAMENTO","textShapes":12}
+{"kind":"textbox","id":"sh/zylsbedw","slide":3,"text":"POSICIONAMENTO","textPreview":"POSICIONAMENTO","textChars":14,"textLines":1,"bbox":[72,48,700,22]}
+{"kind":"textbox","id":"sh/kzutkjuh","slide":3,"text":"HealthLink Sentinel é a camada de operação acima do Zabbix.","textPreview":"HealthLink Sentinel é a camada de operação acima do Zabbix.","textChars":59,"textLines":1,"bbox":[72,88,1120,72]}
+{"kind":"textbox","id":"sh/l03adovm","slide":3,"text":"Preserva o investimento existente e acrescenta contexto, governança e fluidez para quem decide.","textPreview":"Preserva o investimento existente e acrescenta contexto, governança e fluidez para quem decide.","textChars":95,"textLines":1,"bbox":[72,166,1060,36]}
+{"kind":"shape","id":"sh/atsre9cz","slide":3,"bbox":[300,350,210,0]}
+{"kind":"shape","id":"sh/bu1s7edk","slide":3,"bbox":[770,350,210,0]}
+{"kind":"shape","id":"sh/cvutgju5","slide":3,"bbox":[72,270,228,160]}
+{"kind":"textbox","id":"sh/xw3a94vq","slide":3,"text":"FONTES","textPreview":"FONTES","textChars":6,"textLines":1,"bbox":[102,302,150,25]}
+{"kind":"textbox","id":"sh/25srapc3","slide":3,"text":"Zabbix\nStarlink\nMikroTik","textPreview":"Zabbix | Starlink | MikroTik","textChars":24,"textLines":3,"bbox":[102,340,180,90]}
+{"kind":"shape","id":"sh/n61s3udo","slide":3,"bbox":[510,245,260,210]}
+{"kind":"textbox","id":"sh/z6dgbadw","slide":3,"text":"HEALTHLINK\nSENTINEL","textPreview":"HEALTHLINK | SENTINEL","textChars":19,"textLines":2,"bbox":[548,298,190,70]}
+{"kind":"textbox","id":"sh/e54z25cb","slide":3,"text":"normaliza • correlaciona\nprojeta • audita","textPreview":"normaliza • correlaciona | projeta • audita","textChars":41,"textLines":2,"bbox":[548,385,190,48]}
+{"kind":"shape","id":"sh/18fyd0v2","slide":3,"bbox":[980,270,228,160]}
+{"kind":"textbox","id":"sh/07mh4fuh","slide":3,"text":"RESULTADO","textPreview":"RESULTADO","textChars":9,"textLines":1,"bbox":[1010,302,160,25]}
+{"kind":"textbox","id":"sh/naxgfats","slide":3,"text":"NOC\nGestão\nSuporte","textPreview":"NOC | Gestão | Suporte","textChars":18,"textLines":3,"bbox":[1010,340,180,90]}
+{"kind":"textbox","id":"sh/m9oz65c7","slide":3,"text":"A integração é evolutiva: o motor existente continua; a experiência e a governança avançam.","textPreview":"A integração é evolutiva: o motor existente continua; a experiência e a governança avançam.","textChars":91,"textLines":1,"bbox":[72,550,1120,40]}
+{"kind":"textbox","id":"sh/9cfyhkby","slide":3,"text":"HEALTHLINK SENTINEL  /  VISÃO CORPORATIVA","textPreview":"HEALTHLINK SENTINEL  /  VISÃO CORPORATIVA","textChars":41,"textLines":1,"bbox":[72,678,500,20]}
+{"kind":"textbox","id":"sh/ob6h8fud","slide":3,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1160,678,48,20]}
+{"kind":"notes","id":"nt/vilpf0","slide":3,"text":""}
+{"kind":"slide","id":"sl/j9qo0x","slide":4,"title":"MÓDULO 01","textShapes":12}
+{"kind":"textbox","id":"sh/l0vi14b2","slide":4,"text":"MÓDULO 01","textPreview":"MÓDULO 01","textChars":9,"textLines":1,"bbox":[72,48,700,22]}
+{"kind":"textbox","id":"sh/yx4jqpsr","slide":4,"text":"Monitoramento de infraestrutura com contexto operacional.","textPreview":"Monitoramento de infraestrutura com contexto operacional.","textChars":57,"textLines":1,"bbox":[72,88,1120,72]}
+{"kind":"textbox","id":"sh/jyd0zutw","slide":4,"text":"Uma visão consolidada para servidores, rede, VPN, equipamentos e disponibilidade das unidades.","textPreview":"Uma visão consolidada para servidores, rede, VPN, equipamentos e disponibilidade das unidades.","textChars":94,"textLines":1,"bbox":[72,166,1060,36]}
+{"kind":"shape","id":"sh/wv21ofal","slide":4,"bbox":[72,250,350,220]}
+{"kind":"shape","id":"sh/xwbixkb6","slide":4,"bbox":[96,276,14,14]}
+{"kind":"textbox","id":"sh/atkjmpsf","slide":4,"text":"Mapa operacional","textPreview":"Mapa operacional","textChars":16,"textLines":1,"bbox":[122,270,280,30]}
+{"kind":"textbox","id":"sh/but0vat0","slide":4,"text":"Brasil por estado, unidades e pior estado herdado entre equipamentos ativos.","textPreview":"Brasil por estado, unidades e pior estado herdado entre equipamentos ativos.","textChars":76,"textLines":1,"bbox":[96,316,302,138]}
+{"kind":"shape","id":"sh/gr610jap","slide":4,"bbox":[465,250,350,220]}
+{"kind":"shape","id":"sh/hsf29ora","slide":4,"bbox":[489,276,14,14]}
+{"kind":"textbox","id":"sh/dc72hsry","slide":4,"text":"Central de alertas","textPreview":"Central de alertas","textChars":18,"textLines":1,"bbox":[515,270,280,30]}
+{"kind":"textbox","id":"sh/cby18nad","slide":4,"text":"Incidentes ativos, reconhecimento, severidade, histórico e ciclo de vida.","textPreview":"Incidentes ativos, reconhecimento, severidade, histórico e ciclo de vida.","textChars":73,"textLines":1,"bbox":[489,316,302,138]}
+{"kind":"shape","id":"sh/bapkfi9s","slide":4,"bbox":[858,250,350,220]}
+{"kind":"shape","id":"sh/q9gj6xs7","slide":4,"bbox":[882,276,14,14]}
+{"kind":"textbox","id":"sh/p8n2dsrm","slide":4,"text":"Integração governada","textPreview":"Integração governada","textChars":20,"textLines":1,"bbox":[908,270,280,30]}
+{"kind":"textbox","id":"sh/o7e14na1","slide":4,"text":"Hosts autorizados, sugestões de vínculo, sincronização, saúde e auditoria.","textPreview":"Hosts autorizados, sugestões de vínculo, sincronização, saúde e auditoria.","textChars":74,"textLines":1,"bbox":[882,316,302,138]}
+{"kind":"textbox","id":"sh/365kbi9g","slide":4,"text":"O operador deixa de procurar “qual host falhou?” e passa a responder “qual unidade está em risco?”.","textPreview":"O operador deixa de procurar “qual host falhou?” e passa a responder “qual unidade está em risco?”.","textChars":99,"textLines":1,"bbox":[72,550,1120,42]}
+{"kind":"textbox","id":"sh/25wj2dsb","slide":4,"text":"HEALTHLINK SENTINEL  /  VISÃO CORPORATIVA","textPreview":"HEALTHLINK SENTINEL  /  VISÃO CORPORATIVA","textChars":41,"textLines":1,"bbox":[72,678,500,20]}
+{"kind":"textbox","id":"sh/94r2pcr6","slide":4,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[1160,678,48,20]}
+{"kind":"notes","id":"nt/j9qo0x","slide":4,"text":""}
+{"kind":"slide","id":"sl/aty08t","slide":5,"title":"MÓDULO 01","textShapes":22}
+{"kind":"textbox","id":"sh/il0jed4v","slide":5,"text":"MÓDULO 01","textPreview":"MÓDULO 01","textChars":9,"textLines":1,"bbox":[72,48,700,22]}
+{"kind":"textbox","id":"sh/5obi9sn6","slide":5,"text":"Diferenciais sobre o Zabbix para a operação.","textPreview":"Diferenciais sobre o Zabbix para a operação.","textChars":44,"textLines":1,"bbox":[72,88,1120,72]}
+{"kind":"textbox","id":"sh/4ni1gnm1","slide":5,"text":"O valor está na tradução do evento técnico para uma decisão rastreável.","textPreview":"O valor está na tradução do evento técnico para uma decisão rastreável.","textChars":71,"textLines":1,"bbox":[72,166,1060,36]}
+{"kind":"textbox","id":"sh/rqt0bi5c","slide":5,"text":"ZABBIX","textPreview":"ZABBIX","textChars":6,"textLines":1,"bbox":[250,232,220,24]}
+{"kind":"textbox","id":"sh/qpkjid4r","slide":5,"text":"HEALTHLINK SENTINEL","textPreview":"HEALTHLINK SENTINEL","textChars":19,"textLines":1,"bbox":[720,232,300,24]}
+{"kind":"shape","id":"sh/dcbidsni","slide":5,"bbox":[72,270,1136,0]}
+{"kind":"textbox","id":"sh/sb21knmx","slide":5,"text":"Contexto","textPreview":"Contexto","textChars":8,"textLines":1,"bbox":[72,290,150,28]}
+{"kind":"textbox","id":"sh/fet0f25o","slide":5,"text":"Host / trigger","textPreview":"Host / trigger","textChars":14,"textLines":1,"bbox":[250,290,370,28]}
+{"kind":"textbox","id":"sh/edkjmx43","slide":5,"text":"Unidade / equipamento / impacto","textPreview":"Unidade / equipamento / impacto","textChars":31,"textLines":1,"bbox":[720,290,460,28]}
+{"kind":"shape","id":"sh/cbi547id","slide":5,"bbox":[72,332,1136,0]}
+{"kind":"textbox","id":"sh/dcb6xszy","slide":5,"text":"Visão","textPreview":"Visão","textChars":5,"textLines":1,"bbox":[72,355,150,28]}
+{"kind":"textbox","id":"sh/q90n2x07","slide":5,"text":"Telas técnicas","textPreview":"Telas técnicas","textChars":14,"textLines":1,"bbox":[250,355,370,28]}
+{"kind":"textbox","id":"sh/ra94v2hs","slide":5,"text":"Mapa + estado consolidado + detalhe","textPreview":"Mapa + estado consolidado + detalhe","textChars":35,"textLines":1,"bbox":[720,355,460,28]}
+{"kind":"shape","id":"sh/0f2587i9","slide":5,"bbox":[72,397,1136,0]}
+{"kind":"textbox","id":"sh/10b61czu","slide":5,"text":"Ação","textPreview":"Ação","textChars":4,"textLines":1,"bbox":[72,420,150,28]}
+{"kind":"textbox","id":"sh/edkn6x0j","slide":5,"text":"Reconhecer problema","textPreview":"Reconhecer problema","textChars":19,"textLines":1,"bbox":[250,420,370,28]}
+{"kind":"textbox","id":"sh/zetoz2h4","slide":5,"text":"Diagnosticar, registrar e acompanhar","textPreview":"Diagnosticar, registrar e acompanhar","textChars":36,"textLines":1,"bbox":[720,420,460,28]}
+{"kind":"shape","id":"sh/o3m5cril","slide":5,"bbox":[72,462,1136,0]}
+{"kind":"textbox","id":"sh/94v65wz6","slide":5,"text":"Governança","textPreview":"Governança","textChars":10,"textLines":1,"bbox":[72,485,150,28]}
+{"kind":"textbox","id":"sh/x0rmpcra","slide":5,"text":"Configuração distribuída","textPreview":"Configuração distribuída","textChars":24,"textLines":1,"bbox":[250,485,370,28]}
+{"kind":"textbox","id":"sh/wzi5w7ap","slide":5,"text":"RBAC, multi-tenant, auditoria e histórico","textPreview":"RBAC, multi-tenant, auditoria e histórico","textChars":41,"textLines":1,"bbox":[720,485,460,28]}
+{"kind":"shape","id":"sh/vy94nm94","slide":5,"bbox":[72,527,1136,0]}
+{"kind":"textbox","id":"sh/axgnuhsj","slide":5,"text":"Confiabilidade","textPreview":"Confiabilidade","textChars":14,"textLines":1,"bbox":[72,550,150,28]}
+{"kind":"textbox","id":"sh/5or6twr6","slide":5,"text":"Último valor disponível","textPreview":"Último valor disponível","textChars":23,"textLines":1,"bbox":[250,550,370,28]}
+{"kind":"textbox","id":"sh/kni50ral","slide":5,"text":"Telemetria stale vira unknown; histórico preservado","textPreview":"Telemetria stale vira unknown; histórico preservado","textChars":51,"textLines":1,"bbox":[720,550,460,28]}
+{"kind":"shape","id":"sh/jm9orm9g","slide":5,"bbox":[72,592,1136,0]}
+{"kind":"textbox","id":"sh/il0nyhsv","slide":5,"text":"HEALTHLINK SENTINEL  /  VISÃO CORPORATIVA","textPreview":"HEALTHLINK SENTINEL  /  VISÃO CORPORATIVA","textChars":41,"textLines":1,"bbox":[72,678,500,20]}
+{"kind":"textbox","id":"sh/ls7mhsr2","slide":5,"text":"05","textPreview":"05","textChars":2,"textLines":1,"bbox":[1160,678,48,20]}
+{"kind":"notes","id":"nt/aty08t","slide":5,"text":""}
+{"kind":"slide","id":"sl/djv7qa","slide":6,"title":"MÓDULO 02","textShapes":14}
+{"kind":"textbox","id":"sh/j2hcfe50","slide":6,"text":"MÓDULO 02","textPreview":"MÓDULO 02","textChars":9,"textLines":1,"bbox":[72,48,700,22]}
+{"kind":"textbox","id":"sh/k3qdojml","slide":6,"text":"Gestão de links das unidades móveis + suporte.","textPreview":"Gestão de links das unidades móveis + suporte.","textChars":46,"textLines":1,"bbox":[72,88,1120,72]}
+{"kind":"textbox","id":"sh/l4zuho3q","slide":6,"text":"Uma visão específica para conectividade em campo: link, antena, caminho, agente e atendimento.","textPreview":"Uma visão específica para conectividade em campo: link, antena, caminho, agente e atendimento.","textChars":94,"textLines":1,"bbox":[72,166,1060,36]}
+{"kind":"shape","id":"sh/axovi943","slide":6,"bbox":[72,245,270,235]}
+{"kind":"shape","id":"sh/byxcbe5o","slide":6,"bbox":[96,271,14,14]}
+{"kind":"textbox","id":"sh/wzqdkjm9","slide":6,"text":"Link","textPreview":"Link","textChars":4,"textLines":1,"bbox":[122,265,200,30]}
+{"kind":"textbox","id":"sh/x0zud4nu","slide":6,"text":"Plano contratado x tráfego atual; latência, perda e disponibilidade.","textPreview":"Plano contratado x tráfego atual; latência, perda e disponibilidade.","textChars":68,"textLines":1,"bbox":[96,311,222,153]}
+{"kind":"shape","id":"sh/utsvut4n","slide":6,"bbox":[373,245,270,235]}
+{"kind":"shape","id":"sh/vu1wnyl8","slide":6,"bbox":[397,271,14,14]}
+{"kind":"textbox","id":"sh/f6pon25c","slide":6,"text":"Unidade móvel","textPreview":"Unidade móvel","textChars":13,"textLines":1,"bbox":[423,265,200,30]}
+{"kind":"textbox","id":"sh/e5gnexor","slide":6,"text":"Starlink como fonte primária; MikroTik como caminho e interfaces.","textPreview":"Starlink como fonte primária; MikroTik como caminho e interfaces.","textChars":65,"textLines":1,"bbox":[397,311,222,153]}
+{"kind":"shape","id":"sh/18r6psn2","slide":6,"bbox":[674,245,270,235]}
+{"kind":"shape","id":"sh/g7y5gn6h","slide":6,"bbox":[698,271,14,14]}
+{"kind":"textbox","id":"sh/3a9or258","slide":6,"text":"Suporte","textPreview":"Suporte","textChars":7,"textLines":1,"bbox":[724,265,200,30]}
+{"kind":"textbox","id":"sh/290nixon","slide":6,"text":"Diagnóstico de ping/tracert, origem da métrica e evidência para o chamado.","textPreview":"Diagnóstico de ping/tracert, origem da métrica e evidência para o chamado.","textChars":74,"textLines":1,"bbox":[698,311,222,153]}
+{"kind":"shape","id":"sh/pcr6tcne","slide":6,"bbox":[975,245,233,235]}
+{"kind":"shape","id":"sh/obi5k76t","slide":6,"bbox":[999,271,14,14]}
+{"kind":"textbox","id":"sh/be9ovm54","slide":6,"text":"Continuidade","textPreview":"Continuidade","textChars":12,"textLines":1,"bbox":[1025,265,163,30]}
+{"kind":"textbox","id":"sh/qd0nmhoz","slide":6,"text":"Fila local, retry, envio idempotente e telemetria stale explícita.","textPreview":"Fila local, retry, envio idempotente e telemetria stale explícita.","textChars":66,"textLines":1,"bbox":[999,311,185,153]}
+{"kind":"textbox","id":"sh/m94rul87","slide":6,"text":"A conectividade deixa de ser apenas “online/offline” e passa a ser gerenciável.","textPreview":"A conectividade deixa de ser apenas “online/offline” e passa a ser gerenciável.","textChars":79,"textLines":1,"bbox":[72,550,1100,42]}
+{"kind":"textbox","id":"sh/nud8n6ps","slide":6,"text":"HEALTHLINK SENTINEL  /  VISÃO CORPORATIVA","textPreview":"HEALTHLINK SENTINEL  /  VISÃO CORPORATIVA","textChars":41,"textLines":1,"bbox":[72,678,500,20]}
+{"kind":"textbox","id":"sh/8vm9wbqx","slide":6,"text":"06","textPreview":"06","textChars":2,"textLines":1,"bbox":[1160,678,48,20]}
+{"kind":"notes","id":"nt/djv7qa","slide":6,"text":""}
+{"kind":"slide","id":"sl/xtc69y","slide":7,"title":"MÓDULO 02","textShapes":13}
+{"kind":"textbox","id":"sh/b2ds7m1o","slide":7,"text":"MÓDULO 02","textPreview":"MÓDULO 02","textChars":9,"textLines":1,"bbox":[72,48,700,22]}
+{"kind":"textbox","id":"sh/c3mtgr29","slide":7,"text":"Arquitetura híbrida para operar onde o servidor central não alcança.","textPreview":"Arquitetura híbrida para operar onde o servidor central não alcança.","textChars":68,"textLines":1,"bbox":[72,88,1120,72]}
+{"kind":"textbox","id":"sh/dova9wju","slide":7,"text":"O servidor local da unidade coleta, normaliza e entrega telemetria com segurança.","textPreview":"O servidor local da unidade coleta, normaliza e entrega telemetria com segurança.","textChars":81,"textLines":1,"bbox":[72,166,1060,36]}
+{"kind":"shape","id":"sh/2xkbahk7","slide":7,"bbox":[260,360,170,0]}
+{"kind":"shape","id":"sh/3yds321s","slide":7,"bbox":[650,360,170,0]}
+{"kind":"shape","id":"sh/ozmtc72d","slide":7,"bbox":[1040,360,130,0]}
+{"kind":"shape","id":"sh/p0va5cji","slide":7,"bbox":[72,290,190,140]}
+{"kind":"textbox","id":"sh/mtobm1kb","slide":7,"text":"HEALTHLINK\nAPI + jobs","textPreview":"HEALTHLINK | API + jobs","textChars":21,"textLines":2,"bbox":[96,326,145,60]}
+{"kind":"shape","id":"sh/nuxcf61w","slide":7,"bbox":[430,290,190,140]}
+{"kind":"textbox","id":"sh/by187ixc","slide":7,"text":"SERVIDOR LOCAL\nagente + fila","textPreview":"SERVIDOR LOCAL | agente + fila","textChars":28,"textLines":2,"bbox":[454,326,145,60]}
+{"kind":"shape","id":"sh/qxs7edw7","slide":7,"bbox":[820,290,190,140]}
+{"kind":"textbox","id":"sh/d03q9sfi","slide":7,"text":"STARLINK\ngRPC local","textPreview":"STARLINK | gRPC local","textChars":19,"textLines":2,"bbox":[844,326,145,60]}
+{"kind":"shape","id":"sh/cza9gnex","slide":7,"bbox":[1040,290,190,140]}
+{"kind":"textbox","id":"sh/z2l8b2xo","slide":7,"text":"MIKROTIK\nSNMP/API","textPreview":"MIKROTIK | SNMP/API","textChars":17,"textLines":2,"bbox":[1064,326,145,60]}
+{"kind":"textbox","id":"sh/y1crixw3","slide":7,"text":"HTTPS/VPN autenticada","textPreview":"HTTPS/VPN autenticada","textChars":21,"textLines":1,"bbox":[272,410,180,22]}
+{"kind":"textbox","id":"sh/lo3qdsfu","slide":7,"text":"LAN da unidade","textPreview":"LAN da unidade","textChars":14,"textLines":1,"bbox":[670,410,130,22]}
+{"kind":"textbox","id":"sh/0nu9kne9","slide":7,"text":"opcional","textPreview":"opcional","textChars":8,"textLines":1,"bbox":[1080,410,100,22]}
+{"kind":"textbox","id":"sh/nql8f2xk","slide":7,"text":"O frontend consulta apenas projeções da API — nunca acessa diretamente a rede da unidade.","textPreview":"O frontend consulta apenas projeções da API — nunca acessa diretamente a rede da unidade.","textChars":89,"textLines":1,"bbox":[72,550,1120,42]}
+{"kind":"textbox","id":"sh/mpcrmxwz","slide":7,"text":"HEALTHLINK SENTINEL  /  VISÃO CORPORATIVA","textPreview":"HEALTHLINK SENTINEL  /  VISÃO CORPORATIVA","textChars":41,"textLines":1,"bbox":[72,678,500,20]}
+{"kind":"textbox","id":"sh/ilgbe1g7","slide":7,"text":"07","textPreview":"07","textChars":2,"textLines":1,"bbox":[1160,678,48,20]}
+{"kind":"notes","id":"nt/xtc69y","slide":7,"text":""}
+{"kind":"slide","id":"sl/fzrujf","slide":8,"title":"CONFIABILIDADE E SEGURANÇA","textShapes":12}
+{"kind":"textbox","id":"sh/1ofadwjm","slide":8,"text":"CONFIABILIDADE E SEGURANÇA","textPreview":"CONFIABILIDADE E SEGURANÇA","textChars":26,"textLines":1,"bbox":[72,48,700,22]}
+{"kind":"textbox","id":"sh/e14r21kv","slide":8,"text":"O sistema evita decisões baseadas em telemetria velha ou contexto incompleto.","textPreview":"O sistema evita decisões baseadas em telemetria velha ou contexto incompleto.","textChars":77,"textLines":1,"bbox":[72,88,1120,72]}
+{"kind":"textbox","id":"sh/fmdsbm1g","slide":8,"text":"As regras de confiança são parte do produto, não apenas da infraestrutura.","textPreview":"As regras de confiança são parte do produto, não apenas da infraestrutura.","textChars":74,"textLines":1,"bbox":[72,166,1060,36]}
+{"kind":"shape","id":"sh/or698b2x","slide":8,"bbox":[72,250,350,220]}
+{"kind":"shape","id":"sh/psfahgji","slide":8,"bbox":[96,276,14,14]}
+{"kind":"textbox","id":"sh/2por61k7","slide":8,"text":"Telemetria stale","textPreview":"Telemetria stale","textChars":16,"textLines":1,"bbox":[122,270,280,30]}
+{"kind":"textbox","id":"sh/3qxsf61c","slide":8,"text":"Após 30s sem amostra: estado unknown, indicadores atuais zerados e histórico preservado.","textPreview":"Após 30s sem amostra: estado unknown, indicadores atuais zerados e histórico preservado.","textChars":88,"textLines":1,"bbox":[96,316,302,138]}
+{"kind":"shape","id":"sh/4vm9w72t","slide":8,"bbox":[465,250,350,220]}
+{"kind":"shape","id":"sh/5wvq5c3e","slide":8,"bbox":[489,276,14,14]}
+{"kind":"textbox","id":"sh/50rytcfq","slide":8,"text":"Fonte explícita","textPreview":"Fonte explícita","textChars":15,"textLines":1,"bbox":[515,270,280,30]}
+{"kind":"textbox","id":"sh/kzixk7e5","slide":8,"text":"Cada métrica preserva origem, timestamp e qualidade; campo ausente aparece como N/D.","textPreview":"Cada métrica preserva origem, timestamp e qualidade; campo ausente aparece como N/D.","textChars":84,"textLines":1,"bbox":[489,316,302,138]}
+{"kind":"shape","id":"sh/jy9gr2xk","slide":8,"bbox":[858,250,350,220]}
+{"kind":"shape","id":"sh/ix0fixgz","slide":8,"bbox":[882,276,14,14]}
+{"kind":"textbox","id":"sh/tobyxcfm","slide":8,"text":"Acesso controlado","textPreview":"Acesso controlado","textChars":17,"textLines":1,"bbox":[908,270,280,30]}
+{"kind":"textbox","id":"sh/snixore1","slide":8,"text":"Multi-tenant desde o MVP, RLS, RBAC, agente com identidade própria e auditoria.","textPreview":"Multi-tenant desde o MVP, RLS, RBAC, agente com identidade própria e auditoria.","textChars":79,"textLines":1,"bbox":[882,316,302,138]}
+{"kind":"textbox","id":"sh/7m9gvmxg","slide":8,"text":"Resultado: menos “verde falso”, menos ambiguidade e mais confiança na ação.","textPreview":"Resultado: menos “verde falso”, menos ambiguidade e mais confiança na ação.","textChars":75,"textLines":1,"bbox":[72,550,1100,42]}
+{"kind":"textbox","id":"sh/6l0fmhwb","slide":8,"text":"HEALTHLINK SENTINEL  /  VISÃO CORPORATIVA","textPreview":"HEALTHLINK SENTINEL  /  VISÃO CORPORATIVA","textChars":41,"textLines":1,"bbox":[72,678,500,20]}
+{"kind":"textbox","id":"sh/hsby1wfy","slide":8,"text":"08","textPreview":"08","textChars":2,"textLines":1,"bbox":[1160,678,48,20]}
+{"kind":"notes","id":"nt/fzrujf","slide":8,"text":""}
+{"kind":"slide","id":"sl/9akbak","slide":9,"title":"VALOR PARA A EQUIPE DE DESENVOLVIMENTO","textShapes":14}
+{"kind":"textbox","id":"sh/rup8nehk","slide":9,"text":"VALOR PARA A EQUIPE DE DESENVOLVIMENTO","textPreview":"VALOR PARA A EQUIPE DE DESENVOLVIMENTO","textChars":38,"textLines":1,"bbox":[72,48,700,22]}
+{"kind":"textbox","id":"sh/svy9gjy5","slide":9,"text":"Uma plataforma que organiza evolução, integração e operação em torno do domínio.","textPreview":"Uma plataforma que organiza evolução, integração e operação em torno do domínio.","textChars":80,"textLines":1,"bbox":[72,88,1120,72]}
+{"kind":"textbox","id":"sh/tw7qpozq","slide":9,"text":"A arquitetura permite ampliar fontes e módulos sem reescrever a experiência operacional.","textPreview":"A arquitetura permite ampliar fontes e módulos sem reescrever a experiência operacional.","textChars":88,"textLines":1,"bbox":[72,166,1060,36]}
+{"kind":"shape","id":"sh/i5g7a9g3","slide":9,"bbox":[72,252,14,14]}
+{"kind":"textbox","id":"sh/j6p8jeho","slide":9,"text":"Reuso","textPreview":"Reuso","textChars":5,"textLines":1,"bbox":[100,245,200,30]}
+{"kind":"textbox","id":"sh/47ypcjyt","slide":9,"text":"Zabbix continua sendo aproveitado como coletor e fonte de problemas.","textPreview":"Zabbix continua sendo aproveitado como coletor e fonte de problemas.","textChars":68,"textLines":1,"bbox":[100,285,480,54]}
+{"kind":"shape","id":"sh/587qloze","slide":9,"bbox":[642,252,14,14]}
+{"kind":"textbox","id":"sh/210rmtg7","slide":9,"text":"Evolução","textPreview":"Evolução","textChars":8,"textLines":1,"bbox":[670,245,200,30]}
+{"kind":"textbox","id":"sh/3298vyhs","slide":9,"text":"Starlink, MikroTik e novos adaptadores entram por contratos normalizados.","textPreview":"Starlink, MikroTik e novos adaptadores entram por contratos normalizados.","textChars":73,"textLines":1,"bbox":[670,285,480,54]}
+{"kind":"shape","id":"sh/fqd4ret0","slide":9,"bbox":[72,402,14,14]}
+{"kind":"textbox","id":"sh/ep43ytsf","slide":9,"text":"Operabilidade","textPreview":"Operabilidade","textChars":13,"textLines":1,"bbox":[100,395,200,30]}
+{"kind":"textbox","id":"sh/1svmtob6","slide":9,"text":"Diagnóstico, saúde do agente, fila e sincronização são visíveis.","textPreview":"Diagnóstico, saúde do agente, fila e sincronização são visíveis.","textChars":64,"textLines":1,"bbox":[100,435,480,54]}
+{"kind":"shape","id":"sh/grml0jal","slide":9,"bbox":[642,402,14,14]}
+{"kind":"textbox","id":"sh/3ud4vytc","slide":9,"text":"Produto","textPreview":"Produto","textChars":7,"textLines":1,"bbox":[670,395,200,30]}
+{"kind":"textbox","id":"sh/2t432tsr","slide":9,"text":"O dado técnico ganha unidade, impacto, histórico e responsabilidade.","textPreview":"O dado técnico ganha unidade, impacto, histórico e responsabilidade.","textChars":68,"textLines":1,"bbox":[670,435,480,54]}
+{"kind":"textbox","id":"sh/pwfmx8b2","slide":9,"text":"É uma camada de produto: menor dependência de leitura manual e maior capacidade de escalar a operação.","textPreview":"É uma camada de produto: menor dependência de leitura manual e maior capacidade de escalar a operação.","textChars":102,"textLines":1,"bbox":[72,570,1100,42]}
+{"kind":"textbox","id":"sh/ovml43ax","slide":9,"text":"HEALTHLINK SENTINEL  /  VISÃO CORPORATIVA","textPreview":"HEALTHLINK SENTINEL  /  VISÃO CORPORATIVA","textChars":41,"textLines":1,"bbox":[72,678,500,20]}
+{"kind":"textbox","id":"sh/bix4zit8","slide":9,"text":"09","textPreview":"09","textChars":2,"textLines":1,"bbox":[1160,678,48,20]}
+{"kind":"notes","id":"nt/9akbak","slide":9,"text":""}
+{"kind":"slide","id":"sl/w5m2ns","slide":10,"title":"PROPOSTA DE ENCAMINHAMENTO","textShapes":13}
+{"kind":"textbox","id":"sh/2dkr6lkf","slide":10,"text":"PROPOSTA DE ENCAMINHAMENTO","textPreview":"PROPOSTA DE ENCAMINHAMENTO","textChars":26,"textLines":1,"bbox":[72,48,700,22]}
+{"kind":"textbox","id":"sh/p0bq1036","slide":10,"text":"Validar o HealthLink Sentinel como plataforma operacional em dois módulos.","textPreview":"Validar o HealthLink Sentinel como plataforma operacional em dois módulos.","textChars":74,"textLines":1,"bbox":[72,88,1120,72]}
+{"kind":"textbox","id":"sh/oz298v2l","slide":10,"text":"A decisão recomendada é evoluir sobre o Zabbix, com foco em contexto, links móveis e suporte.","textPreview":"A decisão recomendada é evoluir sobre o Zabbix, com foco em contexto, links móveis e suporte.","textChars":93,"textLines":1,"bbox":[72,166,1060,36]}
+{"kind":"shape","id":"sh/b2t83alc","slide":10,"bbox":[72,245,330,210]}
+{"kind":"shape","id":"sh/a1kra5kr","slide":10,"bbox":[96,271,14,14]}
+{"kind":"textbox","id":"sh/x4vq5032","slide":10,"text":"1. Demonstrar","textPreview":"1. Demonstrar","textChars":13,"textLines":1,"bbox":[122,265,260,30]}
+{"kind":"textbox","id":"sh/c329cf2x","slide":10,"text":"Fluxo completo: mapa → alerta → unidade → diagnóstico → histórico.","textPreview":"Fluxo completo: mapa → alerta → unidade → diagnóstico → histórico.","textChars":66,"textLines":1,"bbox":[96,311,282,128]}
+{"kind":"shape","id":"sh/r698r6ls","slide":10,"bbox":[475,245,330,210]}
+{"kind":"shape","id":"sh/q507y1kn","slide":10,"bbox":[499,271,14,14]}
+{"kind":"textbox","id":"sh/4zqhwzu9","slide":10,"text":"2. Priorizar","textPreview":"2. Priorizar","textChars":12,"textLines":1,"bbox":[525,265,260,30]}
+{"kind":"textbox","id":"sh/50zy54vu","slide":10,"text":"Fechar Fase 4 do centro operacional e consolidar gestão de usuários, auditoria e relatórios.","textPreview":"Fechar Fase 4 do centro operacional e consolidar gestão de usuários, auditoria e relatórios.","textChars":92,"textLines":1,"bbox":[499,311,282,128]}
+{"kind":"shape","id":"sh/ix8zupcj","slide":10,"bbox":[878,245,330,210]}
+{"kind":"shape","id":"sh/3yhg3ud4","slide":10,"bbox":[902,271,14,14]}
+{"kind":"textbox","id":"sh/s3ah0zul","slide":10,"text":"3. Pilotar","textPreview":"3. Pilotar","textChars":10,"textLines":1,"bbox":[928,265,260,30]}
+{"kind":"textbox","id":"sh/d4ji94v6","slide":10,"text":"Selecionar unidades móveis e medir tempo de descoberta, diagnóstico e resolução.","textPreview":"Selecionar unidades móveis e medir tempo de descoberta, diagnóstico e resolução.","textChars":80,"textLines":1,"bbox":[902,311,282,128]}
+{"kind":"textbox","id":"sh/q1szypcf","slide":10,"text":"Mensagem final","textPreview":"Mensagem final","textChars":14,"textLines":1,"bbox":[72,530,260,28]}
+{"kind":"textbox","id":"sh/r2107ud0","slide":10,"text":"Zabbix coleta.\nHealthLink Sentinel orienta a operação.","textPreview":"Zabbix coleta. | HealthLink Sentinel orienta a operação.","textChars":54,"textLines":2,"bbox":[72,565,800,68]}
+{"kind":"textbox","id":"sh/876hofuh","slide":10,"text":"HEALTHLINK SENTINEL  /  VISÃO CORPORATIVA","textPreview":"HEALTHLINK SENTINEL  /  VISÃO CORPORATIVA","textChars":41,"textLines":1,"bbox":[72,678,500,20]}
+{"kind":"textbox","id":"sh/t8fyxkvm","slide":10,"text":"10","textPreview":"10","textChars":2,"textLines":1,"bbox":[1160,678,48,20]}
+{"kind":"notes","id":"nt/w5m2ns","slide":10,"text":""}

@@ -40,6 +40,17 @@
 .form-modal-backdrop .form-card::-webkit-scrollbar-track { background: transparent; }
 .form-modal-backdrop .form-card::-webkit-scrollbar-thumb { border: 2px solid transparent; background-clip: padding-box; border-radius: 99px; background-color: rgba(83, 121, 146, 0.72); }
 
+@media (min-width: 701px) {
+  .form-modal-backdrop:has(.form-card[aria-label^="Novo equipamento"]) {
+    overflow: hidden;
+  }
+
+  .form-modal-backdrop .form-card[aria-label^="Novo equipamento"] {
+    max-height: none;
+    overflow: visible;
+  }
+}
+
 .form-modal-backdrop .form-card .panel-title {
   position: sticky;
   top: -18px;
