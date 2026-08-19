@@ -109,6 +109,7 @@ Comece pelo índice da fonte. Os documentos abaixo são requisitos oficiais e n�
 - [[03-Execucao/Diagnostico flutuante e menu na lista]]
 - [[03-Execucao/Notificacoes NOC e Design Revision]]
 - [[03-Execucao/Plano de Coleta Starlink e Unidade Movel]]
+- [[03-Execucao/Agente - Atualizacao Automatica e Versao 1.0]]
 
 ## Centro Operacional, mapas e experiência visual
 

@@ -65,6 +65,31 @@ export const starlinkRoutes: FastifyPluginAsync = async (app) => {
     });
   });
 
+  app.get('/v1/monitoring/agents', { preHandler: [app.authenticate] }, async (request) => {
+    requireRead(request);
+    return withTenant(request.auth.tenantId, async (db) => {
+      const result = await db.query(`
+        SELECT hu.id AS unit_id, hu.code AS unit_code, hu.name AS unit_name, hu.city, hu.state_code,
+               e.name AS equipment_name, s.metadata->>'version' AS version, latest.observed_at,
+               CASE WHEN s.id IS NULL THEN 'unlinked'
+                    WHEN latest.observed_at IS NOT NULL AND latest.observed_at >= now() - interval '30 seconds' THEN 'online'
+                    ELSE 'offline' END AS status
+        FROM health_units hu
+        LEFT JOIN equipment e ON e.unit_id = hu.id AND e.tenant_id = hu.tenant_id AND e.active = true
+          AND EXISTS (SELECT 1 FROM equipment_types et WHERE et.id = e.equipment_type_id AND et.code = 'starlink')
+        LEFT JOIN starlink_telemetry_sources s ON s.equipment_id = e.id AND s.tenant_id = hu.tenant_id
+          AND s.source_kind = 'local_agent' AND s.enabled = true
+        LEFT JOIN LATERAL (
+          SELECT MAX(ms.observed_at) AS observed_at FROM metric_samples ms
+          WHERE ms.equipment_id = e.id AND ms.tenant_id = hu.tenant_id
+        ) latest ON true
+        WHERE hu.tenant_id = $1 AND hu.active = true
+        ORDER BY hu.code
+      `, [request.auth.tenantId]);
+      return result.rows;
+    });
+  });
+
   app.post('/v1/integrations/starlink/telemetry', { preHandler: [app.authenticate] }, async (request, reply) => {
     requireAccess(request);
     const input = ingestSchema.parse(request.body);

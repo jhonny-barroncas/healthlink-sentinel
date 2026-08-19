@@ -45,6 +45,8 @@ Adotada a estratégia híbrida: Zabbix/SNMP continua como fonte de disponibilida
 - A atualização visual da branch `frontend-padronizacao` foi integrada sem remover o painel de telemetria, o tratamento `N/D` ou o cadastro explícito de senha do agente.
 - Regra padronizada de confiabilidade: telemetria Starlink e telemetria de links/Zabbix com amostra acima de 30 segundos passam a `unknown`; a projeção visual zera latência, perda e tráfego, limpa o sparkline e exibe aviso de `Telemetria zerada`. O histórico persistido não é apagado.
 
+Em 2026-08-19, foi criada a projeção operacional agregada dos agentes por unidade móvel. O filtro `Agentes` substitui `VPN` no Centro Operacional e diferencia fonte local ausente, heartbeat expirado e agente em execução.
+
 ## Próxima etapa
 
 Concluir a validação do adapter contra uma antena real e comparar os campos retornados por diferentes firmwares. Até essa validação existir, Zabbix/SNMP permanece como fallback e nenhuma telemetria é fabricada.

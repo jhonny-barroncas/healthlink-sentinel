@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify';
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { env } from '../../../platform/env.js';
 import { hasPermission, permission } from '../../../platform/authorization.js';
@@ -422,6 +423,53 @@ export const zabbixRoutes: FastifyPluginAsync = async (app) => {
       }),
     ]);
     return { hosts, ...catalog };
+  });
+
+  app.get('/v1/integrations/zabbix/agent-versions', { preHandler: [app.authenticate] }, async (request) => {
+    requireIntegrationAccess(request);
+    return withTenant(request.auth.tenantId, async (db) => {
+      const result = await db.query(`
+        SELECT id, version, platform, file_name, file_size, checksum_sha256, active, created_at
+        FROM agent_versions WHERE tenant_id = $1 ORDER BY platform, created_at DESC
+      `, [request.auth.tenantId]);
+      return result.rows;
+    });
+  });
+
+  app.post('/v1/integrations/zabbix/agent-versions', { preHandler: [app.authenticate] }, async (request, reply) => {
+    requireIntegrationAccess(request);
+    const input = z.object({
+      version: z.string().regex(/^\d+\.\d+\.\d+$/),
+      platform: z.enum(['windows', 'linux']),
+      fileName: z.string().min(1).max(200),
+      artifactBase64: z.string().min(1).max(25_000_000),
+    }).parse(request.body);
+    const artifact = Buffer.from(input.artifactBase64, 'base64');
+    if (!artifact.length || artifact.length > 20 * 1024 * 1024) throw Object.assign(new Error('O arquivo precisa ter entre 1 byte e 20 MB.'), { statusCode: 422 });
+    const checksum = createHash('sha256').update(artifact).digest('hex');
+    return withTenant(request.auth.tenantId, async (db) => {
+      const result = await db.query(`
+        INSERT INTO agent_versions (tenant_id, version, platform, file_name, artifact, file_size, checksum_sha256)
+        VALUES ($1,$2,$3,$4,$5,$6,$7)
+        ON CONFLICT (tenant_id, version, platform) DO UPDATE SET file_name = EXCLUDED.file_name,
+          artifact = EXCLUDED.artifact, file_size = EXCLUDED.file_size, checksum_sha256 = EXCLUDED.checksum_sha256,
+          active = true, created_at = now()
+        RETURNING id, version, platform, file_name, file_size, checksum_sha256, active, created_at
+      `, [request.auth.tenantId, input.version, input.platform, input.fileName, artifact, artifact.length, checksum]);
+      return reply.code(201).send(result.rows[0]);
+    });
+  });
+
+  app.get('/v1/integrations/zabbix/agent-versions/:id/download', { preHandler: [app.authenticate] }, async (request, reply) => {
+    requireIntegrationAccess(request);
+    const id = z.string().uuid().parse((request.params as { id: string }).id);
+    return withTenant(request.auth.tenantId, async (db) => {
+      const result = await db.query<{ artifact: Buffer; file_name: string; checksum_sha256: string }>(
+        'SELECT artifact, file_name, checksum_sha256 FROM agent_versions WHERE id = $1 AND tenant_id = $2 AND active = true', [id, request.auth.tenantId]);
+      const version = result.rows[0];
+      if (!version) throw Object.assign(new Error('Versão do agente não encontrada.'), { statusCode: 404 });
+      return reply.type('application/octet-stream').header('content-disposition', `attachment; filename="${version.file_name}"`).header('x-checksum-sha256', version.checksum_sha256).send(version.artifact);
+    });
   });
 
   app.post('/v1/integrations/zabbix/mappings', { preHandler: [app.authenticate] }, async (request, reply) => {
