@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { env } from '../../../platform/env.js';
 import { hasPermission, permission } from '../../../platform/authorization.js';
 import { database, withTenant } from '../../../platform/database.js';
+import { isDeployableAgentArtifact } from '../agent/provisioning.js';
 import { ZabbixClient, ZabbixHttpTransport } from './client.js';
 import { selectLinkMetricCandidates, type LinkMetric, type ZabbixItem } from './telemetry.js';
 
@@ -444,6 +445,7 @@ export const zabbixRoutes: FastifyPluginAsync = async (app) => {
       fileName: z.string().min(1).max(200),
       artifactBase64: z.string().min(1).max(25_000_000),
     }).parse(request.body);
+    if (!isDeployableAgentArtifact(input.fileName)) throw Object.assign(new Error('Publique o bundle executável .cjs do agente; o instalador .ps1/.sh é gerado automaticamente por servidor.'), { statusCode: 422 });
     const artifact = Buffer.from(input.artifactBase64, 'base64');
     if (!artifact.length || artifact.length > 20 * 1024 * 1024) throw Object.assign(new Error('O arquivo precisa ter entre 1 byte e 20 MB.'), { statusCode: 422 });
     const checksum = createHash('sha256').update(artifact).digest('hex');

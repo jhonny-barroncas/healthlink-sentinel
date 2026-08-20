@@ -1,6 +1,6 @@
 ---
 tipo: execucao
-status: em-validacao
+status: implementado-em-homologacao
 ---
 
 # Agente — atualização automática e versão 1.0
@@ -28,9 +28,17 @@ Se a consulta, o download ou a validação falhar, a coleta atual continua e o a
 
 O agente aceita `HEALTHLINK_AGENT_PLATFORM`, `HEALTHLINK_AGENT_VERSION` e `HEALTHLINK_AGENT_PATH`. Os valores padrão são `linux`, `1.0.0` e o caminho do processo atual. O pacote real de instalação Windows/Linux deve definir esses valores e registrar o reinício do serviço.
 
-## Limite atual
+## Provisionamento em arquivo único
 
-A versão `1.0.0` publicada pela migração é um launcher inicial para validar o repositório e o fluxo de checksum. O empacotamento final como serviço Windows e unidade systemd Linux ainda precisa ser homologado em servidor de unidade móvel.
+O detalhe da unidade oferece **Gerar agente** diretamente em cada equipamento de tipo servidor. A API valida servidor ativo, fonte Starlink/MikroTik/link ativa e versão executável `.cjs`; depois cria o vínculo, grava as atribuições, gera um enrollment opaco de uso único com expiração de 30 minutos e devolve um único arquivo para download.
+
+- Windows: instalador PowerShell que baixa/verifica Node.js oficial, instala WinSW e registra o serviço `HealthLinkSentinelAgent`.
+- Linux: instalador Bash que baixa/verifica Node.js oficial, cria o usuário de serviço e registra `healthlink-agent.service` com `Restart=always`.
+- Nenhum prompt ou preenchimento manual é exigido durante a instalação.
+- O agente envia heartbeat mesmo quando não houver Starlink; métricas não suportadas por MikroTik/link permanecem sem preenchimento até existir adaptador real.
+- O agente consulta releases da própria API, valida SHA-256, substitui o bundle atomicamente e reinicia o processo para carregar a nova versão.
+
+O pacote embutido inicial é `dist/agent/healthlink-agent-1.0.0.cjs`, sincronizado para os catálogos Windows/Linux na inicialização da API sem substituir uma publicação administrativa real.
 
 ## Tarefa para amanhã
 

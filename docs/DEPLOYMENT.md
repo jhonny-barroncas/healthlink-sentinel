@@ -182,7 +182,19 @@ Faça backup regular do banco e teste restauração. Não use as credenciais nem
 
 ## 8. Agente Starlink remoto
 
-O agente deve ser instalado em cada servidor local de unidade que consiga alcançar a antena. Ele precisa de:
+### Provisionamento recomendado — arquivo único
+
+No `.env` da API, configure `PUBLIC_API_URL` com a URL pública que o servidor da unidade usará. No frontend, cadastre a unidade, um equipamento de tipo **Servidor** e pelo menos uma Starlink, MikroTik ou link de internet ativo. No equipamento servidor, clique em **Gerar agente**, escolha Windows ou Linux e baixe o arquivo.
+
+O arquivo já contém o vínculo, as atribuições e um enrollment de uso único válido por 30 minutos. O operador só precisa executá-lo uma vez: Windows como Administrador e Linux como `root`/`sudo`. Não há preenchimento de URL, tenant, equipamento, token ou senha durante a instalação.
+
+O primeiro uso precisa de saída HTTPS para a API e para `nodejs.org`; o servidor também precisa alcançar a Starlink local em `192.168.100.1:9200` quando houver Starlink. O instalador registra o serviço, inicia a coleta contínua e o agente consulta automaticamente novas versões publicadas no catálogo Zabbix.
+
+O instalador usa o bundle `.cjs` publicado em **Integração Zabbix / Versões do agente**. Publique o arquivo gerado por `npm run build:agent`, não o instalador `.ps1`/`.sh`.
+
+### Validação manual/legada
+
+Para diagnóstico ou ambientes que não usam o provisionamento pelo frontend, o agente precisa de:
 
 - rota local para `192.168.100.1:9200` ou outro endereço configurado;
 - saída HTTPS para `aplicacao.gbringel.com:5174`;

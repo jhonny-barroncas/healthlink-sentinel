@@ -5,10 +5,7 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
-RUN npm run typecheck && npm run build:web \
-  && cp node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs dist/web/assets/maplibre-gl-worker.mjs \
-  && cp node_modules/maplibre-gl/dist/maplibre-gl-shared.mjs dist/web/assets/maplibre-gl-shared.mjs \
-  && cp node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs dist/web/assets/maplibre-gl-worker.js
+RUN npm run typecheck && npm run build:agent && npm run build:web
 
 FROM node:22-bookworm-slim AS runtime
 
@@ -22,7 +19,7 @@ RUN apt-get update \
 COPY --from=build /app/package*.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/apps ./apps
-COPY --from=build /app/dist ./dist
+COPY --chown=node:node --from=build /app/dist ./dist
 
 EXPOSE 5174
 USER node

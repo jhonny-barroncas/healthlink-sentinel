@@ -1,11 +1,19 @@
 import { collectStarlink, type TelemetryBatch } from './collector.js';
-import { loadConfig } from './config.js';
+import { agentConfigFromInstalled, bundledAgentVersion, loadConfig, type AgentConfig } from './config.js';
 import { loadQueue, saveQueue } from './queue.js';
 import { HealthLinkAuth } from './healthlink-auth.js';
 import { checkForAgentUpdate } from './agent-updater.js';
+import { CollectionAgentClient } from './agent-client.js';
+import { parseAgentCli } from './cli.js';
+import { enrollAndSave, loadInstalledAgentConfig } from './installed-config.js';
+import { bundledProtoAssets, materializeEmbeddedProtos } from './proto-assets.js';
+import { starlinkTargets } from './runtime.js';
 
-async function sendBatch(batch: TelemetryBatch, config: ReturnType<typeof loadConfig>, auth: HealthLinkAuth): Promise<void> {
-  const response = await auth.fetch(`${config.apiUrl}/v1/integrations/starlink/telemetry`, {
+type AuthenticatedFetcher = { fetch(input: string, init?: RequestInit): Promise<Response> };
+
+async function sendBatch(batch: TelemetryBatch, config: AgentConfig, auth: AuthenticatedFetcher): Promise<void> {
+  const endpoint = config.agentId ? '/v1/collection-agents/telemetry' : '/v1/integrations/starlink/telemetry';
+  const response = await auth.fetch(`${config.apiUrl}${endpoint}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(batch),
@@ -14,35 +22,89 @@ async function sendBatch(batch: TelemetryBatch, config: ReturnType<typeof loadCo
   if (!response.ok) throw new Error(`API HealthLink respondeu HTTP ${response.status}.`);
 }
 
-async function cycle(config: ReturnType<typeof loadConfig>, auth: HealthLinkAuth): Promise<void> {
+async function cycle(config: AgentConfig, auth: AuthenticatedFetcher): Promise<void> {
   const queue = await loadQueue(config.queuePath);
   try {
     const batch = await collectStarlink(config);
     queue.push(batch);
-    console.log(`[starlink-agent] coleta concluída: ${Object.keys(batch.payload).length} métricas em ${batch.observedAt}`);
+    console.log(`[healthlink-agent] coleta Starlink concluída: ${Object.keys(batch.payload).length} métricas em ${batch.observedAt}`);
   } catch (error) {
-    console.error(`[starlink-agent] Starlink indisponível: ${(error as Error).message}`);
+    console.error(`[healthlink-agent] Starlink indisponível: ${(error as Error).message}`);
   }
   while (queue.length) {
     try {
       await sendBatch(queue[0], config, auth);
       queue.shift();
-      console.log(`[starlink-agent] lote enviado; pendentes=${queue.length}`);
+      console.log(`[healthlink-agent] lote enviado; pendentes=${queue.length}`);
     } catch (error) {
-      console.error(`[starlink-agent] envio pendente mantido em fila: ${(error as Error).message}`);
+      console.error(`[healthlink-agent] envio pendente mantido em fila: ${(error as Error).message}`);
       break;
     }
   }
   await saveQueue(config.queuePath, queue);
 }
 
-const config = loadConfig();
-const auth = new HealthLinkAuth(config);
-const once = process.argv.includes('--once');
-console.log(`[starlink-agent] iniciado; dish=${config.starlinkHost}:${config.starlinkPort}; intervalo=${config.pollIntervalMs}ms`);
-try { await checkForAgentUpdate(config, auth); } catch (error) { console.warn(`[starlink-agent] atualização automática indisponível: ${(error as Error).message}`); }
-await cycle(config, auth);
-if (!once) {
-  setInterval(() => void cycle(config, auth), config.pollIntervalMs);
-  setInterval(() => void checkForAgentUpdate(config, auth).catch((error) => console.warn(`[starlink-agent] atualização automática indisponível: ${(error as Error).message}`)), 10 * 60_000);
+async function prepareEmbeddedProtos(config: AgentConfig): Promise<void> {
+  const assets = bundledProtoAssets();
+  if (!assets || !config.dataDir) return;
+  process.env.HEALTHLINK_AGENT_PROTO_DIR = await materializeEmbeddedProtos(config.dataDir, assets);
 }
+
+export async function runAgent(config: AgentConfig, once = false): Promise<void> {
+  await prepareEmbeddedProtos(config);
+  const installedClient = config.agentId && config.apiToken ? new CollectionAgentClient({
+    apiUrl: config.apiUrl,
+    credential: config.apiToken,
+    platform: config.platform,
+    version: config.agentVersion,
+    timeoutMs: config.timeoutMs,
+  }) : null;
+  const auth: AuthenticatedFetcher = installedClient ?? new HealthLinkAuth(config);
+  console.log(`[healthlink-agent] iniciado; plataforma=${config.platform}; versão=${config.agentVersion}; intervalo=${config.pollIntervalMs}ms`);
+  try {
+    if (await checkForAgentUpdate(config, auth)) {
+      process.exitCode = 75;
+      return;
+    }
+  } catch (error) {
+    console.warn(`[healthlink-agent] atualização automática indisponível: ${(error as Error).message}`);
+  }
+  const heartbeat = async () => {
+    if (!installedClient) return;
+    try { await installedClient.heartbeat(); } catch (error) { console.warn(`[healthlink-agent] heartbeat pendente: ${(error as Error).message}`); }
+  };
+  await heartbeat();
+  const targets = starlinkTargets(config);
+  if (targets.length === 0) console.log('[healthlink-agent] sem Starlink atribuída; heartbeat permanece ativo aguardando configuração de fonte.');
+  await Promise.all(targets.map((target) => cycle(target, auth)));
+  if (once) return;
+  setInterval(() => void heartbeat(), 15_000);
+  setInterval(() => void Promise.all(targets.map((target) => cycle(target, auth))), config.pollIntervalMs);
+  setInterval(() => void checkForAgentUpdate(config, auth).then((updated) => {
+    if (updated) process.exit(75);
+  }).catch((error) => console.warn(`[healthlink-agent] atualização automática indisponível: ${(error as Error).message}`)), 10 * 60_000);
+}
+
+export async function main(argv = process.argv): Promise<void> {
+  const cli = parseAgentCli(argv);
+  if (cli.command === 'enroll') {
+    const installed = await enrollAndSave({
+      apiUrl: cli.apiUrl,
+      enrollmentToken: cli.enrollmentToken,
+      configPath: cli.configPath,
+      dataDir: cli.dataDir,
+      agentPath: cli.agentPath,
+    });
+    console.log(`[healthlink-agent] enrollment concluído para o agente ${installed.agentId}.`);
+    return;
+  }
+  const config = cli.configPath
+    ? agentConfigFromInstalled(await loadInstalledAgentConfig(cli.configPath), bundledAgentVersion())
+    : loadConfig();
+  await runAgent(config, cli.once);
+}
+
+void main().catch((error) => {
+  console.error(`[healthlink-agent] falha fatal: ${(error as Error).message}`);
+  process.exitCode = 1;
+});

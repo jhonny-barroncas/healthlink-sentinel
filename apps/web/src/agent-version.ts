@@ -16,6 +16,6 @@ export function agentPlatformLabel(platform: AgentPlatform): string {
 }
 
 export function canPublishAgentVersion(fileName: string, platform: AgentPlatform): boolean {
-  const lower = fileName.toLowerCase();
-  return platform === 'windows' ? lower.endsWith('.exe') || lower.endsWith('.msi') : !lower.endsWith('.exe') && !lower.endsWith('.msi');
+  void platform;
+  return /^[a-z0-9][a-z0-9._-]*\.cjs$/i.test(fileName);
 }

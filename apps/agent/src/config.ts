@@ -1,4 +1,11 @@
 import 'dotenv/config';
+import type { InstalledAgentConfig } from './installed-config.js';
+
+declare const __HEALTHLINK_AGENT_VERSION__: string;
+
+export function bundledAgentVersion(fallback = '1.0.0'): string {
+  return typeof __HEALTHLINK_AGENT_VERSION__ === 'string' ? __HEALTHLINK_AGENT_VERSION__ : fallback;
+}
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
@@ -32,7 +39,37 @@ export type AgentConfig = {
   platform: 'windows' | 'linux';
   agentVersion: string;
   agentPath: string;
+  configPath?: string;
+  dataDir?: string;
+  agentId?: string;
+  unitId?: string;
+  serverEquipmentId?: string;
+  assignments: InstalledAgentConfig['assignments'];
 };
+
+export function agentConfigFromInstalled(installed: InstalledAgentConfig, bundledVersion = installed.version): AgentConfig {
+  const starlink = installed.assignments.find((item) => item.type === 'starlink');
+  return {
+    apiUrl: installed.apiUrl,
+    apiToken: installed.credential,
+    tenantId: installed.tenantId,
+    equipmentId: starlink?.equipmentId ?? installed.serverEquipmentId,
+    starlinkHost: starlink?.managementAddress || '192.168.100.1',
+    starlinkPort: 9200,
+    pollIntervalMs: installed.pollIntervalMs,
+    timeoutMs: installed.timeoutMs,
+    queuePath: installed.queuePath,
+    platform: installed.platform,
+    agentVersion: bundledVersion,
+    agentPath: installed.agentPath,
+    configPath: installed.configPath,
+    dataDir: installed.dataDir,
+    agentId: installed.agentId,
+    unitId: installed.unitId,
+    serverEquipmentId: installed.serverEquipmentId,
+    assignments: installed.assignments,
+  };
+}
 
 export function loadConfig(): AgentConfig {
   const apiToken = optional('HEALTHLINK_API_TOKEN');
@@ -56,5 +93,6 @@ export function loadConfig(): AgentConfig {
     platform: process.env.HEALTHLINK_AGENT_PLATFORM === 'windows' ? 'windows' : 'linux',
     agentVersion: process.env.HEALTHLINK_AGENT_VERSION?.trim() || '1.0.0',
     agentPath: process.env.HEALTHLINK_AGENT_PATH?.trim() || process.argv[1],
+    assignments: [{ equipmentId: required('HEALTHLINK_EQUIPMENT_ID'), name: 'Starlink', type: 'starlink', managementAddress: process.env.STARLINK_HOST?.trim() || '192.168.100.1' }],
   };
 }

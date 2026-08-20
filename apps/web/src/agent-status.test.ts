@@ -13,5 +13,6 @@ describe('agent status projection', () => {
   it('distinguishes an unlinked mobile unit', () => {
     expect(agentStatusFromObservedAt(null)).toBe('unlinked');
     expect(agentStatusLabel('unlinked')).toBe('Sem agente vinculado');
+    expect(agentStatusLabel('pending')).toBe('Aguardando instalação');
   });
 });
