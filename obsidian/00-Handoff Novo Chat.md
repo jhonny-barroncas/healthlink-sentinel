@@ -179,8 +179,12 @@ Correção do mapa/serviço em 2026-08-19: o build Docker passou a copiar os mó
 
 Também em 2026-08-19, a imagem Linux do Docker passou a instalar `iputils-ping` e `traceroute`, que estavam ausentes no container e impediam a execução mesmo com o alvo correto.
 
-Atualização 2026-08-19: o filtro do Centro Operacional `VPN` foi substituído por `Agentes`. A API `GET /v1/monitoring/agents` projeta, por unidade móvel, vínculo de fonte `local_agent`, versão, última amostra e estado `Agente em execução`/`Agente parado`/`Sem agente vinculado`. O frontend usa frescor de 30 segundos e cobre a regra em `apps/web/src/agent-status.test.ts`. O painel Starlink agora oferece `Vincular agente local` e `Desvincular agente`, sem comando manual. A Integração Zabbix também ganhou catálogo de artefatos Windows/Linux (`1.0.0` inicial), publicação autenticada com SHA-256 e download por versão.
+Atualização 2026-08-20: o provisionamento do agente foi concluído na branch `codex/provisionamento-agente-1.0`. Cada servidor ativo exibe `Gerar agente`; o backend exige servidor e Starlink/MikroTik/link ativos, pergunta Windows/Linux e baixa um único `.ps1`/`.sh` sem prompts. O arquivo contém enrollment de uso único por 30 minutos, o vínculo da unidade e as atribuições. O monitoramento agora diferencia `pending`, `online`, `offline` e `unlinked`; o agente envia heartbeat e atualiza o bundle por SHA-256. A versão real `1.0.0` é empacotada em `dist/agent` e sincronizada para o catálogo Windows/Linux.
 Nova nota: `obsidian/03-Execucao/Agente - Atualizacao Automatica e Versao 1.0.md` documenta a atualização automática por plataforma, validação SHA-256, substituição atômica e a pendência de homologar os serviços Windows/systemd.
+
+Próxima tarefa: homologar o instalador `1.0.0` em um servidor Windows e um Linux real da unidade móvel, validar serviço persistente, coleta contínua, atualização automática, revogação e comportamento após expiração/uso duplicado do arquivo.
+
+Manual operacional de produção: `docs/MANUAL-IMPLANTACAO-PRODUCAO.md`, com Docker Compose, HTTPS, backup, migrations, geração do agente e troubleshooting.
 
 ## Documentação relacionada
 

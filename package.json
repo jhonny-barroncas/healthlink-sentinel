@@ -9,11 +9,13 @@
   },
   "scripts": {
     "dev": "tsx watch apps/api/src/server.ts",
+    "predev": "npm run build:agent",
     "dev:web": "vite apps/web --host 0.0.0.0 --port 5173",
-    "build:web": "vite build apps/web --outDir ../../dist/web",
+    "build:web": "vite build apps/web --outDir ../../dist/web && node scripts/copy-maplibre-assets.mjs",
     "admin:reset-password": "tsx apps/api/src/scripts/reset-password.ts",
     "agent:starlink": "tsx apps/agent/src/index.ts",
     "agent:starlink:check": "tsx apps/agent/src/check.ts",
+    "build:agent": "node scripts/build-agent-release.mjs",
     "start": "tsx apps/api/src/server.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

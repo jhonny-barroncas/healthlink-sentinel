@@ -46,6 +46,8 @@ phase: foundation
 
 > Atualização 2026-08-19: o Centro Operacional passou a ter a visão **Agentes** no lugar de VPN. A visão lista as unidades móveis e diferencia agente em execução (heartbeat até 30s), agente parado e unidade sem agente vinculado; a API agrega a fonte `local_agent`, última amostra e versão sem expor segredos.
 > Atualização 2026-08-19: a aba **Integração Zabbix** passou a ter o repositório de versões do agente, separado por Windows/Linux. A migração `010_agent_versions.sql` cria o catálogo inicial `1.0.0` para os dois sistemas; a interface publica o arquivo, calcula SHA-256 no servidor e disponibiliza download autenticado para atualização.
+> Atualização 2026-08-20: concluído o provisionamento do agente em arquivo único. No detalhe da unidade, cada servidor ativo exibe **Gerar agente**; o fluxo valida Starlink/MikroTik/link ativo, pergunta Windows/Linux e baixa um instalador sem prompts. O backend grava atribuições, cria enrollment de uso único por 30 minutos, configura a fonte local da Starlink e monitora `pending`, `online`, `offline` e `unlinked`. O bundle real `1.0.0` é sincronizado no catálogo de versões e o agente atualiza automaticamente por SHA-256.
+> Atualização 2026-08-20: criado o manual `docs/MANUAL-IMPLANTACAO-PRODUCAO.md`, cobrindo servidor Docker real, HTTPS, `.env`, migrations, backup, geração do agente, atualização e troubleshooting.
 > Pendência para amanhã: homologar o agente `1.0.0` como serviço Windows e `systemd` Linux, validar reinício, coleta contínua, atualização automática e rollback.
 
 > Atualização 2026-08-18: o painel Starlink passou a mostrar explicitamente a unidade vinculada e sua cidade/UF junto das métricas da antena, incluindo coordenadas e obstrução quando fornecidas pelo agente.
@@ -137,3 +139,12 @@ Os itens abaixo descrevem o ponto de partida histórico e não representam o est
 - Definir mecanismo de provisionamento seguro e rotação de credenciais Zabbix.
 - Definir a política de retenção de métricas e eventos técnicos.
 - Confirmar se haverá uma instância Zabbix por cliente ou compartilhada entre clientes antes do conector produtivo.
+
+## Tarefa para próxima sessão — homologar provisionamento do agente
+
+- Validar no frontend o fluxo: unidade móvel → equipamento servidor → requisito Starlink/MikroTik → botão de gerar agente.
+- Implementar/homologar a escolha Windows/Linux e a geração de um único arquivo instalável, já vinculado à unidade, servidor e fontes permitidas.
+- Confirmar execução única no servidor, coleta contínua após reinício e atualização automática da versão do agente.
+- Homologar instalação como serviço Windows e como `systemd` no Linux, incluindo reinício automático após atualização.
+- Testar aviso de requisito ausente, download, vínculo, heartbeat online/offline e publicação da versão `1.0.0` no catálogo Zabbix.
+- Antes de considerar concluído, executar `npm.cmd run typecheck`, `npm.cmd run build:web` e validar o cenário dentro do Docker.

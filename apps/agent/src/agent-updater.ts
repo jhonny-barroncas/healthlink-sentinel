@@ -1,10 +1,22 @@
 import { createHash } from 'node:crypto';
-import { chmod, rename, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
-import type { AgentConfig } from './config.js';
-import type { HealthLinkAuth } from './healthlink-auth.js';
+import { chmod, copyFile, rename, unlink, writeFile } from 'node:fs/promises';
+
+type UpdateConfig = {
+  apiUrl: string;
+  platform: 'windows' | 'linux';
+  agentVersion: string;
+  agentPath: string;
+  timeoutMs: number;
+  agentId?: string;
+};
+
+type AuthenticatedFetcher = { fetch(input: string, init?: RequestInit): Promise<Response> };
 
 export type AgentRelease = { id: string; version: string; platform: 'windows' | 'linux'; file_name: string; checksum_sha256: string; active: boolean };
+
+export function previousAgentPath(agentPath: string): string {
+  return `${agentPath}.previous`;
+}
 
 export function isNewerVersion(current: string, candidate: string): boolean {
   const left = current.split('.').map(Number); const right = candidate.split('.').map(Number);
@@ -15,13 +27,14 @@ export function isNewerVersion(current: string, candidate: string): boolean {
   return false;
 }
 
-export async function checkForAgentUpdate(config: AgentConfig, auth: HealthLinkAuth): Promise<boolean> {
-  const response = await auth.fetch(`${config.apiUrl}/v1/integrations/zabbix/agent-versions`, { signal: AbortSignal.timeout(config.timeoutMs) });
+export async function checkForAgentUpdate(config: UpdateConfig, auth: AuthenticatedFetcher): Promise<boolean> {
+  const releaseBase = config.agentId ? '/v1/collection-agents/releases' : '/v1/integrations/zabbix/agent-versions';
+  const response = await auth.fetch(`${config.apiUrl}${releaseBase}`, { signal: AbortSignal.timeout(config.timeoutMs) });
   if (!response.ok) throw new Error(`Não foi possível consultar versões do agente (HTTP ${response.status}).`);
   const releases = await response.json() as AgentRelease[];
   const release = releases.filter((item) => item.active && item.platform === config.platform && isNewerVersion(config.agentVersion, item.version)).sort((a, b) => b.version.localeCompare(a.version, undefined, { numeric: true }))[0];
   if (!release) return false;
-  const artifactResponse = await auth.fetch(`${config.apiUrl}/v1/integrations/zabbix/agent-versions/${release.id}/download`, { signal: AbortSignal.timeout(config.timeoutMs) });
+  const artifactResponse = await auth.fetch(`${config.apiUrl}${releaseBase}/${release.id}/download`, { signal: AbortSignal.timeout(config.timeoutMs) });
   if (!artifactResponse.ok) throw new Error(`Não foi possível baixar a versão ${release.version} (HTTP ${artifactResponse.status}).`);
   const artifact = Buffer.from(await artifactResponse.arrayBuffer());
   const checksum = createHash('sha256').update(artifact).digest('hex');
@@ -29,7 +42,23 @@ export async function checkForAgentUpdate(config: AgentConfig, auth: HealthLinkA
   const temporary = `${config.agentPath}.update-${process.pid}`;
   await writeFile(temporary, artifact, { mode: 0o755 });
   if (config.platform === 'linux') await chmod(temporary, 0o755);
+  await copyFile(config.agentPath, previousAgentPath(config.agentPath));
   await rename(temporary, config.agentPath);
   console.log(`[starlink-agent] agente atualizado para ${release.version}; reinicie o serviço para carregar o binário novo.`);
   return true;
+}
+
+export async function finalizeAgentUpdate(agentPath: string): Promise<void> {
+  await unlink(previousAgentPath(agentPath)).catch(() => undefined);
+}
+
+export async function restorePreviousAgent(agentPath: string): Promise<boolean> {
+  const previous = previousAgentPath(agentPath);
+  try {
+    await unlink(agentPath);
+    await rename(previous, agentPath);
+    return true;
+  } catch {
+    return false;
+  }
 }

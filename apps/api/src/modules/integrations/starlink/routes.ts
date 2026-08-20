@@ -70,19 +70,41 @@ export const starlinkRoutes: FastifyPluginAsync = async (app) => {
     return withTenant(request.auth.tenantId, async (db) => {
       const result = await db.query(`
         SELECT hu.id AS unit_id, hu.code AS unit_code, hu.name AS unit_name, hu.city, hu.state_code,
-               e.name AS equipment_name, s.metadata->>'version' AS version, latest.observed_at,
-               CASE WHEN s.id IS NULL THEN 'unlinked'
-                    WHEN latest.observed_at IS NOT NULL AND latest.observed_at >= now() - interval '30 seconds' THEN 'online'
-                    ELSE 'offline' END AS status
+               COALESCE(collection.server_name, legacy.equipment_name) AS equipment_name,
+               COALESCE(collection.installed_version, collection.desired_version, legacy.version) AS version,
+               COALESCE(collection.last_heartbeat_at, legacy.observed_at) AS observed_at,
+               CASE
+                 WHEN collection.id IS NOT NULL AND collection.status = 'pending' THEN 'pending'
+                 WHEN collection.id IS NOT NULL AND collection.last_heartbeat_at >= now() - interval '30 seconds' THEN 'online'
+                 WHEN collection.id IS NOT NULL THEN 'offline'
+                 WHEN legacy.source_id IS NULL THEN 'unlinked'
+                 WHEN legacy.observed_at >= now() - interval '30 seconds' THEN 'online'
+                 ELSE 'offline'
+               END AS status
         FROM health_units hu
-        LEFT JOIN equipment e ON e.unit_id = hu.id AND e.tenant_id = hu.tenant_id AND e.active = true
-          AND EXISTS (SELECT 1 FROM equipment_types et WHERE et.id = e.equipment_type_id AND et.code = 'starlink')
-        LEFT JOIN starlink_telemetry_sources s ON s.equipment_id = e.id AND s.tenant_id = hu.tenant_id
-          AND s.source_kind = 'local_agent' AND s.enabled = true
         LEFT JOIN LATERAL (
-          SELECT MAX(ms.observed_at) AS observed_at FROM metric_samples ms
-          WHERE ms.equipment_id = e.id AND ms.tenant_id = hu.tenant_id
-        ) latest ON true
+          SELECT ca.id, ca.status, ca.desired_version, ca.installed_version, ca.last_heartbeat_at,
+                 e.name AS server_name
+          FROM collection_agents ca
+          JOIN equipment e ON e.id = ca.server_equipment_id AND e.tenant_id = ca.tenant_id
+          WHERE ca.tenant_id = hu.tenant_id AND ca.unit_id = hu.id AND ca.status <> 'revoked'
+          ORDER BY ca.updated_at DESC
+          LIMIT 1
+        ) collection ON true
+        LEFT JOIN LATERAL (
+          SELECT s.id AS source_id, e.name AS equipment_name, s.metadata->>'version' AS version,
+                 latest.observed_at
+          FROM starlink_telemetry_sources s
+          JOIN equipment e ON e.id = s.equipment_id AND e.tenant_id = s.tenant_id AND e.active = true
+          JOIN equipment_types et ON et.id = e.equipment_type_id AND et.code = 'starlink'
+          LEFT JOIN LATERAL (
+            SELECT MAX(ms.observed_at) AS observed_at FROM metric_samples ms
+            WHERE ms.equipment_id = e.id AND ms.tenant_id = hu.tenant_id
+          ) latest ON true
+          WHERE s.tenant_id = hu.tenant_id AND e.unit_id = hu.id AND s.source_kind = 'local_agent' AND s.enabled = true
+          ORDER BY s.updated_at DESC
+          LIMIT 1
+        ) legacy ON true
         WHERE hu.tenant_id = $1 AND hu.active = true
         ORDER BY hu.code
       `, [request.auth.tenantId]);

@@ -1,7 +1,7 @@
 import grpc from '@grpc/grpc-js';
 import protoLoader from '@grpc/proto-loader';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { AgentConfig } from './config.js';
 
 export type StarlinkStatus = {
@@ -25,8 +25,13 @@ type DeviceClient = grpc.Client & {
 type DevicePackage = { Device: new (address: string, credentials: grpc.ChannelCredentials) => DeviceClient };
 
 function devicePackage(): DevicePackage {
-  const currentDir = path.dirname(fileURLToPath(import.meta.url));
-  const protoRoot = path.resolve(currentDir, '../proto');
+  const candidates = [
+    process.env.HEALTHLINK_AGENT_PROTO_DIR,
+    path.resolve(process.cwd(), 'apps/agent/proto'),
+    path.resolve(process.cwd(), 'proto'),
+  ].filter((item): item is string => Boolean(item));
+  const protoRoot = candidates.find((candidate) => existsSync(path.join(candidate, 'spacex/api/device/device.proto')));
+  if (!protoRoot) throw new Error('Contratos protobuf da Starlink não foram encontrados no runtime do agente.');
   const protoPath = path.join(protoRoot, 'spacex/api/device/device.proto');
   const definition = protoLoader.loadSync(protoPath, {
     includeDirs: [protoRoot],

@@ -10,7 +10,8 @@ import { chooseDiagnosticTarget } from './diagnostic-target.js';
 import { hasUnitAssets, selectMapAsset } from './state-map-interactions.js';
 import { agentStatusLabel, type AgentRecord } from './agent-status.js';
 import { localAgentSourcePayload } from './starlink-source.js';
-import type { AgentPlatform, AgentVersionRecord } from './agent-version.js';
+import { canPublishAgentVersion, type AgentPlatform, type AgentVersionRecord } from './agent-version.js';
+import { agentInstallerFileName, extractAgentInstallerFileName, getAgentProvisioningRequirements } from './agent-provisioning.js';
 
 type LoginResponse = { accessToken: string; user: { id: string; displayName: string; email: string }; tenant: { name: string } };
 type Unit = { unit_id: string; code: string; name: string; state_code: string; city: string; latitude: number | string | null; longitude: number | string | null; operational_status: 'online' | 'degraded' | 'offline' | 'unknown'; offline_equipment: number; degraded_equipment: number };
@@ -426,8 +427,9 @@ function getStateFill(uf: string, units: Unit[]) {
 function AgentOverview({ agents, onSelectUnit }: { agents: AgentRecord[]; onSelectUnit: (unitId: string) => void }) {
   const online = agents.filter((agent) => agent.status === 'online').length;
   const offline = agents.filter((agent) => agent.status === 'offline').length;
+  const pending = agents.filter((agent) => agent.status === 'pending').length;
   const unlinked = agents.filter((agent) => agent.status === 'unlinked').length;
-  return <div className="agent-overview"><div className="command-summary"><CommandMetric label="Unidades móveis" value={String(agents.length)} note="no recorte atual" tone="neutral" /><CommandMetric label="Agentes em execução" value={String(online)} note="heartbeat ≤ 30s" tone="ok" /><CommandMetric label="Agentes parados" value={String(offline)} note="sem heartbeat recente" tone="danger" /><CommandMetric label="Sem vínculo" value={String(unlinked)} note="instalação pendente" tone="warn" /></div><div className="agent-list">{agents.length === 0 ? <div className="empty-state"><h3>Nenhuma unidade móvel encontrada</h3><p>Cadastre uma fonte local_agent para monitorar o agente.</p></div> : agents.map((agent) => <button className="agent-row" key={agent.unitId} onClick={() => onSelectUnit(agent.unitId)}><span className={`legend-dot ${agent.status === 'unlinked' ? 'unknown' : agent.status}`} /><span><strong>{agent.unitCode} · {agent.unitName}</strong><small>{agent.city}/{agent.stateCode} · {agent.equipmentName ?? 'Nenhum equipamento Starlink vinculado'}{agent.version ? ` · v${agent.version}` : ''}</small></span><em className={`status ${agent.status === 'unlinked' ? 'unknown' : agent.status}`}>{agentStatusLabel(agent.status)}</em></button>)}</div></div>;
+  return <div className="agent-overview"><div className="command-summary"><CommandMetric label="Unidades móveis" value={String(agents.length)} note="no recorte atual" tone="neutral" /><CommandMetric label="Agentes em execução" value={String(online)} note="heartbeat ≤ 30s" tone="ok" /><CommandMetric label="Agentes parados" value={String(offline)} note="sem heartbeat recente" tone="danger" /><CommandMetric label="Sem vínculo" value={String(unlinked + pending)} note={pending ? `${pending} aguardando instalação` : 'nenhuma instalação pendente'} tone="warn" /></div><div className="agent-list">{agents.length === 0 ? <div className="empty-state"><h3>Nenhuma unidade móvel encontrada</h3><p>Cadastre um servidor e uma fonte para gerar o agente.</p></div> : agents.map((agent) => <button className="agent-row" key={agent.unitId} onClick={() => onSelectUnit(agent.unitId)}><span className={`legend-dot ${agent.status === 'online' || agent.status === 'offline' ? agent.status : 'unknown'}`} /><span><strong>{agent.unitCode} · {agent.unitName}</strong><small>{agent.city}/{agent.stateCode} · {agent.equipmentName ?? 'Nenhum servidor vinculado'}{agent.version ? ` · v${agent.version}` : ''}</small></span><em className={`status ${agent.status === 'online' || agent.status === 'offline' ? agent.status : 'unknown'}`}>{agentStatusLabel(agent.status)}</em></button>)}</div></div>;
 }
 
 function CommandCenter({ units, equipment, agents, alerts: _alerts, resolvedAlerts, summary: _summary, scope, token, onInventoryRefresh, onError, onSelectUnit }: { units: Unit[]; equipment: Equipment[]; agents: AgentRecord[]; alerts: Alert[]; resolvedAlerts: Alert[]; summary: { online: number; attention: number; offline: number; unknown: number }; scope: 'all' | 'links' | 'agents' | 'servers'; token: string; onInventoryRefresh: () => Promise<void>; onError: (message: string) => void; onSelectUnit: (unitId: string) => void }) {
@@ -440,7 +442,7 @@ function CommandCenter({ units, equipment, agents, alerts: _alerts, resolvedAler
   const [statusFilter, setStatusFilter] = useState<'all' | Unit['operational_status']>('all');
   const [stateFilter, setStateFilter] = useState('all');
   const [linkTelemetry, setLinkTelemetry] = useState<LinkTelemetry[]>([]);
-  const scopeTypeCodes = scope === 'links' ? ['internet_link'] : scope === 'servers' ? ['linux_server'] : [];
+  const scopeTypeCodes = scope === 'links' ? ['internet_link'] : scope === 'servers' ? ['linux_server', 'server'] : [];
   const agentUnitIds = scope === 'agents' ? new Set(agents.map((agent) => agent.unitId)) : null;
   const scopedUnitIds = agentUnitIds ?? (scopeTypeCodes.length ? new Set(equipment.filter((item) => scopeTypeCodes.some((code) => item.equipment_type.toLowerCase().includes(code))).map((item) => item.unit_id)) : null);
   const visibleUnits = scopedUnitIds ? units.filter((unit) => scopedUnitIds.has(unit.unit_id)) : units;
@@ -901,9 +903,12 @@ function AppDropdown({ value, options, onChange, placeholder = 'Selecionar', dis
     window.addEventListener('keydown', onEscape);
     return () => { window.removeEventListener('mousedown', close); window.removeEventListener('keydown', onEscape); };
   }, [open]);
-  const selected = options.find((option) => option.value === value);
+  const effectiveOptions = options.some((option) => option.value === 'linux_server') && !options.some((option) => option.value === 'server')
+    ? [{ value: 'server', label: 'Servidor' }, ...options]
+    : options;
+  const selected = effectiveOptions.find((option) => option.value === value);
   const groups: Array<{ label?: string; items: AppDropdownOption[] }> = [];
-  options.forEach((option) => {
+  effectiveOptions.forEach((option) => {
     const last = groups[groups.length - 1];
     if (last && last.label === option.group) { last.items.push(option); return; }
     groups.push({ label: option.group, items: [option] });
@@ -1265,6 +1270,7 @@ function AgentVersionsPanel({ token, onToast }: { token: string; onToast: (toast
   useEffect(() => { void load(); }, [token]);
   async function publish() {
     if (!file) return onToast({ type: 'warning', title: 'Arquivo obrigatório', detail: `Selecione o instalador ${platform === 'windows' ? 'Windows' : 'Linux'} do agente.` });
+    if (!canPublishAgentVersion(file.name, platform)) return onToast({ type: 'warning', title: 'Pacote inválido', detail: 'Publique o bundle executável .cjs do agente, não o instalador .ps1/.sh.' });
     setBusy(true);
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
@@ -1274,7 +1280,7 @@ function AgentVersionsPanel({ token, onToast }: { token: string; onToast: (toast
     } catch (reason) { onToast({ type: 'error', title: 'Falha ao publicar agente', detail: reason instanceof Error ? reason.message : 'Não foi possível enviar o arquivo.' }); }
     finally { setBusy(false); }
   }
-  return <article className="agent-versions-panel"><div className="panel-title"><div><p className="eyebrow">REPOSITÓRIO DO AGENTE</p><h3>Versões Windows e Linux</h3><small>O agente instalado consulta esta versão, valida o checksum e atualiza automaticamente.</small></div><strong>{loaded ? `${versions.length} arquivo(s)` : '…'}</strong></div><div className="agent-version-form"><label>Sistema<select value={platform} onChange={(event) => setPlatform(event.target.value as AgentPlatform)}><option value="windows">Windows</option><option value="linux">Linux</option></select></label><label>Versão<input value={version} onChange={(event) => setVersion(event.target.value)} placeholder="1.0.0" /></label><label>Arquivo do agente<input type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label><button className="primary compact" disabled={busy} onClick={() => void publish()}>{busy ? 'Enviando…' : 'Publicar versão'}</button></div><div className="agent-version-list">{versions.length === 0 ? <small>Nenhuma versão publicada ainda. A primeira versão será Windows 1.0.0 e Linux 1.0.0.</small> : versions.map((item) => <div key={item.id}><span className={`legend-dot ${item.active ? 'online' : 'unknown'}`} /><strong>{item.platform === 'windows' ? 'Windows' : 'Linux'} · v{item.version}</strong><small>{item.file_name} · {Math.round(item.file_size / 1024)} KB · SHA-256 {item.checksum_sha256.slice(0, 12)}…</small></div>)}</div></article>;
+  return <article className="agent-versions-panel"><div className="panel-title"><div><p className="eyebrow">REPOSITÓRIO DO AGENTE</p><h3>Versões Windows e Linux</h3><small>Publique o bundle `.cjs`; o instalador de cada plataforma já cuida do serviço e o agente valida SHA-256 antes de atualizar.</small></div><strong>{loaded ? `${versions.length} arquivo(s)` : '…'}</strong></div><div className="agent-version-form"><label>Sistema<select value={platform} onChange={(event) => setPlatform(event.target.value as AgentPlatform)}><option value="windows">Windows</option><option value="linux">Linux</option></select></label><label>Versão<input value={version} onChange={(event) => setVersion(event.target.value)} placeholder="1.0.0" /></label><label>Bundle `.cjs` do agente<input type="file" accept=".cjs,application/javascript" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label><button className="primary compact" disabled={busy} onClick={() => void publish()}>{busy ? 'Enviando…' : 'Publicar versão'}</button></div><div className="agent-version-list">{versions.length === 0 ? <small>Nenhuma versão publicada ainda. A primeira versão será Windows 1.0.0 e Linux 1.0.0.</small> : versions.map((item) => <div key={item.id}><span className={`legend-dot ${item.active ? 'online' : 'unknown'}`} /><strong>{item.platform === 'windows' ? 'Windows' : 'Linux'} · v{item.version}</strong><small>{item.file_name} · {Math.round(item.file_size / 1024)} KB · SHA-256 {item.checksum_sha256.slice(0, 12)}…</small></div>)}</div></article>;
 }
 
 function UnitDetail({ unit, equipment, onBack, onEdit, onRefresh, onToast = () => undefined }: { unit: Unit; equipment: Equipment[]; onBack: () => void; onEdit: (equipment: Equipment) => void; onRefresh: () => Promise<void>; onToast?: (toast: Omit<Toast, 'id'>) => void }) {
@@ -1284,6 +1290,52 @@ function UnitDetail({ unit, equipment, onBack, onEdit, onRefresh, onToast = () =
   const [blockTarget, setBlockTarget] = useState<Equipment | null>(null);
   const [unblockTarget, setUnblockTarget] = useState<Equipment | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Equipment | null>(null);
+  const [agentServer, setAgentServer] = useState<Equipment | null>(null);
+  const [agentPlatform, setAgentPlatform] = useState<AgentPlatform>('windows');
+  const [agentGenerating, setAgentGenerating] = useState(false);
+  const [agentGenerationError, setAgentGenerationError] = useState('');
+  const servers = equipment.filter((item) => item.active !== false && (item.equipment_type === 'linux_server' || item.equipment_type === 'server'));
+  const agentRequirements = getAgentProvisioningRequirements(equipment.map((item) => ({ equipment_id: item.equipment_id, equipment_type: item.equipment_type, active: item.active })));
+  const missingAgentRequirements = agentRequirements.missingMessages;
+  function openAgentGenerator(server: Equipment) {
+    if (missingAgentRequirements.length) {
+      onToast({ type: 'warning', title: 'Requisitos ausentes', detail: missingAgentRequirements.join(' ') });
+      return;
+    }
+    setAgentGenerationError('');
+    setAgentServer(server);
+  }
+  async function generateAgentInstaller() {
+    if (!agentServer) return;
+    setAgentGenerating(true);
+    setAgentGenerationError('');
+    try {
+      const response = await fetch(`${apiBase}/v1/units/${unit.unit_id}/collection-agents/installer`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ serverEquipmentId: agentServer.equipment_id, platform: agentPlatform }),
+      });
+      if (!response.ok) {
+        let message = `Falha na plataforma (HTTP ${response.status}).`;
+        try { const payload = await response.json() as { message?: string; error?: string }; message = payload.message || payload.error || message; } catch { /* resposta sem JSON */ }
+        throw new Error(message);
+      }
+      const blob = await response.blob();
+      const fileName = extractAgentInstallerFileName(response.headers.get('content-disposition'), agentInstallerFileName(unit.code, agentPlatform));
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      setAgentServer(null);
+      onToast({ type: 'success', title: 'Agente gerado', detail: `${fileName} baixado. Execute o arquivo uma única vez no servidor ${agentServer.name}.` });
+    } catch (reason) {
+      setAgentGenerationError(reason instanceof Error ? reason.message : 'Não foi possível gerar o instalador.');
+    } finally { setAgentGenerating(false); }
+  }
   async function confirmDeactivate() {
     if (!blockTarget) return;
     setProcessingId(blockTarget.equipment_id);
@@ -1307,9 +1359,11 @@ function UnitDetail({ unit, equipment, onBack, onEdit, onRefresh, onToast = () =
     <div className="detail-hero"><div><p className="eyebrow">UNIDADE {unit.code} · {unit.state_code}</p><h2>{unit.name}</h2><p>{unit.city} · monitoramento de infraestrutura</p></div><div className="detail-hero-actions"><button className="secondary-button compact" onClick={() => setEditingUnit((current) => !current)}>{editingUnit ? 'Fechar edição' : <><EditIcon /> Editar unidade</>}</button><span className={`status large-status ${unit.operational_status}`}>{statusLabel[unit.operational_status]}</span></div></div>
     {editingUnit && <UnitEditForm unit={unit} token={token} onSaved={async () => { setEditingUnit(false); await onRefresh(); }} onCancel={() => setEditingUnit(false)} onToast={onToast} />}
     <div className="detail-grid"><article className="equipment-panel"><div className="panel-title"><div><p className="eyebrow">ATIVOS MONITORADOS</p><h3>Infraestrutura da unidade</h3></div><div className="panel-title-actions"><strong>{equipment.length}</strong></div></div>
-      <div className="equipment-list">{equipment.map((item) => { const blocked = item.active === false; return <div className={`equipment-row ${blocked ? 'blocked' : ''}`} key={item.equipment_id}><span className={`equipment-indicator ${blocked ? 'blocked' : item.operational_status}`} /><div><strong>{item.name}</strong><small>{item.equipment_type.replaceAll('_', ' ')} · {item.management_address ?? 'sem endereço'}</small></div><div className="equipment-state"><span className={`status ${blocked ? 'blocked' : item.operational_status}`}>{blocked ? 'Bloqueado' : statusLabel[item.operational_status]}</span><small>{blocked ? 'telemetria desativada' : item.observed_at ? new Date(item.observed_at).toLocaleString('pt-BR') : 'aguardando coleta'}</small></div><div className="equipment-actions"><button className="secondary-button compact" onClick={() => onEdit(item)}><EditIcon /> Editar</button>{blocked ? <button className="secondary-button compact" disabled={processingId === item.equipment_id} onClick={() => setUnblockTarget(item)}><UnblockIcon /> Desbloquear</button> : <button className="secondary-button compact warning-action-button" disabled={processingId === item.equipment_id} onClick={() => setBlockTarget(item)}><BlockIcon /> Bloquear</button>}<button className="secondary-button compact clear-filters-button" disabled={processingId === item.equipment_id} onClick={() => setDeleteTarget(item)}><TrashIcon /> Excluir</button></div></div>; })}</div>
+      <div className="agent-provisioning"><div><p className="eyebrow">AGENTE DE COLETA</p><h4>Instalação em arquivo único</h4><small>{missingAgentRequirements.length ? `Requisitos pendentes: ${missingAgentRequirements.join(' ')}` : `${servers.length} servidor(es) e ${agentRequirements.sources.length} fonte(s) elegíveis. Use o botão no servidor escolhido.`}</small></div>{missingAgentRequirements.length > 0 && <button className="secondary-button compact" onClick={() => onToast({ type: 'warning', title: 'Requisitos ausentes', detail: missingAgentRequirements.join(' ') })}>Ver requisitos</button>}</div>
+      <div className="equipment-list">{equipment.map((item) => { const blocked = item.active === false; const isServer = item.equipment_type === 'server' || item.equipment_type === 'linux_server'; return <div className={`equipment-row ${blocked ? 'blocked' : ''}`} key={item.equipment_id}><span className={`equipment-indicator ${blocked ? 'blocked' : item.operational_status}`} /><div><strong>{item.name}</strong><small>{item.equipment_type.replaceAll('_', ' ')} · {item.management_address ?? 'sem endereço'}</small></div><div className="equipment-state"><span className={`status ${blocked ? 'blocked' : item.operational_status}`}>{blocked ? 'Bloqueado' : statusLabel[item.operational_status]}</span><small>{blocked ? 'telemetria desativada' : item.observed_at ? new Date(item.observed_at).toLocaleString('pt-BR') : 'aguardando coleta'}</small></div><div className="equipment-actions">{isServer && !blocked && <button className="primary compact" onClick={() => openAgentGenerator(item)}>Gerar agente</button>}<button className="secondary-button compact" onClick={() => onEdit(item)}><EditIcon /> Editar</button>{blocked ? <button className="secondary-button compact" disabled={processingId === item.equipment_id} onClick={() => setUnblockTarget(item)}><UnblockIcon /> Desbloquear</button> : <button className="secondary-button compact warning-action-button" disabled={processingId === item.equipment_id} onClick={() => setBlockTarget(item)}><BlockIcon /> Bloquear</button>}<button className="secondary-button compact clear-filters-button" disabled={processingId === item.equipment_id} onClick={() => setDeleteTarget(item)}><TrashIcon /> Excluir</button></div></div>; })}</div>
     </article><aside className="readiness-panel"><p className="eyebrow">PRONTIDÃO OPERACIONAL</p><div className="readiness-score"><strong>{equipment.filter((item) => item.operational_status === 'online').length}</strong><span>de {equipment.length}<small>ativos confirmados</small></span></div><div className="readiness-line"><i style={{ width: `${equipment.length ? equipment.filter((item) => item.operational_status === 'online').length / equipment.length * 100 : 0}%` }} /></div><dl><div><dt>Indisponíveis</dt><dd>{equipment.filter((item) => item.operational_status === 'offline').length}</dd></div><div><dt>Em atenção</dt><dd>{equipment.filter((item) => item.operational_status === 'degraded').length}</dd></div><div><dt>Sem telemetria</dt><dd>{equipment.filter((item) => item.operational_status === 'unknown').length}</dd></div></dl></aside></div>
     <StarlinkTelemetryPanel unit={unit} equipment={equipment} token={token} />
+    {agentServer && <FormCard title={`Gerar agente · ${agentServer.name}`} onCancel={() => { if (!agentGenerating) setAgentServer(null); }}><form className="inline-form" onSubmit={(event) => { event.preventDefault(); void generateAgentInstaller(); }}><div className="agent-installer-summary"><p className="eyebrow">ARQUIVO ÚNICO · SEM CONFIGURAÇÃO MANUAL</p><p>O instalador já leva o vínculo desta unidade, o servidor e as fontes elegíveis. Execute uma única vez no equipamento servidor; depois o serviço coleta, envia heartbeat e atualiza o agente sozinho.</p><small>O link de instalação expira em 30 minutos e só pode ser consumido uma vez.</small></div><label>Sistema operacional<select value={agentPlatform} onChange={(event) => setAgentPlatform(event.target.value as AgentPlatform)} disabled={agentGenerating}><option value="windows">Windows · PowerShell</option><option value="linux">Linux · systemd</option></select></label><div className="agent-installer-sources"><span className="field-label">Fontes que serão vinculadas</span>{agentRequirements.sources.map((source) => <small key={source.equipment_id}>● {equipment.find((item) => item.equipment_id === source.equipment_id)?.name ?? source.equipment_type} · {source.equipment_type.replaceAll('_', ' ')}</small>)}</div>{agentGenerationError && <div className="error-banner" role="alert">{agentGenerationError}</div>}<div className="form-actions"><button type="button" className="secondary-button clear-filters-button" onClick={() => setAgentServer(null)} disabled={agentGenerating}><CloseIcon /> Cancelar</button><button className="primary" disabled={agentGenerating}>{agentGenerating ? 'Gerando e preparando download…' : 'Gerar e baixar instalador'}</button></div></form></FormCard>}
     {blockTarget && <ConfirmDialog title="Bloquear equipamento" message={`Bloquear o equipamento "${blockTarget.name}"? Ele para de contar para o status da unidade e para de receber telemetria, assim como um usuário bloqueado. O histórico será preservado.`} confirmLabel="Bloquear" confirmIcon={<BlockIcon />} tone="warning" busy={processingId === blockTarget.equipment_id} onConfirm={() => void confirmDeactivate()} onCancel={() => setBlockTarget(null)} />}
     {unblockTarget && <ConfirmDialog title="Desbloquear equipamento" message={`Desbloquear o equipamento "${unblockTarget.name}"? Ele volta a contar para o status da unidade e a receber telemetria normalmente.`} confirmLabel="Desbloquear" confirmIcon={<UnblockIcon />} tone="positive" busy={processingId === unblockTarget.equipment_id} onConfirm={() => void confirmReactivate()} onCancel={() => setUnblockTarget(null)} />}
     {deleteTarget && <ConfirmDialog title="Excluir equipamento" message={`Excluir definitivamente o equipamento "${deleteTarget.name}"? Esta ação não pode ser desfeita.`} confirmLabel="Excluir" confirmIcon={<TrashIcon />} busy={processingId === deleteTarget.equipment_id} onConfirm={() => void confirmRemove()} onCancel={() => setDeleteTarget(null)} />}

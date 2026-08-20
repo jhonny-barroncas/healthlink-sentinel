@@ -9,7 +9,7 @@ import { createEquipment, deactivateEquipment, deleteEquipment, listEquipment, r
 const paramsSchema = z.object({ unitId: z.string().uuid() });
 const equipmentParamsSchema = z.object({ id: z.string().uuid() });
 const equipmentSchema = z.object({
-  equipmentTypeCode: z.enum(['linux_server', 'mikrotik', 'starlink', 'vpn', 'internet_link']),
+  equipmentTypeCode: z.enum(['server', 'linux_server', 'mikrotik', 'starlink', 'vpn', 'internet_link']),
   name: z.string().trim().min(2).max(150),
   serialNumber: z.string().trim().max(120).optional(),
   managementAddress: z.string().trim().max(120).optional(),

@@ -4,11 +4,16 @@ import { z } from 'zod';
 import { env } from '../../../platform/env.js';
 import { hasPermission, permission } from '../../../platform/authorization.js';
 import { database, withTenant } from '../../../platform/database.js';
+import { isDeployableAgentArtifact } from '../agent/provisioning.js';
 import { ZabbixClient, ZabbixHttpTransport } from './client.js';
 import { selectLinkMetricCandidates, type LinkMetric, type ZabbixItem } from './telemetry.js';
 
 function requireIntegrationAccess(request: { auth: { roles: string[] } }): void {
   if (!hasPermission(request.auth.roles, permission.integrationsManage)) throw Object.assign(new Error('Permissão insuficiente.'), { statusCode: 403 });
+}
+
+function requireAgentVersionAccess(request: { auth: { roles: string[] } }): void {
+  if (!hasPermission(request.auth.roles, permission.agentVersionsManage)) throw Object.assign(new Error('Permissão insuficiente para publicar versões do agente.'), { statusCode: 403 });
 }
 
 function configuredClient(): ZabbixClient {
@@ -437,13 +442,14 @@ export const zabbixRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.post('/v1/integrations/zabbix/agent-versions', { preHandler: [app.authenticate] }, async (request, reply) => {
-    requireIntegrationAccess(request);
+    requireAgentVersionAccess(request);
     const input = z.object({
       version: z.string().regex(/^\d+\.\d+\.\d+$/),
       platform: z.enum(['windows', 'linux']),
       fileName: z.string().min(1).max(200),
       artifactBase64: z.string().min(1).max(25_000_000),
     }).parse(request.body);
+    if (!isDeployableAgentArtifact(input.fileName)) throw Object.assign(new Error('Publique o bundle executável .cjs do agente; o instalador .ps1/.sh é gerado automaticamente por servidor.'), { statusCode: 422 });
     const artifact = Buffer.from(input.artifactBase64, 'base64');
     if (!artifact.length || artifact.length > 20 * 1024 * 1024) throw Object.assign(new Error('O arquivo precisa ter entre 1 byte e 20 MB.'), { statusCode: 422 });
     const checksum = createHash('sha256').update(artifact).digest('hex');

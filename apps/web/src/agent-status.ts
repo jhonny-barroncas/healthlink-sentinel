@@ -1,4 +1,4 @@
-export type AgentStatus = 'online' | 'offline' | 'unlinked';
+export type AgentStatus = 'online' | 'offline' | 'pending' | 'unlinked';
 
 export type AgentRecord = {
   unitId: string;
@@ -19,5 +19,5 @@ export function agentStatusFromObservedAt(observedAt: string | null, now = Date.
 }
 
 export function agentStatusLabel(status: AgentStatus): string {
-  return status === 'online' ? 'Agente em execução' : status === 'offline' ? 'Agente parado' : 'Sem agente vinculado';
+  return status === 'online' ? 'Agente em execução' : status === 'offline' ? 'Agente parado' : status === 'pending' ? 'Aguardando instalação' : 'Sem agente vinculado';
 }
