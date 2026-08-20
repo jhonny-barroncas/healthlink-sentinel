@@ -9,13 +9,14 @@ export const permission = {
   reportsRead: 'reports.read',
   auditRead: 'audit.read',
   integrationsManage: 'integrations.manage',
+  agentVersionsManage: 'agent_versions.manage',
 } as const;
 
 export type Permission = (typeof permission)[keyof typeof permission];
 
 export const systemRoles: Record<string, Permission[]> = {
   global_administrator: Object.values(permission),
-  tenant_administrator: [permission.usersManage, permission.unitsRead, permission.unitsManage, permission.monitoringRead, permission.alertsRead, permission.alertsAcknowledge, permission.reportsRead, permission.auditRead, permission.integrationsManage],
+  tenant_administrator: [permission.usersManage, permission.unitsRead, permission.unitsManage, permission.monitoringRead, permission.alertsRead, permission.alertsAcknowledge, permission.reportsRead, permission.auditRead, permission.integrationsManage, permission.agentVersionsManage],
   supervisor: [permission.unitsRead, permission.monitoringRead, permission.alertsRead, permission.alertsAcknowledge, permission.reportsRead],
   noc_operator: [permission.unitsRead, permission.monitoringRead, permission.alertsRead, permission.alertsAcknowledge],
   viewer: [permission.unitsRead, permission.monitoringRead, permission.alertsRead, permission.reportsRead],

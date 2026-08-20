@@ -72,6 +72,7 @@ describe('agent provisioning rules', () => {
     expect(resolveAgentApiUrl({ requestProtocol: 'http', forwardedProtocol: 'https, http', host: 'sentinel.example:5174' }))
       .toBe('https://sentinel.example:5174');
     expect(() => resolveAgentApiUrl({ requestProtocol: 'ftp', host: 'sentinel.example' })).toThrow('URL pública');
+    expect(() => resolveAgentApiUrl({ configuredUrl: 'http://sentinel.example', requestProtocol: 'http', requireHttps: true })).toThrow('URL pública');
     expect(collectionAgentInstallerFileName('UMS 01/AM', 'windows')).toBe('healthlink-agent-ums-01-am-windows.ps1');
     expect(collectionAgentInstallerFileName('UMS 01/AM', 'linux')).toBe('healthlink-agent-ums-01-am-linux.sh');
   });

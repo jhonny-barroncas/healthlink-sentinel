@@ -12,6 +12,10 @@ function requireIntegrationAccess(request: { auth: { roles: string[] } }): void 
   if (!hasPermission(request.auth.roles, permission.integrationsManage)) throw Object.assign(new Error('Permissão insuficiente.'), { statusCode: 403 });
 }
 
+function requireAgentVersionAccess(request: { auth: { roles: string[] } }): void {
+  if (!hasPermission(request.auth.roles, permission.agentVersionsManage)) throw Object.assign(new Error('Permissão insuficiente para publicar versões do agente.'), { statusCode: 403 });
+}
+
 function configuredClient(): ZabbixClient {
   if (!env.ZABBIX_API_URL || !env.ZABBIX_API_TOKEN) throw Object.assign(new Error('Integração Zabbix não configurada no ambiente.'), { statusCode: 503 });
   return new ZabbixClient(new ZabbixHttpTransport(env.ZABBIX_API_URL, env.ZABBIX_API_TOKEN));
@@ -438,7 +442,7 @@ export const zabbixRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.post('/v1/integrations/zabbix/agent-versions', { preHandler: [app.authenticate] }, async (request, reply) => {
-    requireIntegrationAccess(request);
+    requireAgentVersionAccess(request);
     const input = z.object({
       version: z.string().regex(/^\d+\.\d+\.\d+$/),
       platform: z.enum(['windows', 'linux']),

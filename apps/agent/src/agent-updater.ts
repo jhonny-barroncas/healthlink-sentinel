@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { chmod, rename, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, rename, unlink, writeFile } from 'node:fs/promises';
 
 type UpdateConfig = {
   apiUrl: string;
@@ -13,6 +13,10 @@ type UpdateConfig = {
 type AuthenticatedFetcher = { fetch(input: string, init?: RequestInit): Promise<Response> };
 
 export type AgentRelease = { id: string; version: string; platform: 'windows' | 'linux'; file_name: string; checksum_sha256: string; active: boolean };
+
+export function previousAgentPath(agentPath: string): string {
+  return `${agentPath}.previous`;
+}
 
 export function isNewerVersion(current: string, candidate: string): boolean {
   const left = current.split('.').map(Number); const right = candidate.split('.').map(Number);
@@ -38,7 +42,23 @@ export async function checkForAgentUpdate(config: UpdateConfig, auth: Authentica
   const temporary = `${config.agentPath}.update-${process.pid}`;
   await writeFile(temporary, artifact, { mode: 0o755 });
   if (config.platform === 'linux') await chmod(temporary, 0o755);
+  await copyFile(config.agentPath, previousAgentPath(config.agentPath));
   await rename(temporary, config.agentPath);
   console.log(`[starlink-agent] agente atualizado para ${release.version}; reinicie o serviço para carregar o binário novo.`);
   return true;
+}
+
+export async function finalizeAgentUpdate(agentPath: string): Promise<void> {
+  await unlink(previousAgentPath(agentPath)).catch(() => undefined);
+}
+
+export async function restorePreviousAgent(agentPath: string): Promise<boolean> {
+  const previous = previousAgentPath(agentPath);
+  try {
+    await unlink(agentPath);
+    await rename(previous, agentPath);
+    return true;
+  } catch {
+    return false;
+  }
 }

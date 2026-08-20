@@ -152,6 +152,7 @@ Na raiz do projeto:
 ```bash
 npm ci
 npm run typecheck
+npm run build:agent
 npm run build:web
 npm run start
 ```

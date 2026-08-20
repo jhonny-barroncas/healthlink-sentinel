@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { hasPermission, permission } from '../../../platform/authorization.js';
 import { withTenant } from '../../../platform/database.js';
@@ -84,7 +84,11 @@ export const collectionAgentRoutes: FastifyPluginAsync = async (app) => {
       `, [parsed.agentId, parsed.tenantId]);
       return result.rows[0];
     });
-    if (!agent?.credential_hash || agent.credential_hash !== hashAgentSecret(parsed.secret)) throw httpError('Credencial do agente inválida ou revogada.', 401);
+    const presentedHash = hashAgentSecret(parsed.secret);
+    const storedHash = agent?.credential_hash ?? '';
+    const validCredential = storedHash.length === presentedHash.length
+      && timingSafeEqual(Buffer.from(storedHash, 'utf8'), Buffer.from(presentedHash, 'utf8'));
+    if (!validCredential) throw httpError('Credencial do agente inválida ou revogada.', 401);
     request.collectionAgentAuth = {
       agentId: agent.id,
       tenantId: agent.tenant_id,
@@ -297,12 +301,16 @@ export const collectionAgentRoutes: FastifyPluginAsync = async (app) => {
     requireUserAccess(request, permission.integrationsManage);
     const unitId = z.string().uuid().parse((request.params as { unitId: string }).unitId);
     const input = installerSchema.parse(request.body);
+    if (env.NODE_ENV === 'production' && !env.PUBLIC_API_URL) {
+      throw httpError('PUBLIC_API_URL deve estar configurada em produção antes de gerar um instalador.', 503);
+    }
     const forwardedProtocol = request.headers['x-forwarded-proto'];
     const apiUrl = resolveAgentApiUrl({
       configuredUrl: env.PUBLIC_API_URL,
       requestProtocol: request.protocol,
       forwardedProtocol: Array.isArray(forwardedProtocol) ? forwardedProtocol[0] : forwardedProtocol,
       host: request.headers.host,
+      requireHttps: env.NODE_ENV === 'production',
     });
     const generated = await withTenant(request.auth.tenantId, async (db) => {
       const equipmentResult = await db.query<{
@@ -441,6 +449,30 @@ export const collectionAgentRoutes: FastifyPluginAsync = async (app) => {
         RETURNING id
       `, [agentId, request.auth.tenantId]);
       if (!result.rows[0]) throw httpError('Agente não encontrado.', 404);
+      await db.query(`
+        UPDATE collection_agent_assignments SET active = false, updated_at = now()
+        WHERE agent_id = $1 AND tenant_id = $2
+      `, [agentId, request.auth.tenantId]);
+      await db.query(`
+        UPDATE starlink_telemetry_sources s
+        SET enabled = false, updated_at = now()
+        WHERE s.tenant_id = $1
+          AND EXISTS (
+            SELECT 1 FROM collection_agent_assignments a
+            WHERE a.agent_id = $2 AND a.tenant_id = $1 AND a.equipment_id = s.equipment_id
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM collection_agent_assignments other_assignment
+            JOIN collection_agents other_agent ON other_agent.id = other_assignment.agent_id
+              AND other_agent.tenant_id = other_assignment.tenant_id
+            WHERE other_assignment.tenant_id = $1
+              AND other_assignment.equipment_id = s.equipment_id
+              AND other_assignment.active = true
+              AND other_agent.status = 'active'
+              AND other_agent.id <> $2
+          )
+      `, [request.auth.tenantId, agentId]);
       await db.query(`
         UPDATE collection_agent_enrollments SET revoked_at = now()
         WHERE agent_id = $1 AND tenant_id = $2 AND consumed_at IS NULL AND revoked_at IS NULL

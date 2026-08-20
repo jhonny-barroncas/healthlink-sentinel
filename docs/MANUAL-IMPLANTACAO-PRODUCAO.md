@@ -248,6 +248,8 @@ Não envie o instalador `.ps1` ou `.sh` nessa área. O instalador é gerado por 
 
 Os agentes instalados consultam o catálogo, baixam uma versão mais nova da mesma plataforma, validam o checksum e reiniciam o serviço.
 
+A publicação de versões exige a permissão específica de gerenciamento de versões do agente. A conta técnica `service_agent` usada pelos agentes não pode publicar releases.
+
 ## 12. Monitoramento operacional
 
 No filtro **Agentes**:

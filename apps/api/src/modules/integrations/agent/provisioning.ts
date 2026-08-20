@@ -56,13 +56,14 @@ export function resolveAgentApiUrl(input: {
   requestProtocol: string;
   forwardedProtocol?: string;
   host?: string;
+  requireHttps?: boolean;
 }): string {
   const forwardedProtocol = input.forwardedProtocol?.split(',')[0]?.trim();
   const candidate = input.configuredUrl?.trim()
     || `${forwardedProtocol || input.requestProtocol}://${input.host ?? ''}`;
   let url: URL;
   try { url = new URL(candidate); } catch { throw new Error('URL pública da API inválida para o instalador.'); }
-  if (!['http:', 'https:'].includes(url.protocol) || !url.host || url.username || url.password || url.search || url.hash) {
+  if (!['http:', 'https:'].includes(url.protocol) || (input.requireHttps && url.protocol !== 'https:') || !url.host || url.username || url.password || url.search || url.hash) {
     throw new Error('URL pública da API inválida para o instalador.');
   }
   return url.toString().replace(/\/$/, '');

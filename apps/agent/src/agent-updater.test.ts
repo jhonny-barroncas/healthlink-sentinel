@@ -3,7 +3,7 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { checkForAgentUpdate, isNewerVersion } from './agent-updater.js';
+import { checkForAgentUpdate, isNewerVersion, previousAgentPath } from './agent-updater.js';
 
 describe('agent updater', () => {
   it('detects a strictly newer semantic version', () => {
@@ -31,6 +31,7 @@ describe('agent updater', () => {
 
     expect(updated).toBe(true);
     expect(await readFile(agentPath, 'utf8')).toBe('new-version');
+    expect(await readFile(previousAgentPath(agentPath), 'utf8')).toBe('old-version');
     expect(requested).toEqual([
       'https://healthlink.example/v1/collection-agents/releases',
       'https://healthlink.example/v1/collection-agents/releases/release-id/download',
