@@ -56,17 +56,17 @@ Se Zabbix for utilizado, preencha também `ZABBIX_API_URL` e `ZABBIX_API_TOKEN` 
 
 ### Docker Compose (fluxo recomendado)
 
-O ambiente está adaptado para Docker Compose: o serviço `migrate` aguarda o PostgreSQL, aplica as migrations uma única vez e só então inicia a aplicação. O container `healthlink` serve o frontend compilado, a API e o health check na mesma porta `5174`.
+O ambiente está adaptado para Docker Compose: o serviço `migrate` aguarda o PostgreSQL, aplica as migrations uma única vez e só então inicia a aplicação. O container `healthlink` serve o frontend compilado, a API e o health check na mesma porta `3002`.
 
 ```powershell
 Copy-Item .env.example .env
 notepad .env
 docker compose up -d --build
 docker compose ps
-Invoke-WebRequest http://localhost:5174/health
+Invoke-WebRequest http://localhost:3002/health
 ```
 
-O retorno esperado do health check é `{"status":"ok","service":"healthlink-sentinel"}`. PostgreSQL e Redis permanecem internos ao Compose; somente `5174` é publicada no host. O endereço externo de produção será `https://aplicacao.gbringel.com:5174`. Consulte [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) antes de usar em produção.
+O retorno esperado do health check é `{"status":"ok","service":"healthlink-sentinel"}`. PostgreSQL e Redis permanecem internos ao Compose; somente `3002` é publicada no host. O endereço externo de produção será `https://aplicacao.gbringel.com:3002`. Consulte [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) antes de usar em produção.
 
 Para o procedimento completo de implantação, HTTPS, backup, atualização e instalação do agente nas unidades móveis, consulte o [Manual de implantação em produção](docs/MANUAL-IMPLANTACAO-PRODUCAO.md).
 

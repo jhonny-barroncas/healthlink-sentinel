@@ -7,11 +7,11 @@ services:
       - .env
     environment:
       NODE_ENV: production
-      PORT: 5174
+      PORT: 3002
       DATABASE_URL: postgresql://healthlink:${POSTGRES_PASSWORD:-healthlink_change_me}@postgres:5432/healthlink
       REDIS_URL: redis://redis:6379
     ports:
-      - "5174:5174"
+      - "3002:3002"
     depends_on:
       bootstrap:
         condition: service_completed_successfully
@@ -21,7 +21,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5174/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -78,6 +78,28 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  retention:
+    image: postgres:16-alpine
+    env_file:
+      - .env
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-healthlink_change_me}
+      HEALTHLINK_RETENTION_INTERVAL_SECONDS: ${HEALTHLINK_RETENTION_INTERVAL_SECONDS:-86400}
+    volumes:
+      - ./scripts/postgres-retention.sql:/retention.sql:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          echo "[retention] executando limpeza do PostgreSQL";
+          psql -h postgres -U healthlink -d healthlink -v ON_ERROR_STOP=1 -f /retention.sql || exit 1;
+          sleep "$${HEALTHLINK_RETENTION_INTERVAL_SECONDS:-86400}";
+        done
+    restart: unless-stopped
 
 volumes:
   postgres_data:

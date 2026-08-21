@@ -195,6 +195,8 @@ Próxima tarefa: homologar o instalador `1.0.0` em um servidor Windows e um Linu
 
 Manual operacional de produção: `docs/MANUAL-IMPLANTACAO-PRODUCAO.md`, com Docker Compose, HTTPS, backup, migrations, geração do agente e troubleshooting.
 
+Atualização 2026-08-21: a aplicação HealthLink foi padronizada para escutar na porta TCP `3002` no container e no override do servidor. O healthcheck, Dockerfile, exemplos de ambiente e manuais foram alinhados; GLPI permanece em `8090` e Uptime Kuma em `3001`. O serviço de retenção do PostgreSQL executa a limpeza periódica definida em `scripts/postgres-retention.sql`.
+
 ## Documentação relacionada
 
 - [[00-Mapa Mestre do Vault]]

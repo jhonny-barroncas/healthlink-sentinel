@@ -3,4 +3,4 @@ services:
     # O proxy existente do servidor encaminha o domínio para esta porta.
     # Assim o HealthLink não disputa 80/443 com GLPI ou Uptime Kuma.
     ports:
-      - "127.0.0.1:5174:5174"
+      - "127.0.0.1:3002:3002"

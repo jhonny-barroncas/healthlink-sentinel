@@ -10,7 +10,7 @@ O cenário recomendado é:
 Internet
    │ HTTPS
 DNS + proxy reverso
-   │ HTTP interno :5174
+   │ HTTP interno :3002
 HealthLink container ─── PostgreSQL
                       └─ Redis
 ```
@@ -34,7 +34,7 @@ Portas:
 | Porta | Uso | Exposição |
 |---|---|---|
 | `443/tcp` | HTTPS público, se houver proxy reverso | pública |
-| `5174/tcp` | aplicação HealthLink | interna ou pública somente com HTTPS configurado |
+| `3002/tcp` | aplicação HealthLink | interna ou pública somente com HTTPS configurado |
 | `5432/tcp` | PostgreSQL | nunca publicar na internet |
 | `6379/tcp` | Redis | nunca publicar na internet |
 | `9200/tcp` | Starlink na unidade móvel | somente na LAN da unidade |
@@ -51,7 +51,7 @@ cd healthlink-sentinel
 Use uma branch ou tag revisada para produção. Não execute diretamente uma branch de desenvolvimento sem homologação.
 
 Se o servidor já possui GLPI e Uptime Kuma em outras pastas, mantenha cada aplicação em sua própria stack Docker. Para o
-HealthLink, use o override `docker-compose.server.yml`; ele publica a aplicação apenas em `127.0.0.1:5174`, evitando
+HealthLink, use o override `docker-compose.server.yml`; ele publica a aplicação apenas em `127.0.0.1:3002`, evitando
 conflito com as portas públicas do proxy existente:
 
 ```bash
@@ -59,7 +59,7 @@ cd /opt/healthlink-sentinel
 docker compose -f docker-compose.yml -f docker-compose.server.yml up -d --build
 ```
 
-O proxy reverso deve encaminhar o domínio do HealthLink para `http://127.0.0.1:5174`.
+O proxy reverso deve encaminhar o domínio do HealthLink para `http://127.0.0.1:3002`.
 
 ## 4. Criar o ambiente de produção
 
@@ -74,7 +74,7 @@ Preencha, no mínimo:
 
 ```env
 NODE_ENV=production
-PORT=5174
+PORT=3002
 POSTGRES_PASSWORD=GERAR_UMA_SENHA_FORTE_E_UNICA
 JWT_SECRET=GERAR_UM_SEGREDO_COM_PELO_MENOS_32_CARACTERES
 ZABBIX_CREDENTIALS_ENCRYPTION_KEY=GERAR_UMA_CHAVE_COM_PELO_MENOS_32_CARACTERES
@@ -119,7 +119,7 @@ O serviço `healthlink` deve estar `Up` e o `migrate` deve terminar com código 
 No próprio servidor:
 
 ```bash
-curl -i http://127.0.0.1:5174/health
+curl -i http://127.0.0.1:3002/health
 ```
 
 Resposta esperada:
@@ -142,7 +142,7 @@ https://healthlink.seudominio.com
 
 ## 7. HTTPS e proxy reverso
 
-O Docker entrega a aplicação na porta interna `5174`. Em produção, recomenda-se terminar o TLS em Nginx, Caddy, Traefik ou no proxy corporativo e encaminhar para `127.0.0.1:5174`.
+O Docker entrega a aplicação na porta interna `3002`. Em produção, recomenda-se terminar o TLS em Nginx, Caddy, Traefik ou no proxy corporativo e encaminhar para `127.0.0.1:3002`.
 
 Exemplo conceitual de Nginx:
 
@@ -155,7 +155,7 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/healthlink.seudominio.com/privkey.pem;
 
     location / {
-        proxy_pass http://127.0.0.1:5174;
+        proxy_pass http://127.0.0.1:3002;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto https;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -184,6 +184,11 @@ O Compose utiliza o volume `postgres_data`. Confirme o volume:
 ```bash
 docker volume ls | grep postgres
 ```
+
+O serviço `retention` executa diariamente o SQL em `scripts/postgres-retention.sql`. Ele remove telemetria com mais de
+30 dias, histórico operacional com mais de 90 dias, dados temporários de agentes com mais de 30 dias e sessões/enrollments
+expirados. Inventário, estado atual e auditoria não são removidos. O intervalo pode ser ajustado por
+`HEALTHLINK_RETENTION_INTERVAL_SECONDS`.
 
 Backup:
 

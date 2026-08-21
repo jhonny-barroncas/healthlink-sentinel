@@ -21,6 +21,6 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/apps ./apps
 COPY --chown=node:node --from=build /app/dist ./dist
 
-EXPOSE 5174
+EXPOSE 3002
 USER node
 CMD ["npm", "run", "start"]

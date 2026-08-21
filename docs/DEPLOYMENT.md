@@ -1,19 +1,19 @@
 # Implantação do HealthLink Sentinel
 
-Este guia descreve a implantação em servidor/container com uma única porta pública: **TCP 5174**.
+Este guia descreve a implantação em servidor/container com uma única porta pública: **TCP 3002**.
 
 O acesso será:
 
 ```text
-https://aplicacao.gbringel.com:5174
+https://aplicacao.gbringel.com:3002
 ```
 
-Importante: fornecer a porta significa encaminhar o serviço completo do HealthLink. Não basta apontar `5174` somente para os arquivos do frontend. A mesma porta deve atender a interface, a API e o health check:
+Importante: fornecer a porta significa encaminhar o serviço completo do HealthLink. Não basta apontar `3002` somente para os arquivos do frontend. A mesma porta deve atender a interface, a API e o health check:
 
 ```text
-Frontend: https://aplicacao.gbringel.com:5174
-API:      https://aplicacao.gbringel.com:5174/v1/...
-Health:   https://aplicacao.gbringel.com:5174/health
+Frontend: https://aplicacao.gbringel.com:3002
+API:      https://aplicacao.gbringel.com:3002/v1/...
+Health:   https://aplicacao.gbringel.com:3002/health
 ```
 
 Se houver um proxy reverso, ele deve encaminhar todas essas rotas para o container HealthLink. Não é necessário fornecer uma segunda porta para a API.
