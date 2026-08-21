@@ -10,7 +10,9 @@
   "scripts": {
     "dev": "tsx watch apps/api/src/server.ts",
     "predev": "npm run build:agent",
+    "predev:web": "npm run dev:cert",
     "dev:web": "vite apps/web --host 0.0.0.0 --port 5173",
+    "dev:cert": "node scripts/generate-local-certs.mjs",
     "build:web": "vite build apps/web --outDir ../../dist/web && node scripts/copy-maplibre-assets.mjs",
     "admin:reset-password": "tsx apps/api/src/scripts/reset-password.ts",
     "bootstrap:sysadmin": "tsx apps/api/src/scripts/seed-sysadmin.ts",
@@ -45,6 +47,7 @@
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.3.4",
+    "selfsigned": "^5.5.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vite": "^5.4.21",

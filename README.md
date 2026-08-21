@@ -63,10 +63,11 @@ Copy-Item .env.example .env
 notepad .env
 docker compose up -d --build
 docker compose ps
-Invoke-WebRequest http://localhost:3002/health
+docker compose -f docker-compose.yml -f docker-compose.local-https.yml up -d --build
+Invoke-WebRequest https://localhost:3002/health -SkipCertificateCheck
 ```
 
-O retorno esperado do health check é `{"status":"ok","service":"healthlink-sentinel"}`. PostgreSQL e Redis permanecem internos ao Compose. No servidor, o override publica o HealthLink somente em `127.0.0.1:3003`; o proxy reverso entrega HTTPS externamente em `https://aplicacao.gbringel.com:3002`. Consulte [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) antes de usar em produção.
+Para desenvolvimento local com HTTPS, use o segundo comando: o override monta `.certs/` no container e entrega frontend, API e health check em HTTPS. O Compose base permanece HTTP interno, que é o modo correto quando um proxy reverso existente termina o HTTPS no ambiente de produção. PostgreSQL e Redis permanecem internos ao Compose. Consulte [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) antes de usar em produção.
 
 Para o procedimento completo de implantação, HTTPS, backup, atualização e instalação do agente nas unidades móveis, consulte o [Manual de implantação em produção](docs/MANUAL-IMPLANTACAO-PRODUCAO.md).
 
@@ -87,7 +88,7 @@ Get-ChildItem apps/api/database/migrations/*.sql | Sort-Object Name | ForEach-Ob
 Confira a API fora do Compose:
 
 ```powershell
-Invoke-WebRequest http://localhost:3000/health
+Invoke-WebRequest https://localhost:3002/health -SkipCertificateCheck
 ```
 
 ## Executar o sistema
@@ -106,7 +107,7 @@ Terminal 2 — frontend:
 npm.cmd run dev:web
 ```
 
-Acesse [http://localhost:5173](http://localhost:5173). A API ficará em [http://localhost:3000](http://localhost:3000).
+Acesse [https://localhost:5173](https://localhost:5173). A API ficará em [https://localhost:3002](https://localhost:3002).
 
 Nesse fluxo de dois terminais, o frontend e a API rodam em portas diferentes, então é preciso informar ao Vite onde está a API. Copie `apps/web/.env.local.example` para `apps/web/.env.local` (não é versionado):
 
@@ -114,7 +115,7 @@ Nesse fluxo de dois terminais, o frontend e a API rodam em portas diferentes, en
 Copy-Item apps/web/.env.local.example apps/web/.env.local
 ```
 
-Sem esse arquivo, o login e as demais chamadas falham porque o frontend tenta usar a própria origem (`localhost:5173`) como base da API. Para acessar de outro computador da rede, abra as portas no firewall e troque `localhost` pelo IP da máquina que executa a API/frontend.
+Sem esse arquivo, o login e as demais chamadas falham porque o frontend tenta usar a própria origem (`localhost:5173`) como base da API. Na primeira abertura, aceite o certificado local; ele é gerado em `.certs/` e não é versionado.
 
 Esse ajuste só é necessário nesse fluxo de desenvolvimento local com dois terminais. No fluxo do Docker Compose (recomendado, ver seção acima), frontend e API são servidos juntos na mesma porta e nenhuma variável extra é necessária.
 

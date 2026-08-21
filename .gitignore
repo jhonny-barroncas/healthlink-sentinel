@@ -2,6 +2,7 @@ node_modules/
 dist/
 .env
 .env.local
+.certs/
 apps/web/.env*
 !apps/web/.env.local.example
 obsidian/00-Inbox/CREDENCIAL LOCAL — SYSADMIN.md

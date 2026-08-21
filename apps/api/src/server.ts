@@ -2,6 +2,7 @@ import 'dotenv/config';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import authPlugin from './modules/auth/plugin.js';
 import { healthRoutes } from './modules/health/routes.js';
@@ -17,9 +18,12 @@ import { userRoutes } from './modules/users/routes.js';
 import { env } from './platform/env.js';
 import { registerWebAssets } from './web-assets.js';
 
-const app = Fastify({ logger: true });
+const app = Fastify({
+  logger: true,
+  ...(env.HTTPS ? { https: { key: readFileSync(resolve(process.cwd(), env.HTTPS_KEY_PATH)), cert: readFileSync(resolve(process.cwd(), env.HTTPS_CERT_PATH)) } } : {}),
+});
 await app.register(cors, {
-  origin: [/^http:\/\/(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+):517[3-9]$/],
+  origin: [/^https?:\/\/(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+):517[3-9]$/],
   methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 });

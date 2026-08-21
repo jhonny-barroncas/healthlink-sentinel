@@ -3,6 +3,9 @@ import { z } from 'zod';
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
+  HTTPS: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
+  HTTPS_KEY_PATH: z.string().default('.certs/localhost-key.pem'),
+  HTTPS_CERT_PATH: z.string().default('.certs/localhost.pem'),
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
   JWT_SECRET: z.string().min(32),

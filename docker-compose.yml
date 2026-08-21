@@ -12,6 +12,8 @@ services:
       REDIS_URL: redis://redis:6379
     ports:
       - "3002:3002"
+    volumes:
+      - ./.certs:/app/.certs:ro
     depends_on:
       bootstrap:
         condition: service_completed_successfully

@@ -80,6 +80,10 @@ Use esta nota como ponto de entrada ao migrar para outro chat do Codex. O projet
 
 ## Localização dos arquivos
 
+Atualização 2026-08-21: o desenvolvimento local agora usa HTTPS ponta a ponta. `npm.cmd run dev` atende a API em `https://localhost:3002` e `npm.cmd run dev:web` atende o Vite em `https://localhost:5173`; os certificados são gerados em `.certs/` por `npm.cmd run dev:cert` e permanecem fora do Git. O certificado é autoassinado, então o navegador precisa aceitá-lo uma vez.
+
+Atualização 2026-08-21: o HTTPS direto do Docker foi isolado em `docker-compose.local-https.yml`. O Compose base permanece HTTP interno para não quebrar produção quando o proxy reverso existente termina o TLS e encaminha para o container.
+
 - Projeto: `C:\Users\ADMIN\Documents\Codex\healthlink-sentinel`
 - Backend/API: `C:\Users\ADMIN\Documents\Codex\healthlink-sentinel\apps\api`
 - Frontend: `C:\Users\ADMIN\Documents\Codex\healthlink-sentinel\apps\web`

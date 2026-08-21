@@ -1,0 +1,10 @@
+services:
+  healthlink:
+    environment:
+      HTTPS: "true"
+      HTTPS_KEY_PATH: /app/.certs/localhost-key.pem
+      HTTPS_CERT_PATH: /app/.certs/localhost.pem
+    volumes:
+      - ./.certs:/app/.certs:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.env.NODE_TLS_REJECT_UNAUTHORIZED='0'; fetch('https://127.0.0.1:3002/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]

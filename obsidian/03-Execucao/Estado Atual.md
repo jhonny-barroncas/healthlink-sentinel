@@ -44,6 +44,9 @@ phase: foundation
 
 # Estado Atual
 
+> Atualização 2026-08-21: o ambiente de desenvolvimento local foi colocado em HTTPS ponta a ponta. A API Fastify usa `HTTPS=true` com certificado em `.certs/localhost*.pem`, e o Vite usa o mesmo par em `https://localhost:5173`; a API local fica em `https://localhost:3002`. Os certificados são gerados sob demanda por `npm.cmd run dev:cert` e não são versionados.
+> O HTTPS direto no Docker usa o override `docker-compose.local-https.yml`. O Compose base continua HTTP interno, compatível com o proxy reverso do ambiente de produção.
+
 > Regra de retenção 2026-08-21: o PostgreSQL do HealthLink deve preservar permanentemente inventário, usuários, permissões, unidades, equipamentos, vínculos, configurações, agentes, versões publicadas, estado atual e auditoria. Telemetria detalhada deve ser mantida por 30 dias; heartbeats por 7 dias; eventos resolvidos por 90 dias; logs técnicos por 30 dias; diagnósticos Ping/Tracert por 7 dias. A projeção operacional reserva 100 GB para o volume do PostgreSQL, incluindo margem e backups temporários. A rotina automática de limpeza ainda precisa ser implementada para fazer cumprir esses prazos.
 
 > Atualização 2026-08-21: criada a rotina `scripts/postgres-retention.sql`, executada diariamente pelo serviço Docker `retention`. Ela limpa `metric_samples` após 30 dias, `monitoring_events`/`alert_events` após 90 dias, lotes temporários do agente após 30 dias e sessões/enrollments expirados. Inventário, estado atual e `audit_logs` permanecem preservados.
