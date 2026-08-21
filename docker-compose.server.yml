@@ -1,6 +1,8 @@
 services:
   healthlink:
     # O HealthLink termina o HTTPS diretamente na porta pública 3002.
+    # Necessário para ler a chave privada do certificado montado pelo host.
+    user: root
     ports: !override
       - "3002:3002"
     environment:
