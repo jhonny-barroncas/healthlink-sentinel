@@ -18,6 +18,7 @@ import {
   parseAgentCredential,
   parseEnrollmentToken,
   resolveAgentApiUrl,
+  resolveConfiguredPublicUrl,
 } from './provisioning.js';
 
 type AgentAuthContext = {
@@ -301,12 +302,13 @@ export const collectionAgentRoutes: FastifyPluginAsync = async (app) => {
     requireUserAccess(request, permission.integrationsManage);
     const unitId = z.string().uuid().parse((request.params as { unitId: string }).unitId);
     const input = installerSchema.parse(request.body);
-    if (env.NODE_ENV === 'production' && !env.PUBLIC_API_URL) {
-      throw httpError('PUBLIC_API_URL deve estar configurada em produção antes de gerar um instalador.', 503);
+    const configuredPublicUrl = resolveConfiguredPublicUrl(env.PUBLIC_APP_URL, env.PUBLIC_API_URL);
+    if (env.NODE_ENV === 'production' && !configuredPublicUrl) {
+      throw httpError('PUBLIC_APP_URL deve estar configurada em produção antes de gerar um instalador.', 503);
     }
     const forwardedProtocol = request.headers['x-forwarded-proto'];
     const apiUrl = resolveAgentApiUrl({
-      configuredUrl: env.PUBLIC_API_URL,
+      configuredUrl: configuredPublicUrl,
       requestProtocol: request.protocol,
       forwardedProtocol: Array.isArray(forwardedProtocol) ? forwardedProtocol[0] : forwardedProtocol,
       host: request.headers.host,

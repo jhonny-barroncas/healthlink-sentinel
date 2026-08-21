@@ -13,6 +13,8 @@ services:
     ports:
       - "5174:5174"
     depends_on:
+      bootstrap:
+        condition: service_completed_successfully
       migrate:
         condition: service_completed_successfully
       redis:
@@ -23,6 +25,22 @@ services:
       interval: 30s
       timeout: 5s
       retries: 5
+
+  bootstrap:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://healthlink:${POSTGRES_PASSWORD:-healthlink_change_me}@postgres:5432/healthlink
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ["npm", "run", "bootstrap:sysadmin"]
+    restart: "no"
 
   postgres:
     image: postgres:16-alpine

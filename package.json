@@ -13,6 +13,7 @@
     "dev:web": "vite apps/web --host 0.0.0.0 --port 5173",
     "build:web": "vite build apps/web --outDir ../../dist/web && node scripts/copy-maplibre-assets.mjs",
     "admin:reset-password": "tsx apps/api/src/scripts/reset-password.ts",
+    "bootstrap:sysadmin": "tsx apps/api/src/scripts/seed-sysadmin.ts",
     "agent:starlink": "tsx apps/agent/src/index.ts",
     "agent:starlink:check": "tsx apps/agent/src/check.ts",
     "build:agent": "node scripts/build-agent-release.mjs",

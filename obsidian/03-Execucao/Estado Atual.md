@@ -44,6 +44,8 @@ phase: foundation
 
 # Estado Atual
 
+> Atualização 2026-08-21: o Compose passou a executar o serviço `bootstrap` após as migrations e antes da aplicação. Ele garante de forma idempotente o usuário sysadmin do tenant `default` com perfil `tenant_administrator`; a senha fica somente no ambiente local/secret e não é sobrescrita em reinícios, salvo quando `HEALTHLINK_SYSADMIN_RESET_PASSWORD=true`. O domínio canônico passou a ser `PUBLIC_APP_URL`, com fallback compatível para `PUBLIC_API_URL`, e é usado na geração dos instaladores dos agentes.
+
 > Atualização 2026-08-19: o Centro Operacional passou a ter a visão **Agentes** no lugar de VPN. A visão lista as unidades móveis e diferencia agente em execução (heartbeat até 30s), agente parado e unidade sem agente vinculado; a API agrega a fonte `local_agent`, última amostra e versão sem expor segredos.
 > Atualização 2026-08-19: a aba **Integração Zabbix** passou a ter o repositório de versões do agente, separado por Windows/Linux. A migração `010_agent_versions.sql` cria o catálogo inicial `1.0.0` para os dois sistemas; a interface publica o arquivo, calcula SHA-256 no servidor e disponibiliza download autenticado para atualização.
 > Atualização 2026-08-20: concluído o provisionamento do agente em arquivo único. No detalhe da unidade, cada servidor ativo exibe **Gerar agente**; o fluxo valida Starlink/MikroTik/link ativo, pergunta Windows/Linux e baixa um instalador sem prompts. O backend grava atribuições, cria enrollment de uso único por 30 minutos, configura a fonte local da Starlink e monitora `pending`, `online`, `offline` e `unlinked`. O bundle real `1.0.0` é sincronizado no catálogo de versões e o agente atualiza automaticamente por SHA-256.

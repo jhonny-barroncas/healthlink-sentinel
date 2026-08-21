@@ -69,6 +69,10 @@ export function resolveAgentApiUrl(input: {
   return url.toString().replace(/\/$/, '');
 }
 
+export function resolveConfiguredPublicUrl(appUrl?: string, legacyApiUrl?: string): string | undefined {
+  return appUrl?.trim() || legacyApiUrl?.trim();
+}
+
 export function collectionAgentInstallerFileName(unitCode: string, platform: AgentPlatform): string {
   const slug = unitCode.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
     .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'unidade';

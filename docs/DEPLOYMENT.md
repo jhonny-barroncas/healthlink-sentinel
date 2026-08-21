@@ -103,6 +103,10 @@ ZABBIX_API_URL=https://<zabbix>/zabbix/api_jsonrpc.php
 ZABBIX_API_TOKEN=<token-do-zabbix>
 ZABBIX_SYNC_INTERVAL_MS=60000
 ZABBIX_TELEMETRY_INTERVAL_MS=2000
+PUBLIC_APP_URL=https://healthlink.seudominio.com
+HEALTHLINK_SYSADMIN_EMAIL=sysadmin@healthlink.local
+HEALTHLINK_SYSADMIN_PASSWORD=<segredo-do-sysadmin>
+HEALTHLINK_SYSADMIN_RESET_PASSWORD=false
 ```
 
 O build do frontend é servido pela própria API a partir de `dist/web`. Portanto, em produção, frontend e endpoints `/v1/*` compartilham a porta `5174` e a mesma origem.
@@ -121,7 +125,7 @@ docker compose ps
 docker compose logs -f healthlink
 ```
 
-O serviço `migrate` aguarda o PostgreSQL ficar saudável e aplica as migrations antes de iniciar o `healthlink`. O PostgreSQL e o Redis ficam sem publicação de portas no host; somente `5174` é publicada pelo Compose.
+O serviço `migrate` aguarda o PostgreSQL ficar saudável e aplica as migrations. Em seguida, o serviço `bootstrap` garante o usuário `sysadmin` no tenant `default` de forma idempotente; só altera uma senha existente quando `HEALTHLINK_SYSADMIN_RESET_PASSWORD=true`. Por fim, o `healthlink` inicia. O PostgreSQL e o Redis ficam sem publicação de portas no host; somente `5174` é publicada pelo Compose.
 
 O container está preparado para o fluxo completo de produção: o build executa `typecheck` e `build:web`, o runtime inicia a API Fastify e os arquivos compilados do frontend compartilham a mesma origem. O fallback da SPA é registrado sem duplicar o wildcard do `@fastify/static`, evitando falha de inicialização do Fastify em versões atuais.
 
@@ -185,7 +189,7 @@ Faça backup regular do banco e teste restauração. Não use as credenciais nem
 
 ### Provisionamento recomendado — arquivo único
 
-No `.env` da API, configure `PUBLIC_API_URL` com a URL pública que o servidor da unidade usará. No frontend, cadastre a unidade, um equipamento de tipo **Servidor** e pelo menos uma Starlink, MikroTik ou link de internet ativo. No equipamento servidor, clique em **Gerar agente**, escolha Windows ou Linux e baixe o arquivo.
+No `.env` da API, configure `PUBLIC_APP_URL` com a URL pública que o servidor da unidade usará. `PUBLIC_API_URL` continua aceita como compatibilidade legada, mas `PUBLIC_APP_URL` tem prioridade. No frontend, cadastre a unidade, um equipamento de tipo **Servidor** e pelo menos uma Starlink, MikroTik ou link de internet ativo. No equipamento servidor, clique em **Gerar agente**, escolha Windows ou Linux e baixe o arquivo.
 
 O arquivo já contém o vínculo, as atribuições e um enrollment de uso único válido por 30 minutos. O operador só precisa executá-lo uma vez: Windows como Administrador e Linux como `root`/`sudo`. Não há preenchimento de URL, tenant, equipamento, token ou senha durante a instalação.
 

@@ -9,6 +9,7 @@ import {
   parseAgentCredential,
   parseEnrollmentToken,
   resolveAgentApiUrl,
+  resolveConfiguredPublicUrl,
 } from './provisioning.js';
 
 const tenantId = '11111111-1111-4111-8111-111111111111';
@@ -63,6 +64,9 @@ describe('agent provisioning rules', () => {
   });
 
   it('resolves the public API URL safely and gives each platform a deterministic installer name', () => {
+    expect(resolveConfiguredPublicUrl('https://app.example', 'https://legacy.example')).toBe('https://app.example');
+    expect(resolveConfiguredPublicUrl(undefined, 'https://legacy.example')).toBe('https://legacy.example');
+
     expect(resolveAgentApiUrl({
       configuredUrl: 'https://sentinel.example/api/',
       requestProtocol: 'http',

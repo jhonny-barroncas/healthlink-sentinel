@@ -5,6 +5,15 @@ updated: 2026-08-11
 status: active
 ---
 
+## Atualização 2026-08-21 — bootstrap do sysadmin e domínio canônico
+
+- O Docker Compose agora executa `bootstrap` depois de `migrate` e antes de `healthlink`.
+- `npm run bootstrap:sysadmin` garante o usuário sysadmin do tenant `default` de forma idempotente.
+- A senha do sysadmin permanece somente no `.env`/secret local; não deve ser registrada em notas, código, logs ou commits.
+- `HEALTHLINK_SYSADMIN_RESET_PASSWORD` controla explicitamente uma troca de senha existente; o padrão é não sobrescrever.
+- `PUBLIC_APP_URL` é a URL canônica para os instaladores dos agentes; `PUBLIC_API_URL` continua como fallback legado.
+- Validação: build Docker com typecheck e build web passou; Compose subiu; bootstrap foi executado duas vezes com sucesso; `/health` respondeu 200; asset `maplibre-gl-worker.mjs` respondeu 200.
+
 > Atualização 2026-08-13: módulo Starlink iniciado pela estratégia híbrida, com ingestão normalizada e fontes configuráveis. Consulte [[03-Execucao/Modulo Starlink - Estrategia Hibrida]].
 
 > Atualização 2026-08-15: definido o plano de coleta da unidade móvel: servidor local obrigatório como agente/ponte, Starlink via gRPC local como fonte primária e MikroTik opcional para caminho e interfaces. Consulte [[03-Execucao/Plano de Coleta Starlink e Unidade Movel]].
