@@ -1,6 +1,13 @@
 services:
   healthlink:
-    # O proxy existente do servidor encaminha o domínio para esta porta.
-    # Assim o HealthLink não disputa 80/443 com GLPI ou Uptime Kuma.
+    # O HealthLink termina o HTTPS diretamente na porta pública 3002.
     ports: !override
-      - "127.0.0.1:3003:3002"
+      - "3002:3002"
+    environment:
+      HTTPS: "true"
+      HTTPS_KEY_PATH: /etc/letsencrypt/live/aplicacao.gbringel.com/privkey.pem
+      HTTPS_CERT_PATH: /etc/letsencrypt/live/aplicacao.gbringel.com/fullchain.pem
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.env.NODE_TLS_REJECT_UNAUTHORIZED='0'; fetch('https://127.0.0.1:3002/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
