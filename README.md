@@ -66,7 +66,7 @@ docker compose ps
 Invoke-WebRequest http://localhost:3002/health
 ```
 
-O retorno esperado do health check é `{"status":"ok","service":"healthlink-sentinel"}`. PostgreSQL e Redis permanecem internos ao Compose; somente `3002` é publicada no host. O endereço externo de produção será `https://aplicacao.gbringel.com:3002`. Consulte [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) antes de usar em produção.
+O retorno esperado do health check é `{"status":"ok","service":"healthlink-sentinel"}`. PostgreSQL e Redis permanecem internos ao Compose. No servidor, o override publica o HealthLink somente em `127.0.0.1:3003`; o proxy reverso entrega HTTPS externamente em `https://aplicacao.gbringel.com:3002`. Consulte [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) antes de usar em produção.
 
 Para o procedimento completo de implantação, HTTPS, backup, atualização e instalação do agente nas unidades móveis, consulte o [Manual de implantação em produção](docs/MANUAL-IMPLANTACAO-PRODUCAO.md).
 

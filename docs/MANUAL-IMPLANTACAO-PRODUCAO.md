@@ -10,7 +10,8 @@ O cenário recomendado é:
 Internet
    │ HTTPS
 DNS + proxy reverso
-   │ HTTP interno :3002
+   │ HTTPS público :3002
+   │ HTTP interno :3003
 HealthLink container ─── PostgreSQL
                       └─ Redis
 ```
@@ -51,7 +52,7 @@ cd healthlink-sentinel
 Use uma branch ou tag revisada para produção. Não execute diretamente uma branch de desenvolvimento sem homologação.
 
 Se o servidor já possui GLPI e Uptime Kuma em outras pastas, mantenha cada aplicação em sua própria stack Docker. Para o
-HealthLink, use o override `docker-compose.server.yml`; ele publica a aplicação apenas em `127.0.0.1:3002`, evitando
+HealthLink, use o override `docker-compose.server.yml`; ele publica a aplicação apenas em `127.0.0.1:3003`, evitando
 conflito com as portas públicas do proxy existente:
 
 ```bash
@@ -59,7 +60,7 @@ cd /opt/healthlink-sentinel
 docker compose -f docker-compose.yml -f docker-compose.server.yml up -d --build
 ```
 
-O proxy reverso deve encaminhar o domínio do HealthLink para `http://127.0.0.1:3002`.
+O proxy reverso deve escutar HTTPS na porta externa `3002` e encaminhar o domínio do HealthLink para `http://127.0.0.1:3003`.
 
 ## 4. Criar o ambiente de produção
 
@@ -119,7 +120,7 @@ O serviço `healthlink` deve estar `Up` e o `migrate` deve terminar com código 
 No próprio servidor:
 
 ```bash
-curl -i http://127.0.0.1:3002/health
+curl -i http://127.0.0.1:3003/health
 ```
 
 Resposta esperada:
@@ -142,20 +143,20 @@ https://healthlink.seudominio.com
 
 ## 7. HTTPS e proxy reverso
 
-O Docker entrega a aplicação na porta interna `3002`. Em produção, recomenda-se terminar o TLS em Nginx, Caddy, Traefik ou no proxy corporativo e encaminhar para `127.0.0.1:3002`.
+O Docker entrega a aplicação na porta interna `3002`, publicada pelo override do servidor em `127.0.0.1:3003`. Em produção, o TLS deve terminar no proxy reverso na porta externa `3002`, encaminhando para `127.0.0.1:3003`.
 
 Exemplo conceitual de Nginx:
 
 ```nginx
 server {
-    listen 443 ssl http2;
+    listen 3002 ssl;
     server_name healthlink.seudominio.com;
 
     ssl_certificate     /etc/letsencrypt/live/healthlink.seudominio.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/healthlink.seudominio.com/privkey.pem;
 
     location / {
-        proxy_pass http://127.0.0.1:3002;
+        proxy_pass http://127.0.0.1:3003;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto https;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
