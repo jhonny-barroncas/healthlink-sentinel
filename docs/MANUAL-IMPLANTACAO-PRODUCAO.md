@@ -50,6 +50,17 @@ cd healthlink-sentinel
 
 Use uma branch ou tag revisada para produção. Não execute diretamente uma branch de desenvolvimento sem homologação.
 
+Se o servidor já possui GLPI e Uptime Kuma em outras pastas, mantenha cada aplicação em sua própria stack Docker. Para o
+HealthLink, use o override `docker-compose.server.yml`; ele publica a aplicação apenas em `127.0.0.1:5174`, evitando
+conflito com as portas públicas do proxy existente:
+
+```bash
+cd /opt/healthlink-sentinel
+docker compose -f docker-compose.yml -f docker-compose.server.yml up -d --build
+```
+
+O proxy reverso deve encaminhar o domínio do HealthLink para `http://127.0.0.1:5174`.
+
 ## 4. Criar o ambiente de produção
 
 Copie o modelo e edite o arquivo local:
@@ -161,6 +172,12 @@ PUBLIC_API_URL=https://healthlink.seudominio.com:5174
 Não disponibilize HTTP puro na internet para login, API ou enrollment de agentes.
 
 ## 8. Banco, persistência e backup
+
+Política de retenção do HealthLink: inventário, configurações, vínculos, estado atual e auditoria são permanentes. A
+telemetria detalhada deve ser retida por 30 dias; heartbeats por 7 dias; eventos resolvidos por 90 dias; logs técnicos
+por 30 dias; e diagnósticos Ping/Tracert por 7 dias. Reserve aproximadamente 100 GB para o volume do PostgreSQL,
+incluindo margem de crescimento e backups temporários. A limpeza automática desses dados deve ser validada antes do
+go-live.
 
 O Compose utiliza o volume `postgres_data`. Confirme o volume:
 

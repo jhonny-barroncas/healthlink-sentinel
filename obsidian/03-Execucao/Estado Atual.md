@@ -44,6 +44,8 @@ phase: foundation
 
 # Estado Atual
 
+> Regra de retenção 2026-08-21: o PostgreSQL do HealthLink deve preservar permanentemente inventário, usuários, permissões, unidades, equipamentos, vínculos, configurações, agentes, versões publicadas, estado atual e auditoria. Telemetria detalhada deve ser mantida por 30 dias; heartbeats por 7 dias; eventos resolvidos por 90 dias; logs técnicos por 30 dias; diagnósticos Ping/Tracert por 7 dias. A projeção operacional reserva 100 GB para o volume do PostgreSQL, incluindo margem e backups temporários. A rotina automática de limpeza ainda precisa ser implementada para fazer cumprir esses prazos.
+
 > Atualização 2026-08-21: o Compose passou a executar o serviço `bootstrap` após as migrations e antes da aplicação. Ele garante de forma idempotente o usuário sysadmin do tenant `default` com perfil `tenant_administrator`; a senha fica somente no ambiente local/secret e não é sobrescrita em reinícios, salvo quando `HEALTHLINK_SYSADMIN_RESET_PASSWORD=true`. O domínio canônico passou a ser `PUBLIC_APP_URL`, com fallback compatível para `PUBLIC_API_URL`, e é usado na geração dos instaladores dos agentes.
 
 > Atualização 2026-08-19: o Centro Operacional passou a ter a visão **Agentes** no lugar de VPN. A visão lista as unidades móveis e diferencia agente em execução (heartbeat até 30s), agente parado e unidade sem agente vinculado; a API agrega a fonte `local_agent`, última amostra e versão sem expor segredos.
