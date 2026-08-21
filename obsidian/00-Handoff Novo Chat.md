@@ -84,6 +84,8 @@ Atualização 2026-08-21: o desenvolvimento local agora usa HTTPS ponta a ponta.
 
 Atualização 2026-08-21: o HTTPS direto do Docker foi isolado em `docker-compose.local-https.yml`. O Compose base permanece HTTP interno para não quebrar produção quando o proxy reverso existente termina o TLS e encaminha para o container.
 
+Correção 2026-08-21: o build Docker não depende mais da existência dos certificados locais; o Vite ativa HTTPS somente quando `.certs/localhost*.pem` está presente.
+
 - Projeto: `C:\Users\ADMIN\Documents\Codex\healthlink-sentinel`
 - Backend/API: `C:\Users\ADMIN\Documents\Codex\healthlink-sentinel\apps\api`
 - Frontend: `C:\Users\ADMIN\Documents\Codex\healthlink-sentinel\apps\web`
