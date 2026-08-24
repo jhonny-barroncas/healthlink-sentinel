@@ -63,7 +63,7 @@ export async function listEquipmentStatus(client: PoolClient, tenantId: string, 
 
 export async function listUnitOperationalStatus(client: PoolClient, tenantId: string, mobileOnly = false) {
   const result = await client.query(`
-    SELECT hu.id AS unit_id, hu.code, hu.name, hu.state_code, hu.city, hu.latitude, hu.longitude,
+    SELECT hu.id AS unit_id, hu.code, hu.name, hu.state_code, hu.city, hu.unit_type, hu.latitude, hu.longitude,
       CASE WHEN bool_or(CASE WHEN s.observed_at IS NULL THEN 'unknown' WHEN (COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' AND s.observed_at < now() - interval '30 seconds') OR (COALESCE(s.source_payload->>'source', '') LIKE 'zabbix_%' AND s.observed_at < now() - interval '90 seconds') THEN 'unknown' ELSE COALESCE(s.operational_status, 'unknown') END = 'offline') THEN 'offline'
            WHEN bool_or(CASE WHEN s.observed_at IS NULL THEN 'unknown' WHEN (COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' AND s.observed_at < now() - interval '30 seconds') OR (COALESCE(s.source_payload->>'source', '') LIKE 'zabbix_%' AND s.observed_at < now() - interval '90 seconds') THEN 'unknown' ELSE COALESCE(s.operational_status, 'unknown') END = 'degraded') THEN 'degraded'
            WHEN bool_and(CASE WHEN s.observed_at IS NULL THEN 'unknown' WHEN (COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' AND s.observed_at < now() - interval '30 seconds') OR (COALESCE(s.source_payload->>'source', '') LIKE 'zabbix_%' AND s.observed_at < now() - interval '90 seconds') THEN 'unknown' ELSE COALESCE(s.operational_status, 'unknown') END = 'online') THEN 'online'
