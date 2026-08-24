@@ -165,3 +165,6 @@ Os itens abaixo descrevem o ponto de partida histórico e não representam o est
 - Homologar instalação como serviço Windows e como `systemd` no Linux, incluindo reinício automático após atualização.
 - Testar aviso de requisito ausente, download, vínculo, heartbeat online/offline e publicação da versão `1.0.0` no catálogo Zabbix.
 - Antes de considerar concluído, executar `npm.cmd run typecheck`, `npm.cmd run build:web` e validar o cenário dentro do Docker.
+Atualização 2026-08-24: filtros da tela principal ampliados com tipo de unidade (fixa/móvel), situação e UF. O bloco usa o padrão visual dark/glass existente, possui botão de limpeza e quebra responsiva; typecheck e build web aprovados.
+
+Atualização 2026-08-24: implementada a tela Relatórios de incidentes com filtros operacionais, resumo de indicadores, tabela auditável, atualização manual e impressão. A lógica foi coberta por `apps/web/src/incident-reports.test.ts`; suíte completa, typecheck e build web aprovados.

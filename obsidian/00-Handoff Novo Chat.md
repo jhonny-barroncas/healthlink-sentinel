@@ -7,6 +7,10 @@ status: active
 
 ## Atualização 2026-08-24 — revisão visual, repositório do agente e padronização do frontend
 
+Atualização 2026-08-24: a Visão geral recebeu filtros operacionais adicionais para tipo de unidade (fixa/móvel), situação e UF. O recorte selecionado agora alimenta indicadores, mapa e visão operacional, com controles responsivos para tablet e celular.
+
+Atualização 2026-08-24: a navegação Relatórios agora abre o relatório operacional de incidentes, com filtros por período, situação, severidade e unidade; indicadores de total, abertos, reconhecidos, resolvidos, críticos e tempo médio; tabela auditável e impressão. Usa alertas ativos/resolvidos reais já carregados pela aplicação.
+
 - Redesenhado o painel **Repositório do Agente** com estética NET-OPS mission-critical: seletor de sistema estilizado, custom file picker elegante (eliminando o botão nativo feio do browser), botão de publicação proporcional com estado desabilitado inteligente, e cartões de pacotes estruturados com tags monospace de versão (`v1.0.0`), tamanho em KB e hash SHA-256.
 - Adotada a família tipográfica **Inter** (Google Fonts) integrada com fallback sans-serif e antialiasing/otimização de renderização no `body`.
 - Expandido o sistema de tokens CSS no `:root` de `apps/web/src/styles.css` com escala estruturada de `border-radius` (`--radius-xs` a `--radius-full`), superfícies (`--surface-1` a `--surface-3`), transições e z-index padronizados.
