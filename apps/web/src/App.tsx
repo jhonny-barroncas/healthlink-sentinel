@@ -308,16 +308,16 @@ export function App() {
       <aside className="sidebar" style={lockedStyle}>
         <div className="brand"><img className="brand-mark" src={brandIcon} alt="HealthLink Sentinel" width={38} height={38} /><div><strong>HealthLink</strong><small>SENTINEL</small></div></div>
         <nav>
-          <button className={`nav-item ${view === 'command' ? 'active' : ''}`} onClick={() => { setView('command'); setSelectedUnitId(null); setCommandMenuOpen((open) => !open); }}><span className="nav-icon"><NavDashboardIcon /></span> Visão geral <b className="nav-chevron">{commandMenuOpen && view === 'command' ? '−' : '+'}</b></button>
+          <button title="Visão geral" className={`nav-item ${view === 'command' ? 'active' : ''}`} onClick={() => { setView('command'); setSelectedUnitId(null); setCommandMenuOpen((open) => !open); }}><span className="nav-icon"><NavDashboardIcon /></span><span className="nav-label">Visão geral</span><b className="nav-chevron">{commandMenuOpen && view === 'command' ? '−' : '+'}</b></button>
           {commandMenuOpen && view === 'command' && <div className="nav-submenu" aria-label="Filtros do centro operacional">
             {([['all', 'Geral', <NavGeneralIcon />], ['links', 'Links', <NavLinkIcon />], ['agents', 'Agentes', <NavVpnIcon />], ['servers', 'Servidores', <NavServerIcon />]] as const).map(([scope, label, icon]) => <button key={scope} className={`nav-subitem ${commandScope === scope ? 'active' : ''}`} onClick={() => { setCommandScope(scope); setSelectedUnitId(null); }}><span className="nav-subitem-icon">{icon}</span>{label}</button>)}
           </div>}
-          {!(session.tenant.roles ?? []).includes('mobile_unit_supervisor') && <button className={`nav-item ${view === 'fixed-units' ? 'active' : ''}`} onClick={() => { setView('fixed-units'); setSelectedUnitId(null); }}><span className="nav-icon"><NavServerIcon /></span> Unidades</button>}
-          <button className={`nav-item ${view === 'mobile-units' ? 'active' : ''}`} onClick={() => { setView('mobile-units'); setSelectedUnitId(null); }}><span className="nav-icon"><NavTruckIcon /></span> Unidades móveis</button>
-          <button className={`nav-item ${view === 'alerts' ? 'active' : ''}`} onClick={() => { setView('alerts'); setSelectedUnitId(null); }}><span className="nav-icon"><NavBellIcon /></span> Alertas {activeAlertCount > 0 && <b className="nav-badge">{activeAlertCount}</b>}</button>
-          <button className={`nav-item ${view === 'connections' ? 'active' : ''}`} onClick={() => { setView('connections'); setSelectedUnitId(null); void loadZabbixStatus(); }}><span className="nav-icon"><NavActivityIcon /></span> Status das conexões <i className={`nav-health-dot ${zabbixStatus?.health_status ?? 'unknown'}`} /></button>
-          <button className={`nav-item ${view === 'users' ? 'active' : ''}`} onClick={() => { setView('users'); setSelectedUnitId(null); void loadUsers(); }}><span className="nav-icon"><NavUsersIcon /></span> Usuários</button>
-          <button className="nav-item"><span className="nav-icon"><NavReportIcon /></span> Relatórios</button>
+          {!(session.tenant.roles ?? []).includes('mobile_unit_supervisor') && <button title="Unidades" className={`nav-item ${view === 'fixed-units' ? 'active' : ''}`} onClick={() => { setView('fixed-units'); setSelectedUnitId(null); }}><span className="nav-icon"><NavServerIcon /></span><span className="nav-label">Unidades</span></button>}
+          <button title="Unidades móveis" className={`nav-item ${view === 'mobile-units' ? 'active' : ''}`} onClick={() => { setView('mobile-units'); setSelectedUnitId(null); }}><span className="nav-icon"><NavTruckIcon /></span><span className="nav-label">Unidades móveis</span></button>
+          <button title="Alertas" className={`nav-item ${view === 'alerts' ? 'active' : ''}`} onClick={() => { setView('alerts'); setSelectedUnitId(null); }}><span className="nav-icon"><NavBellIcon /></span><span className="nav-label">Alertas</span>{activeAlertCount > 0 && <b className="nav-badge">{activeAlertCount}</b>}</button>
+          <button title="Status das conexões" className={`nav-item ${view === 'connections' ? 'active' : ''}`} onClick={() => { setView('connections'); setSelectedUnitId(null); void loadZabbixStatus(); }}><span className="nav-icon"><NavActivityIcon /></span><span className="nav-label">Status das conexões</span><i className={`nav-health-dot ${zabbixStatus?.health_status ?? 'unknown'}`} /></button>
+          <button title="Usuários" className={`nav-item ${view === 'users' ? 'active' : ''}`} onClick={() => { setView('users'); setSelectedUnitId(null); void loadUsers(); }}><span className="nav-icon"><NavUsersIcon /></span><span className="nav-label">Usuários</span></button>
+          <button title="Relatórios" className="nav-item"><span className="nav-icon"><NavReportIcon /></span><span className="nav-label">Relatórios</span></button>
         </nav>
         <SyncStatusButton status={zabbixStatus} onClick={() => { setView('zabbix'); setSelectedUnitId(null); void Promise.all([loadZabbixStatus(), loadZabbixCandidates()]); }} />
         <div className={`sidebar-footer integration-${zabbixStatus?.health_status ?? 'unknown'}`}><span className="pulse" /> {zabbixStatus?.health_status === 'healthy' ? 'Zabbix sincronizado' : zabbixStatus?.health_status === 'unavailable' ? 'Zabbix indisponível' : zabbixStatus?.health_status === 'degraded' ? 'Zabbix em atenção' : 'Zabbix aguardando coleta'}<small>{zabbixStatus?.last_success_at ? `última coleta · ${new Date(zabbixStatus.last_success_at).toLocaleTimeString('pt-BR')}` : 'ciclo automático · 60s'}</small></div>
@@ -1278,7 +1278,88 @@ function AgentVersionsPanel({ token, onToast }: { token: string; onToast: (toast
     } catch (reason) { onToast({ type: 'error', title: 'Falha ao publicar agente', detail: reason instanceof Error ? reason.message : 'Não foi possível enviar o arquivo.' }); }
     finally { setBusy(false); }
   }
-  return <article className="agent-versions-panel"><div className="panel-title"><div><p className="eyebrow">REPOSITÓRIO DO AGENTE</p><h3>Versões Windows e Linux</h3><small>Publique um bundle `.cjs`; a API calcula a próxima versão, embute a numeração no arquivo e valida o checksum.</small></div><strong>{loaded ? `${versions.length} arquivo(s)` : '…'}</strong></div><div className="agent-version-form"><label>Sistema<select value={platform} onChange={(event) => setPlatform(event.target.value as AgentPlatform)}><option value="windows">Windows</option><option value="linux">Linux</option></select></label><label>Bundle `.cjs` do agente<input type="file" accept=".cjs,application/javascript" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label><button className="primary compact" disabled={busy} onClick={() => void publish()}>{busy ? 'Enviando…' : 'Publicar próxima versão'}</button></div><div className="agent-version-list">{versions.length === 0 ? <small>Nenhuma versão publicada ainda. A primeira versão será 1.0.0.</small> : versions.map((item) => <div key={item.id}><span className={`legend-dot ${item.active ? 'online' : 'unknown'}`} /><strong>{item.platform === 'windows' ? 'Windows' : 'Linux'} · v{item.version}</strong><small>{item.file_name} · {Math.round(item.file_size / 1024)} KB · SHA-256 {item.checksum_sha256.slice(0, 12)}…</small></div>)}</div></article>;
+  return (
+    <article className="agent-versions-panel">
+      <div className="agent-versions-header">
+        <div className="agent-versions-info">
+          <p className="eyebrow">REPOSITÓRIO DO AGENTE</p>
+          <h3>Versões Windows e Linux</h3>
+          <small>Publique um bundle <code>.cjs</code>; a API calcula a versão automaticamente, embute a numeração e valida o checksum SHA-256.</small>
+        </div>
+        <div className="agent-versions-badge">
+          <span className="badge-count-icon">📦</span>
+          <span>{loaded ? `${versions.length} pacote(s)` : '…'}</span>
+        </div>
+      </div>
+
+      <div className="agent-version-form-card">
+        <div className="agent-form-field">
+          <label className="field-label">Sistema Operacional</label>
+          <select className="agent-select" value={platform} onChange={(event) => setPlatform(event.target.value as AgentPlatform)}>
+            <option value="windows">🪟 Windows (x64)</option>
+            <option value="linux">🐧 Linux (x64 / ARM)</option>
+          </select>
+        </div>
+
+        <div className="agent-form-field file-field">
+          <label className="field-label">Bundle <code>.cjs</code> do Agente</label>
+          <div className="agent-file-picker">
+            <input
+              type="file"
+              id="agent-bundle-file"
+              accept=".cjs,application/javascript"
+              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            />
+            <label htmlFor="agent-bundle-file" className="agent-file-label">
+              <span className="file-icon">📁</span>
+              <span className="file-name-text">{file ? file.name : 'Selecionar bundle .cjs…'}</span>
+              <span className="file-browse-btn">Procurar</span>
+            </label>
+          </div>
+        </div>
+
+        <div className="agent-form-action">
+          <button className="primary" disabled={busy || !file} onClick={() => void publish()}>
+            {busy ? 'Validando e publicando…' : 'Publicar versão'}
+          </button>
+        </div>
+      </div>
+
+      <div className="agent-version-list-section">
+        <div className="agent-list-heading">
+          <h4>Versões Disponíveis</h4>
+          <span className="subtext">Sincronizadas com agentes locais</span>
+        </div>
+        <div className="agent-version-list">
+          {versions.length === 0 ? (
+            <div className="agent-version-empty">
+              <span>🚀</span>
+              <p>Nenhuma versão publicada ainda. A primeira versão será <strong>v1.0.0</strong>.</p>
+            </div>
+          ) : (
+            versions.map((item) => (
+              <div className="agent-version-card" key={item.id}>
+                <div className="agent-version-main">
+                  <span className={`legend-dot ${item.active ? 'online' : 'unknown'}`} />
+                  <div className="agent-version-title-group">
+                    <strong>{item.platform === 'windows' ? 'Windows' : 'Linux'}</strong>
+                    <span className="version-tag">v{item.version}</span>
+                  </div>
+                </div>
+                <div className="agent-version-meta">
+                  <span className="file-name">{item.file_name}</span>
+                  <span className="file-size">{Math.round(item.file_size / 1024)} KB</span>
+                  <span className="file-hash" title={item.checksum_sha256}>
+                    SHA-256: <code>{item.checksum_sha256.slice(0, 10)}…</code>
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </article>
+  );
 }
 
 function UnitDetail({ unit, equipment, onBack, onEdit, onRefresh, onToast = () => undefined }: { unit: Unit; equipment: Equipment[]; onBack: () => void; onEdit: (equipment: Equipment) => void; onRefresh: () => Promise<void>; onToast?: (toast: Omit<Toast, 'id'>) => void }) {
@@ -1795,162 +1876,6 @@ function LoginWithRequest({ onSuccess, showLogoutToast = false }: { onSuccess: (
     } catch (reason) { setError(reason instanceof Error ? friendlyApiMessage(reason.message, 'Falha de autenticação. Tente novamente.') : 'Falha de autenticação. Tente novamente.'); }
   }
   return <div className="login-page"><section className="login-context"><div className="brand large"><img className="brand-mark" src={brandIcon} alt="HealthLink Sentinel" width={46} height={46} /><div><strong>HealthLink</strong><small>SENTINEL</small></div></div><div className="context-copy"><p className="eyebrow">PLATAFORMA DE MISSÃO CRÍTICA</p><h1>Visibilidade para proteger cada unidade em campo.</h1><p>Monitoramento contínuo de conectividade, infraestrutura e disponibilidade operacional.</p></div></section><section className="login-panel"><form onSubmit={submit} noValidate><p className="eyebrow">ACESSO RESTRITO</p><h2>Entrar no centro de comando</h2><p className="muted">Utilize sua identidade corporativa.</p><label>E-mail corporativo<input type="email" maxLength={254} value={email} className={emailMissing ? 'field-invalid' : ''} onChange={(event) => setEmail(event.target.value)} autoFocus />{emailMissing && <span className="field-error-text">Informe o e-mail.</span>}</label><label>Senha<div className="password-field"><input type={showPassword ? 'text' : 'password'} maxLength={200} value={password} className={passwordMissing ? 'field-invalid' : ''} onChange={(event) => setPassword(event.target.value)} /><button type="button" className="password-toggle" onClick={() => setShowPassword((prev) => !prev)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOffIcon /> : <EyeIcon />}</button></div>{passwordMissing && <span className="field-error-text">A senha deve ter de 8 a 200 caracteres.</span>}</label>{error && <div className="error-banner" role="alert"><span className="error-banner-icon"><WarningIcon /></span><span className="error-banner-text">{error}</span></div>}<button className="primary">Acessar plataforma</button><button type="button" className="request-access-link" onClick={() => setRequestOpen(true)}>Criar conta <span>(sujeito a aprovação)</span></button></form></section>{requestOpen && <RequestAccessModal onClose={() => setRequestOpen(false)} onToast={addToast} />}<ToastStack toasts={toasts} /></div>;
-}
-
-function EyeIcon() {
-  return <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z" /><circle cx="12" cy="12" r="3" /></svg>;
-}
-
-function EyeOffIcon() {
-  return <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3l18 18" /><path d="M10.6 5.1A10.9 10.9 0 0 1 12 5c7 0 10.5 7 10.5 7a13.7 13.7 0 0 1-3.1 4.1M6.6 6.6C3.7 8.4 1.5 12 1.5 12s3.5 7 10.5 7a10.6 10.6 0 0 0 4.4-.9" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" /></svg>;
-}
-
-function UserIcon() {
-  return <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="3.6" /><path d="M4.5 20c1.3-3.8 4.3-5.8 7.5-5.8s6.2 2 7.5 5.8" /></svg>;
-}
-
-function ChevronIcon({ up }: { up: boolean }) {
-  return <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: up ? 'rotate(180deg)' : 'none', transition: 'transform .15s ease' }}><path d="M6 9l6 6 6-6" /></svg>;
-}
-
-function EditIcon() {
-  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3Z" /><path d="M14 6.5l3 3" /></svg>;
-}
-
-function LogoutIcon() {
-  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M15 4h3.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H15" /><path d="M4 12h11.5" /><path d="M12 8.5L15.5 12 12 15.5" /></svg>;
-}
-
-function CloseIcon() {
-  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 5l14 14M19 5L5 19" /></svg>;
-}
-
-function BlockIcon() {
-  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="8.5" /><path d="M6.4 6.4l11.2 11.2" /></svg>;
-}
-
-function UnblockIcon() {
-  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="8.5" /><path d="M8.5 12.3l2.3 2.3 4.7-4.9" /></svg>;
-}
-
-function RejectIcon() {
-  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="8.5" /><path d="M8.5 12h7" /></svg>;
-}
-
-function CheckIcon() {
-  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7" /></svg>;
-}
-
-function EyeCheckIcon() {
-  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" /><circle cx="12" cy="12" r="2.6" /></svg>;
-}
-
-function ResolveIcon() {
-  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="8.5" /><path d="M8.3 12.4l2.6 2.6 5-5.2" /></svg>;
-}
-
-function NavDashboardIcon() {
-  return <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3.5" y="3.5" width="7.5" height="7.5" rx="1.4" /><rect x="13" y="3.5" width="7.5" height="4.5" rx="1.4" /><rect x="13" y="10.5" width="7.5" height="10" rx="1.4" /><rect x="3.5" y="13.5" width="7.5" height="7" rx="1.4" /></svg>;
-}
-
-function NavTruckIcon() {
-  return <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="6.5" width="11" height="9" rx="1.2" /><path d="M13.5 10h4l3 3v2.5h-7z" /><circle cx="7" cy="17.5" r="1.7" /><circle cx="17" cy="17.5" r="1.7" /></svg>;
-}
-
-function NavBellIcon() {
-  return <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 10.5a6 6 0 0 1 12 0c0 4 1.5 5.5 1.5 5.5h-15S6 14.5 6 10.5z" /><path d="M10 19a2.2 2.2 0 0 0 4 0" /></svg>;
-}
-
-function NavActivityIcon() {
-  return <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12.5h4l2.2-7 4 15 2.2-8H21" /></svg>;
-}
-
-function NavUsersIcon() {
-  return <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="8" r="3.2" /><path d="M2.8 19.5c.8-3.4 3.2-5.3 6.2-5.3s5.4 1.9 6.2 5.3" /><circle cx="17.5" cy="8.8" r="2.5" /><path d="M15.8 14.6c2.4.2 4.2 1.9 4.9 4.9" /></svg>;
-}
-
-function NavReportIcon() {
-  return <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h9l4 4v14H6z" /><path d="M15 3v4h4" /><path d="M9 13v4M12.5 11v6M16 15v2" /></svg>;
-}
-
-function SyncIcon() {
-  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7.5h9.5a4.5 4.5 0 0 1 4.5 4.5v1" /><path d="M11 4l3.5 3.5L11 11" /><path d="M20 16.5h-9.5A4.5 4.5 0 0 1 6 12v-1" /><path d="M13 20l-3.5-3.5L13 13" /></svg>;
-}
-
-function SunIcon() {
-  return <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4.2" /><path d="M12 2.5v2.4M12 19.1v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7" /></svg>;
-}
-
-function SearchIcon() {
-  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4.3-4.3" /></svg>;
-}
-
-function HomeIcon() {
-  return <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11.5L12 4l8 7.5" /><path d="M6 10v9h12v-9" /><path d="M10 19v-5.5h4V19" /></svg>;
-}
-
-function BreadcrumbChevronIcon() {
-  return <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5l7 7-7 7" /></svg>;
-}
-
-function NavGeneralIcon() {
-  return <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="8.5" /><path d="M12 3.5c2.6 2.4 4 5.3 4 8.5s-1.4 6.1-4 8.5c-2.6-2.4-4-5.3-4-8.5s1.4-6.1 4-8.5z" /><path d="M3.8 9h16.4M3.8 15h16.4" /></svg>;
-}
-
-function NavLinkIcon() {
-  return <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 14.5l5-5" /><path d="M11 7.5l1.3-1.3a3.5 3.5 0 0 1 5 5L16 12.5" /><path d="M13 16.5l-1.3 1.3a3.5 3.5 0 0 1-5-5L8 11.5" /></svg>;
-}
-
-function NavVpnIcon() {
-  return <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l7 3v5.5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" /><path d="M9 12l2.2 2.2L15.5 9.5" /></svg>;
-}
-
-function NavServerIcon() {
-  return <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3.5" y="4" width="17" height="6.5" rx="1.4" /><rect x="3.5" y="13.5" width="17" height="6.5" rx="1.4" /><path d="M7 7.2h.01M7 16.7h.01" /></svg>;
-}
-
-function ClipboardIcon() {
-  return <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4.5" width="12" height="16" rx="2" /><rect x="9" y="3" width="6" height="3" rx="1" /><path d="M9 11h6M9 14.5h6M9 18h3.5" /></svg>;
-}
-
-function MoonIcon() {
-  return <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" stroke="none"><path d="M20.7 14.7A8.6 8.6 0 019.3 3.3a.7.7 0 00-.9-.9A10 10 0 1021.6 15.6a.7.7 0 00-.9-.9z" /></svg>;
-}
-
-function WarningIcon() {
-  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3.5l9.5 16.5H2.5z" /><path d="M12 9.5v4.5" /><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none" /></svg>;
-}
-
-function ErrorIcon() {
-  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M9 9l6 6M15 9l-6 6" /></svg>;
-}
-
-function InfoIcon() {
-  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 11v5.5" /><circle cx="12" cy="7.7" r="0.9" fill="currentColor" stroke="none" /></svg>;
-}
-
-function PingIcon() {
-  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="2.1" fill="currentColor" stroke="none" /><path d="M8.3 8.3a5.2 5.2 0 0 1 7.4 0" /><path d="M5.4 5.4a9.3 9.3 0 0 1 13.2 0" /></svg>;
-}
-
-function TracertIcon() {
-  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="6" r="1.8" /><circle cx="19" cy="18" r="1.8" /><path d="M5 8v3a4 4 0 0 0 4 4h6a4 4 0 0 1 4 4" /></svg>;
-}
-
-function TrashIcon() {
-  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16" /><path d="M9 7V4.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1V7" /><path d="M6 7l1 12.5a1.5 1.5 0 0 0 1.5 1.5h7a1.5 1.5 0 0 0 1.5-1.5L18 7" /><path d="M10 11v6" /><path d="M14 11v6" /></svg>;
-}
-
-function PlusIcon() {
-  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>;
-}
-
-function RefreshIcon() {
-  return <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 12a8.5 8.5 0 0 1 14.5-6" /><path d="M20.5 12a8.5 8.5 0 0 1-14.5 6" /><path d="M18 3v3.5h-3.5" /><path d="M6 21v-3.5h3.5" /></svg>;
-}
-
-function ClearFilterIcon() {
-  return <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 5h17" /><path d="M6.5 10.5h11" /><path d="M9.5 16h5" /><path d="M15.5 15l5 5M20.5 15l-5 5" /></svg>;
 }
 
 function RequestAccessModal({ onClose, onToast }: { onClose: () => void; onToast: (toast: Omit<Toast, 'id'>) => void }) {

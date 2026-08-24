@@ -44,6 +44,8 @@ phase: foundation
 
 # Estado Atual
 
+> Atualização 2026-08-24: a barra lateral desktop passou a ficar compacta por padrão, exibindo apenas ícones, e expande como sobreposição ao receber hover ou foco de teclado. A gestão de usuários também passou a empilhar formulário e lista em larguras de tablet e reorganizar filtros/ações em telas móveis.
+
 > Atualização 2026-08-24: unidades agora possuem tipo estruturado (`mobile` ou `fixed`) pela migration `012_unit_types.sql`. A navegação separa **Unidades** e **Unidades móveis**; o perfil `mobile_unit_supervisor` recebe somente dados móveis também no backend, enquanto infraestrutura/administradores mantêm visão das duas categorias.
 
 > Atualização 2026-08-21: o ambiente de desenvolvimento local foi colocado em HTTPS ponta a ponta. A API Fastify usa `HTTPS=true` com certificado em `.certs/localhost*.pem`, e o Vite usa o mesmo par em `https://localhost:5173`; a API local fica em `https://localhost:3002`. Os certificados são gerados sob demanda por `npm.cmd run dev:cert` e não são versionados.

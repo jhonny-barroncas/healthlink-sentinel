@@ -5,13 +5,14 @@ updated: 2026-08-11
 status: active
 ---
 
-## Atualização 2026-08-24 — revisão visual e padronização do frontend
+## Atualização 2026-08-24 — revisão visual, repositório do agente e padronização do frontend
 
+- Redesenhado o painel **Repositório do Agente** com estética NET-OPS mission-critical: seletor de sistema estilizado, custom file picker elegante (eliminando o botão nativo feio do browser), botão de publicação proporcional com estado desabilitado inteligente, e cartões de pacotes estruturados com tags monospace de versão (`v1.0.0`), tamanho em KB e hash SHA-256.
 - Adotada a família tipográfica **Inter** (Google Fonts) integrada com fallback sans-serif e antialiasing/otimização de renderização no `body`.
 - Expandido o sistema de tokens CSS no `:root` de `apps/web/src/styles.css` com escala estruturada de `border-radius` (`--radius-xs` a `--radius-full`), superfícies (`--surface-1` a `--surface-3`), transições e z-index padronizados.
 - Consolidada a base visual dos botões (`.primary`, `.secondary-button`, `.danger-button`, `.warning-button`, `.positive-button`, `.icon-button`) com elevação uniforme, gradientes refinados e feedback `:focus-visible` em anel ciano para acessibilidade por teclado.
 - Removido markup morto de tema em `App.tsx` e classes de `display: none` em `styles.css`.
-- Validação: `npm.cmd run typecheck` e `npm.cmd run build:web` aprovados com sucesso.
+- Validação: `npm.cmd run typecheck` e `npm.cmd run build:web` aprovados; assets em `dist/web` atualizados para o Docker container.
 
 ## Atualização 2026-08-21 — bootstrap do sysadmin e domínio canônico
 
@@ -71,6 +72,8 @@ status: active
 > Atualização 2026-08-13: corrigido o ranking de itens SNMP para hosts FortiGate com múltiplas interfaces. O `FW-LAV-IRANDUBA` foi validado usando `wan1 (LINK-ICOM-100Mb)`. Consulte [[03-Execucao/Correcao Telemetria SNMP FortiGate]].
 
 # Handoff de contexto — HealthLink Sentinel
+
+Atualização 2026-08-24: navegação lateral desktop recolhível por hover/foco implementada sem deslocar o conteúdo; responsividade da gestão de usuários ajustada para tablet e celular. Testes dedicados: `sidebar-collapse.test.ts` e `users-responsive-layout.test.ts`.
 
 Atualização 2026-08-24: a navegação foi renomeada para **Visão geral** e separada em **Unidades** e **Unidades móveis**. A classificação é persistida em `health_units.unit_type`; unidades legadas recebem `mobile`. O perfil `mobile_unit_supervisor` é filtrado no backend para unidades móveis.
 
