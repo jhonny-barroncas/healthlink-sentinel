@@ -23,7 +23,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      test: ["CMD", "node", "-e", "const secure = process.env.HTTPS === 'true'; const client = secure ? require('https') : require('http'); const request = client.get((secure ? 'https' : 'http') + '://127.0.0.1:3002/health', secure ? { rejectUnauthorized: false } : {}, response => process.exit(response.statusCode === 200 ? 0 : 1)); request.on('error', () => process.exit(1));"]
       interval: 30s
       timeout: 5s
       retries: 5

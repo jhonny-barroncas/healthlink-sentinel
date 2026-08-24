@@ -82,6 +82,8 @@ Use esta nota como ponto de entrada ao migrar para outro chat do Codex. O projet
 
 Atualização 2026-08-21: o desenvolvimento local agora usa HTTPS ponta a ponta. `npm.cmd run dev` atende a API em `https://localhost:3002` e `npm.cmd run dev:web` atende o Vite em `https://localhost:5173`; os certificados são gerados em `.certs/` por `npm.cmd run dev:cert` e permanecem fora do Git. O certificado é autoassinado, então o navegador precisa aceitá-lo uma vez.
 
+Atualização 2026-08-24: o versionamento do agente passou a ser automático. A publicação calcula o próximo patch por tenant (`1.0.0` → `1.0.1`), embute a versão no bundle baixável, valida o marcador e recalcula o SHA-256. O bundle responde `node healthlink-agent-<versao>.cjs --version`.
+
 Atualização 2026-08-21: o HTTPS direto do Docker foi isolado em `docker-compose.local-https.yml`. O Compose base permanece HTTP interno para não quebrar produção quando o proxy reverso existente termina o TLS e encaminha para o container.
 
 Correção 2026-08-21: o build Docker não depende mais da existência dos certificados locais; o Vite ativa HTTPS somente quando `.certs/localhost*.pem` está presente.
@@ -202,6 +204,8 @@ Próxima tarefa: homologar o instalador `1.0.0` em um servidor Windows e um Linu
 Manual operacional de produção: `docs/MANUAL-IMPLANTACAO-PRODUCAO.md`, com Docker Compose, HTTPS, backup, migrations, geração do agente e troubleshooting.
 
 Atualização 2026-08-21: a aplicação HealthLink foi padronizada para escutar na porta TCP `3002` no container e no override do servidor. O healthcheck, Dockerfile, exemplos de ambiente e manuais foram alinhados; GLPI permanece em `8090` e Uptime Kuma em `3001`. O serviço de retenção do PostgreSQL executa a limpeza periódica definida em `scripts/postgres-retention.sql`.
+
+Correção 2026-08-24: o healthcheck do Compose passou a detectar automaticamente se a API local está em HTTP ou HTTPS, respeitando `HTTPS=true` do ambiente local. Isso evita o container ficar como `unhealthy` quando a API usa certificado local.
 
 ## Documentação relacionada
 
