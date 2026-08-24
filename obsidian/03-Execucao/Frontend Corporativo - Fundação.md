@@ -49,7 +49,17 @@ O frontend escuta em todas as interfaces. Abrir `http://localhost:5173` localmen
 
 - No modo compacto, rótulos e metadados ocultos deixam de participar do cálculo de largura, evitando que os ícones sejam empurrados ou cortados.
 - No modo expandido por hover/foco, a barra lateral usa uma camada superior à topbar para que logo, navegação e rodapé não sejam recortados pelo conteúdo principal.
+- O clique do mouse não mantém mais a lateral aberta por `focus-within`: a interação por ponteiro remove o foco residual do botão, enquanto o teclado preserva a expansão acessível.
+- As regras essenciais da lateral não dependem de `:has()`, reduzindo o risco de incompatibilidade no navegador de produção.
 - A regressão é coberta por `apps/web/src/sidebar-collapse.test.ts`.
+
+## Saída após sessão expirada — 2026-08-24
+
+- O aviso de sessão expirada mantém o painel bloqueado até a interação do operador.
+- Qualquer clique/toque na tela retorna ao login; Enter, Espaço e Esc são capturados globalmente e oferecem o mesmo fluxo por teclado.
+- A camada de saída fica acima dos popovers do sistema, inclusive do menu de usuário.
+- Somente a chave `healthlink.session` é removida do armazenamento da sessão.
+- A regressão é coberta por `apps/web/src/session-expiry.test.ts`.
 
 ## Próximo passo
 

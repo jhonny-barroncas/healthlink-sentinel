@@ -73,6 +73,10 @@ status: active
 
 # Handoff de contexto — HealthLink Sentinel
 
+Correção 2026-08-24: clicar em uma opção da barra lateral não mantém mais o menu expandido depois que o ponteiro sai. Interações por ponteiro removem o foco residual do botão; a navegação por teclado continua usando `focus-within`, sem depender de `:has()` nas regras essenciais.
+
+Atualização 2026-08-24: ao receber `401`, a tela de sessão expirada passa a funcionar como uma camada de saída acima dos demais popovers. Qualquer toque/clique, além de Enter, Espaço ou Esc capturados globalmente, remove a sessão local e retorna ao login.
+
 Atualização 2026-08-24: corrigida a regressão visual da barra lateral recolhível. Elementos transparentes não reservam mais largura no modo compacto, mantendo ícones centralizados, e a lateral expandida fica acima do cabeçalho/conteúdo sem cortes por camadas concorrentes.
 
 Atualização 2026-08-24: navegação lateral desktop recolhível por hover/foco implementada sem deslocar o conteúdo; responsividade da gestão de usuários ajustada para tablet e celular. Testes dedicados: `sidebar-collapse.test.ts` e `users-responsive-layout.test.ts`.

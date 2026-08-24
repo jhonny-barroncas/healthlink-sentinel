@@ -81,6 +81,7 @@ body {
 }
 button, input { font: inherit; }
 button { cursor: pointer; }
+.session-expired-exit-layer { position: fixed; inset: 0; z-index: 100000; cursor: pointer; }
 /* Focus visível acessível — anel ciano para navegação por teclado */
 :focus-visible {
   outline: 2px solid rgba(53, 211, 208, .65);

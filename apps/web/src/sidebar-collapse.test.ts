@@ -10,6 +10,8 @@ describe('collapsible desktop sidebar', () => {
     expect(styles).toMatch(/\.app-shell\s*\{[^}]*grid-template-columns:\s*76px 1fr;/s);
     expect(styles).toMatch(/\.sidebar\s*\{[^}]*z-index:\s*200;[^}]*width:\s*76px;[^}]*transition:\s*width/s);
     expect(styles).toMatch(/\.sidebar:is\(:hover,\s*:focus-within\)\s*\{[^}]*width:\s*250px;/s);
+    expect(styles).not.toMatch(/\.sidebar:(?:is|not)\([^}]*:has\(/);
+    expect(appSource).toContain("onPointerUp={(event) => { const button = (event.target as HTMLElement).closest('button'); button?.blur(); }}");
   });
 
   it('uses dedicated labels that can be hidden while compact', () => {

@@ -118,6 +118,21 @@ export function App() {
   function dismissToast(id: string) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }
+  function exitExpiredSession() {
+    sessionStorage.removeItem('healthlink.session');
+    setJustLoggedOut(false);
+    setSessionExpired(false);
+    setToasts((prev) => prev.filter((toast) => toast.id !== SESSION_EXPIRED_TOAST_ID));
+    setSession(null);
+  }
+  useEffect(() => {
+    if (!sessionExpired) return;
+    const exitOnKeyboard = (event: KeyboardEvent) => {
+      if (['Enter', ' ', 'Escape'].includes(event.key)) exitExpiredSession();
+    };
+    window.addEventListener('keydown', exitOnKeyboard);
+    return () => window.removeEventListener('keydown', exitOnKeyboard);
+  }, [sessionExpired]);
 
   async function loadAlerts(mode: 'active' | 'history') {
     if (!session) return;
@@ -306,7 +321,7 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar" style={lockedStyle}>
+      <aside className="sidebar" style={lockedStyle} onPointerUp={(event) => { const button = (event.target as HTMLElement).closest('button'); button?.blur(); }}>
         <div className="brand"><img className="brand-mark" src={brandIcon} alt="HealthLink Sentinel" width={38} height={38} /><div><strong>HealthLink</strong><small>SENTINEL</small></div></div>
         <nav>
           <button title="Visão geral" className={`nav-item ${view === 'command' ? 'active' : ''}`} onClick={() => { setView('command'); setSelectedUnitId(null); setCommandMenuOpen((open) => !open); }}><span className="nav-icon"><NavDashboardIcon /></span><span className="nav-label">Visão geral</span><b className="nav-chevron">{commandMenuOpen && view === 'command' ? '−' : '+'}</b></button>
@@ -372,6 +387,15 @@ export function App() {
       </main>
       {profileModalOpen && <EditProfileModal session={session} onSave={(newName) => { setSession({ ...session, user: { ...session.user, displayName: newName } }); addToast({ type: 'success', title: 'Perfil atualizado', detail: 'Nome de exibição salvo com sucesso.' }); }} onClose={() => setProfileModalOpen(false)} />}
       <ToastStack toasts={toasts} />
+      {sessionExpired && (
+        <div
+          className="session-expired-exit-layer"
+          role="button"
+          tabIndex={0}
+          aria-label="Sessão expirada. Toque para voltar ao login."
+          onPointerDown={exitExpiredSession}
+        />
+      )}
     </div>
   );
 }
