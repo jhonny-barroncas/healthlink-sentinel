@@ -5,6 +5,14 @@ updated: 2026-08-11
 status: active
 ---
 
+## Atualização 2026-08-24 — revisão visual e padronização do frontend
+
+- Adotada a família tipográfica **Inter** (Google Fonts) integrada com fallback sans-serif e antialiasing/otimização de renderização no `body`.
+- Expandido o sistema de tokens CSS no `:root` de `apps/web/src/styles.css` com escala estruturada de `border-radius` (`--radius-xs` a `--radius-full`), superfícies (`--surface-1` a `--surface-3`), transições e z-index padronizados.
+- Consolidada a base visual dos botões (`.primary`, `.secondary-button`, `.danger-button`, `.warning-button`, `.positive-button`, `.icon-button`) com elevação uniforme, gradientes refinados e feedback `:focus-visible` em anel ciano para acessibilidade por teclado.
+- Removido markup morto de tema em `App.tsx` e classes de `display: none` em `styles.css`.
+- Validação: `npm.cmd run typecheck` e `npm.cmd run build:web` aprovados com sucesso.
+
 ## Atualização 2026-08-21 — bootstrap do sysadmin e domínio canônico
 
 - O Docker Compose agora executa `bootstrap` depois de `migrate` e antes de `healthlink`.
