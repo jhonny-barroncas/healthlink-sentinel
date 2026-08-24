@@ -45,6 +45,12 @@ O frontend escuta em todas as interfaces. Abrir `http://localhost:5173` localmen
 - Typecheck do frontend concluído com sucesso.
 - Typecheck da API concluído com sucesso.
 
+## Correção da barra lateral recolhível — 2026-08-24
+
+- No modo compacto, rótulos e metadados ocultos deixam de participar do cálculo de largura, evitando que os ícones sejam empurrados ou cortados.
+- No modo expandido por hover/foco, a barra lateral usa uma camada superior à topbar para que logo, navegação e rodapé não sejam recortados pelo conteúdo principal.
+- A regressão é coberta por `apps/web/src/sidebar-collapse.test.ts`.
+
 ## Próximo passo
 
 Validar o login no navegador e evoluir a navegação para detalhe de unidade e central de alertas.

@@ -73,6 +73,8 @@ status: active
 
 # Handoff de contexto — HealthLink Sentinel
 
+Atualização 2026-08-24: corrigida a regressão visual da barra lateral recolhível. Elementos transparentes não reservam mais largura no modo compacto, mantendo ícones centralizados, e a lateral expandida fica acima do cabeçalho/conteúdo sem cortes por camadas concorrentes.
+
 Atualização 2026-08-24: navegação lateral desktop recolhível por hover/foco implementada sem deslocar o conteúdo; responsividade da gestão de usuários ajustada para tablet e celular. Testes dedicados: `sidebar-collapse.test.ts` e `users-responsive-layout.test.ts`.
 
 Atualização 2026-08-24: a navegação foi renomeada para **Visão geral** e separada em **Unidades** e **Unidades móveis**. A classificação é persistida em `health_units.unit_type`; unidades legadas recebem `mobile`. O perfil `mobile_unit_supervisor` é filtrado no backend para unidades móveis.

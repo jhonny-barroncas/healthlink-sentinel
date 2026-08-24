@@ -13,6 +13,7 @@ import { localAgentSourcePayload } from './starlink-source.js';
 import { canPublishAgentVersion, type AgentPlatform, type AgentVersionRecord } from './agent-version.js';
 import { agentInstallerFileName, extractAgentInstallerFileName, getAgentProvisioningRequirements } from './agent-provisioning.js';
 import { friendlyApiMessage } from './error-messages.js';
+import { EyeIcon, EyeOffIcon, UserIcon, ChevronIcon, EditIcon, LogoutIcon, CloseIcon, BlockIcon, UnblockIcon, RejectIcon, CheckIcon, EyeCheckIcon, ResolveIcon, NavDashboardIcon, NavTruckIcon, NavBellIcon, NavActivityIcon, NavUsersIcon, NavReportIcon, SyncIcon, SunIcon, SearchIcon, HomeIcon, BreadcrumbChevronIcon, NavGeneralIcon, NavLinkIcon, NavVpnIcon, NavServerIcon, ClipboardIcon, MoonIcon, WarningIcon, ErrorIcon, InfoIcon, PingIcon, TracertIcon, TrashIcon, PlusIcon, RefreshIcon, ClearFilterIcon } from './icons.js';
 
 type LoginResponse = { accessToken: string; user: { id: string; displayName: string; email: string }; tenant: { name: string; roles?: string[] } };
 type Unit = { unit_id: string; code: string; name: string; state_code: string; city: string; unit_type: 'mobile' | 'fixed'; latitude: number | string | null; longitude: number | string | null; operational_status: 'online' | 'degraded' | 'offline' | 'unknown'; offline_equipment: number; degraded_equipment: number };

@@ -98,10 +98,11 @@ button:focus-visible, a:focus-visible {
 .brand-mark { display: block; width: 38px; height: 38px; border-radius: 9px; flex-shrink: 0; }
 .brand strong, .brand small { display: block; }.brand strong { font-size: 15px; }.brand small { color: var(--cyan); font-family: var(--font-sans); font-size: 12px; letter-spacing: .22em; margin-top: 2px; font-weight: 600; }
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: 76px 1fr; }
-.sidebar { position: sticky; z-index: var(--z-sticky); top: 0; width: 76px; height: 100vh; padding: 28px 12px; border-right: 1px solid var(--line); background: rgba(5, 13, 24, .97); display: flex; flex-direction: column; overflow: hidden; box-shadow: 10px 0 30px transparent; transition: width .22s ease, padding .22s ease, box-shadow .22s ease; }
+.sidebar { position: sticky; z-index: 200; top: 0; width: 76px; height: 100vh; padding: 28px 12px; border-right: 1px solid var(--line); background: rgba(5, 13, 24, .97); display: flex; flex-direction: column; overflow: hidden; box-shadow: 10px 0 30px transparent; transition: width .22s ease, padding .22s ease, box-shadow .22s ease; }
 .sidebar:is(:hover, :focus-within) { width: 250px; padding-inline: 20px; box-shadow: 18px 0 42px rgba(0,0,0,.34); }
 .sidebar .brand > div, .sidebar .nav-label, .sidebar .nav-chevron, .sidebar .nav-badge, .sidebar .nav-health-dot, .sidebar-sync-button strong, .sidebar-sync-button small, .sidebar-status-arrow { opacity: 1; transition: opacity .12s ease; white-space: nowrap; }
 .sidebar:not(:hover):not(:focus-within) .brand > div, .sidebar:not(:hover):not(:focus-within) .nav-label, .sidebar:not(:hover):not(:focus-within) .nav-chevron, .sidebar:not(:hover):not(:focus-within) .nav-badge, .sidebar:not(:hover):not(:focus-within) .nav-health-dot, .sidebar:not(:hover):not(:focus-within) .sidebar-sync-button strong, .sidebar:not(:hover):not(:focus-within) .sidebar-sync-button small, .sidebar:not(:hover):not(:focus-within) .sidebar-status-arrow { opacity: 0; pointer-events: none; }
+.sidebar:not(:hover):not(:focus-within) .brand > div, .sidebar:not(:hover):not(:focus-within) .nav-label, .sidebar:not(:hover):not(:focus-within) .nav-chevron, .sidebar:not(:hover):not(:focus-within) .nav-badge, .sidebar:not(:hover):not(:focus-within) .nav-health-dot, .sidebar:not(:hover):not(:focus-within) .sidebar-sync-button strong, .sidebar:not(:hover):not(:focus-within) .sidebar-sync-button small, .sidebar:not(:hover):not(:focus-within) .sidebar-status-arrow { width: 0; min-width: 0; margin: 0; padding: 0; overflow: hidden; }
 .sidebar:not(:hover):not(:focus-within) .brand { justify-content: center; }
 .sidebar:not(:hover):not(:focus-within) .nav-submenu { display: none; }
 .sidebar nav { margin-top: 54px; display: grid; gap: 7px; }
@@ -147,6 +148,8 @@ button:focus-visible, a:focus-visible {
 .nav-item span.nav-icon { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 16px; margin-right: 12px; color: #7d97ac; vertical-align: -3px; transition: color .18s ease, margin .22s ease; }
 .sidebar:not(:hover):not(:focus-within) .nav-item { justify-content: center; padding-inline: 8px; }
 .sidebar:not(:hover):not(:focus-within) .nav-item span.nav-icon { margin-right: 0; }
+.sidebar:not(:hover):not(:focus-within) .sidebar-sync-button { padding-inline: 8px; }
+.sidebar:not(:hover):not(:focus-within) .sidebar-status-main { justify-content: center; }
 .nav-item.active span.nav-icon { color: var(--cyan); }
 .nav-item:hover span.nav-icon { color: #a9c0d1; }.nav-item.active { color: #e6f4ff; border-color: var(--cyan); background: linear-gradient(90deg, rgba(53,211,208,.1), transparent); }.nav-badge { float: right; border-radius: 10px; padding: 2px 6px; background: rgba(255,89,100,.18); color: var(--red); font: 12px Arial, Helvetica, 'Segoe UI', sans-serif; }
 .nav-badge.approval-count { float: none; background: rgba(53,211,208,.16); color: var(--cyan); margin-left: 6px; }
