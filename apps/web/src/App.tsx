@@ -938,8 +938,7 @@ function GlassCombobox({ value, options, onChange, placeholder, invalid = false,
   const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const search = value.trim().toLocaleLowerCase('pt-BR');
-  const hasExactSelection = options.some((option) => option.value.toLocaleLowerCase('pt-BR') === search);
-  const filtered = options.filter((option) => !search || hasExactSelection || option.value.toLocaleLowerCase('pt-BR').includes(search) || option.label.toLocaleLowerCase('pt-BR').includes(search)).slice(0, compact ? 27 : 100);
+  const filtered = options.filter((option) => !search || option.value.toLocaleLowerCase('pt-BR').includes(search) || option.label.toLocaleLowerCase('pt-BR').includes(search)).slice(0, compact ? 27 : 100);
   useLayoutEffect(() => {
     if (!open || !rootRef.current) return;
     const updateRect = () => {
