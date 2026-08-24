@@ -42,7 +42,7 @@ export async function ingestEvent(client: PoolClient, tenantId: string, input: M
   return { duplicate: false, event: event.rows[0] };
 }
 
-export async function listEquipmentStatus(client: PoolClient, tenantId: string) {
+export async function listEquipmentStatus(client: PoolClient, tenantId: string, mobileOnly = false) {
   const result = await client.query(`
     SELECT e.id AS equipment_id, e.unit_id, et.code AS equipment_type, e.name, e.active,
            e.serial_number, e.management_address,
@@ -55,13 +55,13 @@ export async function listEquipmentStatus(client: PoolClient, tenantId: string) 
     FROM equipment e
     JOIN equipment_types et ON et.id = e.equipment_type_id
     LEFT JOIN equipment_status_snapshots s ON s.equipment_id = e.id AND s.tenant_id = e.tenant_id
-    WHERE e.tenant_id = $1
+    WHERE e.tenant_id = $1 AND ($2 = false OR EXISTS (SELECT 1 FROM health_units hu WHERE hu.id = e.unit_id AND hu.unit_type = 'mobile'))
     ORDER BY e.unit_id, e.name
-  `, [tenantId]);
+  `, [tenantId, mobileOnly]);
   return result.rows;
 }
 
-export async function listUnitOperationalStatus(client: PoolClient, tenantId: string) {
+export async function listUnitOperationalStatus(client: PoolClient, tenantId: string, mobileOnly = false) {
   const result = await client.query(`
     SELECT hu.id AS unit_id, hu.code, hu.name, hu.state_code, hu.city, hu.latitude, hu.longitude,
       CASE WHEN bool_or(CASE WHEN s.observed_at IS NULL THEN 'unknown' WHEN (COALESCE(s.source_payload->>'source', '') LIKE 'starlink_%' AND s.observed_at < now() - interval '30 seconds') OR (COALESCE(s.source_payload->>'source', '') LIKE 'zabbix_%' AND s.observed_at < now() - interval '90 seconds') THEN 'unknown' ELSE COALESCE(s.operational_status, 'unknown') END = 'offline') THEN 'offline'
@@ -73,13 +73,13 @@ export async function listUnitOperationalStatus(client: PoolClient, tenantId: st
     FROM health_units hu
     LEFT JOIN equipment e ON e.unit_id = hu.id AND e.tenant_id = hu.tenant_id AND e.active = true
     LEFT JOIN equipment_status_snapshots s ON s.equipment_id = e.id AND s.tenant_id = hu.tenant_id
-    WHERE hu.tenant_id = $1 AND hu.active = true
+    WHERE hu.tenant_id = $1 AND hu.active = true AND ($2 = false OR hu.unit_type = 'mobile')
     GROUP BY hu.id ORDER BY hu.code
-  `, [tenantId]);
+  `, [tenantId, mobileOnly]);
   return result.rows;
 }
 
-export async function listLinkTelemetry(client: PoolClient, tenantId: string) {
+export async function listLinkTelemetry(client: PoolClient, tenantId: string, mobileOnly = false) {
   const result = await client.query(`
     SELECT hu.id AS unit_id, hu.code AS unit_code, hu.name AS unit_name,
       e.id AS equipment_id, e.name AS equipment_name,
@@ -105,10 +105,10 @@ export async function listLinkTelemetry(client: PoolClient, tenantId: string) {
       ORDER BY observed_at DESC
       LIMIT 60
     ) ms ON true
-    WHERE hu.tenant_id = $1 AND hu.active = true
+    WHERE hu.tenant_id = $1 AND hu.active = true AND ($2 = false OR hu.unit_type = 'mobile')
       AND (lower(et.code) LIKE '%link%' OR lower(et.code) LIKE '%router%' OR lower(et.code) LIKE '%starlink%' OR lower(et.code) LIKE '%mikrotik%' OR lower(et.code) LIKE '%vpn%')
     ORDER BY hu.code, e.name, ms.observed_at DESC
-  `, [tenantId]);
+  `, [tenantId, mobileOnly]);
   const equipment = new Map<string, any>();
   for (const row of result.rows) {
     const current = equipment.get(row.equipment_id) ?? {

@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { withTenant } from '../../platform/database.js';
-import { hasPermission, permission } from '../../platform/authorization.js';
+import { canOnlySeeMobileUnits, hasPermission, permission } from '../../platform/authorization.js';
 import { createHealthUnit, deactivateHealthUnit, getHealthUnit, listHealthUnits, updateHealthUnit, writeUnitAudit, type HealthUnitInput } from './repository.js';
 
 const unitSchema = z.object({
@@ -9,6 +9,7 @@ const unitSchema = z.object({
   name: z.string().trim().min(2).max(150),
   stateCode: z.string().trim().length(2).transform((value) => value.toUpperCase()),
   city: z.string().trim().min(2).max(120),
+  unitType: z.enum(['mobile', 'fixed']).default('mobile'),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
 });
@@ -25,14 +26,14 @@ export const unitRoutes: FastifyPluginAsync = async (app) => {
   app.get('/v1/units', { preHandler: [app.authenticate] }, async (request) => {
     requirePermission(request, permission.unitsRead);
     const tenantId = request.auth.tenantId;
-    return withTenant(tenantId, (client) => listHealthUnits(client, tenantId));
+    return withTenant(tenantId, (client) => listHealthUnits(client, tenantId, canOnlySeeMobileUnits(request.auth.roles)));
   });
 
   app.get('/v1/units/:id', { preHandler: [app.authenticate] }, async (request) => {
     requirePermission(request, permission.unitsRead);
     const params = z.object({ id: z.string().uuid() }).parse(request.params);
     const unit = await withTenant(request.auth.tenantId, (client) => getHealthUnit(client, request.auth.tenantId, params.id));
-    if (!unit) {
+    if (!unit || (canOnlySeeMobileUnits(request.auth.roles) && unit.unit_type !== 'mobile')) {
       const error = new Error('Unidade não encontrada.') as Error & { statusCode: number };
       error.statusCode = 404;
       throw error;

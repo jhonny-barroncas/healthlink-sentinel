@@ -64,6 +64,8 @@ status: active
 
 # Handoff de contexto — HealthLink Sentinel
 
+Atualização 2026-08-24: a navegação foi renomeada para **Visão geral** e separada em **Unidades** e **Unidades móveis**. A classificação é persistida em `health_units.unit_type`; unidades legadas recebem `mobile`. O perfil `mobile_unit_supervisor` é filtrado no backend para unidades móveis.
+
 Use esta nota como ponto de entrada ao migrar para outro chat do Codex. O projeto é um SaaS corporativo de missão crítica para monitoramento de unidades móveis de saúde. A documentação oficial do PRD e as ADRs têm prioridade sobre qualquer interpretação desta nota.
 
 ## Prompt para colar no novo chat

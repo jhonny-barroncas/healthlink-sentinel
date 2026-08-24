@@ -21,7 +21,12 @@ export const systemRoles: Record<string, Permission[]> = {
   noc_operator: [permission.unitsRead, permission.monitoringRead, permission.alertsRead, permission.alertsAcknowledge],
   viewer: [permission.unitsRead, permission.monitoringRead, permission.alertsRead, permission.reportsRead],
   service_agent: [permission.integrationsManage],
+  mobile_unit_supervisor: [permission.unitsRead, permission.monitoringRead, permission.alertsRead, permission.alertsAcknowledge, permission.reportsRead],
 };
+
+export function canOnlySeeMobileUnits(roles: string[]): boolean {
+  return roles.length > 0 && roles.every((role) => role === 'mobile_unit_supervisor');
+}
 
 export function hasPermission(roles: string[], required: Permission): boolean {
   return roles.some((role) => systemRoles[role]?.includes(required));

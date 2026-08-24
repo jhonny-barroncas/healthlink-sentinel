@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { withTenant } from '../../platform/database.js';
-import { hasPermission, permission } from '../../platform/authorization.js';
+import { canOnlySeeMobileUnits, hasPermission, permission } from '../../platform/authorization.js';
 import { ingestEvent, listEquipmentStatus, listLinkTelemetry, listUnitOperationalStatus, type MonitoringEventInput } from './repository.js';
 
 const eventSchema = z.object({
@@ -17,15 +17,15 @@ function requireMonitoring(request: { auth: { roles: string[] } }) {
 export const monitoringRoutes: FastifyPluginAsync = async (app) => {
   app.get('/v1/monitoring/equipment', { preHandler: [app.authenticate] }, async (request) => {
     requireMonitoring(request);
-    return withTenant(request.auth.tenantId, (client) => listEquipmentStatus(client, request.auth.tenantId));
+    return withTenant(request.auth.tenantId, (client) => listEquipmentStatus(client, request.auth.tenantId, canOnlySeeMobileUnits(request.auth.roles)));
   });
   app.get('/v1/monitoring/units', { preHandler: [app.authenticate] }, async (request) => {
     requireMonitoring(request);
-    return withTenant(request.auth.tenantId, (client) => listUnitOperationalStatus(client, request.auth.tenantId));
+    return withTenant(request.auth.tenantId, (client) => listUnitOperationalStatus(client, request.auth.tenantId, canOnlySeeMobileUnits(request.auth.roles)));
   });
   app.get('/v1/monitoring/link-telemetry', { preHandler: [app.authenticate] }, async (request) => {
     requireMonitoring(request);
-    return withTenant(request.auth.tenantId, (client) => listLinkTelemetry(client, request.auth.tenantId));
+    return withTenant(request.auth.tenantId, (client) => listLinkTelemetry(client, request.auth.tenantId, canOnlySeeMobileUnits(request.auth.roles)));
   });
   app.get('/v1/monitoring/alerts', { preHandler: [app.authenticate] }, async (request) => {
     if (!hasPermission(request.auth.roles, permission.alertsRead)) { const error = Object.assign(new Error('PermissÃ£o insuficiente.'), { statusCode: 403 }); throw error; }
@@ -40,9 +40,10 @@ export const monitoringRoutes: FastifyPluginAsync = async (app) => {
         LEFT JOIN health_units hu ON hu.id = a.unit_id AND hu.tenant_id = a.tenant_id
         LEFT JOIN equipment e ON e.id = a.equipment_id AND e.tenant_id = a.tenant_id
         WHERE a.tenant_id = $1 AND ($2::alert_status IS NULL OR a.status = $2::alert_status)
+          AND ($4 = false OR hu.unit_type = 'mobile')
         ORDER BY CASE WHEN a.status IN ('open','acknowledged') THEN 0 ELSE 1 END, a.opened_at DESC
         LIMIT $3
-      `, [request.auth.tenantId, query.status ?? null, query.limit]);
+      `, [request.auth.tenantId, query.status ?? null, query.limit, canOnlySeeMobileUnits(request.auth.roles)]);
       return result.rows;
     });
   });

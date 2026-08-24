@@ -14,8 +14,8 @@ import { canPublishAgentVersion, type AgentPlatform, type AgentVersionRecord } f
 import { agentInstallerFileName, extractAgentInstallerFileName, getAgentProvisioningRequirements } from './agent-provisioning.js';
 import { friendlyApiMessage } from './error-messages.js';
 
-type LoginResponse = { accessToken: string; user: { id: string; displayName: string; email: string }; tenant: { name: string } };
-type Unit = { unit_id: string; code: string; name: string; state_code: string; city: string; latitude: number | string | null; longitude: number | string | null; operational_status: 'online' | 'degraded' | 'offline' | 'unknown'; offline_equipment: number; degraded_equipment: number };
+type LoginResponse = { accessToken: string; user: { id: string; displayName: string; email: string }; tenant: { name: string; roles?: string[] } };
+type Unit = { unit_id: string; code: string; name: string; state_code: string; city: string; unit_type: 'mobile' | 'fixed'; latitude: number | string | null; longitude: number | string | null; operational_status: 'online' | 'degraded' | 'offline' | 'unknown'; offline_equipment: number; degraded_equipment: number };
 type Alert = { id: string; title: string; severity: number; status: string; unit_id?: string | null; unit_code?: string; equipment_id?: string | null; equipment_name?: string; opened_at: string; resolved_at?: string | null };
 type Equipment = { equipment_id: string; unit_id: string; equipment_type: string; name: string; serial_number?: string | null; management_address?: string | null; contracted_download_mbps?: number | null; contracted_upload_mbps?: number | null; operational_status: 'online' | 'degraded' | 'offline' | 'unknown'; observed_at?: string; active?: boolean };
 type LatencyPoint = { value: number; observed_at: string };
@@ -72,7 +72,7 @@ export function App() {
   const [alertMode, setAlertMode] = useState<'active' | 'history'>('active');
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
-  const [view, setView] = useState<'command' | 'units' | 'alerts' | 'zabbix' | 'connections' | 'users'>('command');
+  const [view, setView] = useState<'command' | 'mobile-units' | 'fixed-units' | 'alerts' | 'zabbix' | 'connections' | 'users'>('command');
   const [commandMenuOpen, setCommandMenuOpen] = useState(true);
   const [commandScope, setCommandScope] = useState<'all' | 'links' | 'agents' | 'servers'>('all');
   const [agents, setAgents] = useState<AgentRecord[]>([]);
@@ -244,7 +244,7 @@ export function App() {
   const selectedUnit = units.find((unit) => unit.unit_id === selectedUnitId);
   const selectedEquipment = equipment.filter((item) => item.unit_id === selectedUnitId);
   const scopeLabelFor = (scope: 'all' | 'links' | 'agents' | 'servers') => scope === 'all' ? 'Geral' : scope === 'links' ? 'Links' : scope === 'agents' ? 'Agentes' : 'Servidores';
-  const breadcrumbSectionLabel = view === 'command' ? 'Centro operacional' : view === 'units' ? 'Unidades móveis' : view === 'alerts' ? 'Alertas' : view === 'connections' ? 'Status das conexões' : view === 'users' ? 'Usuários' : 'Integração Zabbix';
+  const breadcrumbSectionLabel = view === 'command' ? 'Visão geral' : view === 'mobile-units' ? 'Unidades móveis' : view === 'fixed-units' ? 'Unidades' : view === 'alerts' ? 'Alertas' : view === 'connections' ? 'Status das conexões' : view === 'users' ? 'Usuários' : 'Integração Zabbix';
   async function refreshAlerts() {
     if (!session) return;
     await loadAlerts(alertMode);
@@ -308,11 +308,12 @@ export function App() {
       <aside className="sidebar" style={lockedStyle}>
         <div className="brand"><img className="brand-mark" src={brandIcon} alt="HealthLink Sentinel" width={38} height={38} /><div><strong>HealthLink</strong><small>SENTINEL</small></div></div>
         <nav>
-          <button className={`nav-item ${view === 'command' ? 'active' : ''}`} onClick={() => { setView('command'); setSelectedUnitId(null); setCommandMenuOpen((open) => !open); }}><span className="nav-icon"><NavDashboardIcon /></span> Centro operacional <b className="nav-chevron">{commandMenuOpen && view === 'command' ? '−' : '+'}</b></button>
+          <button className={`nav-item ${view === 'command' ? 'active' : ''}`} onClick={() => { setView('command'); setSelectedUnitId(null); setCommandMenuOpen((open) => !open); }}><span className="nav-icon"><NavDashboardIcon /></span> Visão geral <b className="nav-chevron">{commandMenuOpen && view === 'command' ? '−' : '+'}</b></button>
           {commandMenuOpen && view === 'command' && <div className="nav-submenu" aria-label="Filtros do centro operacional">
             {([['all', 'Geral', <NavGeneralIcon />], ['links', 'Links', <NavLinkIcon />], ['agents', 'Agentes', <NavVpnIcon />], ['servers', 'Servidores', <NavServerIcon />]] as const).map(([scope, label, icon]) => <button key={scope} className={`nav-subitem ${commandScope === scope ? 'active' : ''}`} onClick={() => { setCommandScope(scope); setSelectedUnitId(null); }}><span className="nav-subitem-icon">{icon}</span>{label}</button>)}
           </div>}
-          <button className={`nav-item ${view === 'units' ? 'active' : ''}`} onClick={() => { setView('units'); setSelectedUnitId(null); }}><span className="nav-icon"><NavTruckIcon /></span> Unidades móveis</button>
+          {!(session.tenant.roles ?? []).includes('mobile_unit_supervisor') && <button className={`nav-item ${view === 'fixed-units' ? 'active' : ''}`} onClick={() => { setView('fixed-units'); setSelectedUnitId(null); }}><span className="nav-icon"><NavServerIcon /></span> Unidades</button>}
+          <button className={`nav-item ${view === 'mobile-units' ? 'active' : ''}`} onClick={() => { setView('mobile-units'); setSelectedUnitId(null); }}><span className="nav-icon"><NavTruckIcon /></span> Unidades móveis</button>
           <button className={`nav-item ${view === 'alerts' ? 'active' : ''}`} onClick={() => { setView('alerts'); setSelectedUnitId(null); }}><span className="nav-icon"><NavBellIcon /></span> Alertas {activeAlertCount > 0 && <b className="nav-badge">{activeAlertCount}</b>}</button>
           <button className={`nav-item ${view === 'connections' ? 'active' : ''}`} onClick={() => { setView('connections'); setSelectedUnitId(null); void loadZabbixStatus(); }}><span className="nav-icon"><NavActivityIcon /></span> Status das conexões <i className={`nav-health-dot ${zabbixStatus?.health_status ?? 'unknown'}`} /></button>
           <button className={`nav-item ${view === 'users' ? 'active' : ''}`} onClick={() => { setView('users'); setSelectedUnitId(null); void loadUsers(); }}><span className="nav-icon"><NavUsersIcon /></span> Usuários</button>
@@ -329,13 +330,11 @@ export function App() {
               <BreadcrumbChevronIcon />
               <button className={`breadcrumb-item ${!selectedUnitId && (view !== 'command' || commandScope === 'all') ? 'current' : ''}`} onClick={() => { setSelectedUnitId(null); if (view === 'command') setCommandScope('all'); }}>{breadcrumbSectionLabel}</button>
               {view === 'command' && commandScope !== 'all' && <><BreadcrumbChevronIcon /><span className="breadcrumb-item current">{scopeLabelFor(commandScope)}</span></>}
-              {view === 'units' && selectedUnit && <><BreadcrumbChevronIcon /><span className="breadcrumb-item current">{selectedUnit.code} · {selectedUnit.name}</span></>}
+              {(view === 'mobile-units' || view === 'fixed-units') && selectedUnit && <><BreadcrumbChevronIcon /><span className="breadcrumb-item current">{selectedUnit.code} · {selectedUnit.name}</span></>}
             </nav>
             <p className="eyebrow">CENTRO DE COMANDO · {session.tenant.name}</p><h1>Consciência operacional</h1>
           </div>
           <div className="header-actions-group">
-              <span className="theme-moon-icon"><MoonIcon /></span>
-              <span className="theme-switch-knob" />
             <div className="user-profile-pill-wrapper">
               <button className={`user-profile-pill ${userMenuOpen ? 'active' : ''}`} onClick={() => setUserMenuOpen((prev) => !prev)} aria-expanded={userMenuOpen}>
                 <span className="user-avatar-circle"><UserIcon /></span>
@@ -367,7 +366,7 @@ export function App() {
               <button className="error-banner-close" onClick={() => setError('')} title="Fechar"><CloseIcon /></button>
             </div>
           )}
-          {view === 'alerts' ? <AlertsCenter alerts={alerts} mode={alertMode} loading={alertsLoading} onModeChange={setAlertMode} onAction={changeAlert} onRetry={() => void loadAlerts(alertMode).catch((r: Error) => setError(r.message))} /> : view === 'users' ? <UsersPanel users={managedUsers} requests={accessRequests} loading={usersLoading} token={session.accessToken} onRefresh={loadUsers} onChange={changeUser} onToast={addToast} /> : view === 'command' ? <CommandCenter units={units} equipment={equipment} agents={agents} alerts={activeAlerts} resolvedAlerts={resolvedAlerts} summary={summary} scope={commandScope} token={session.accessToken} onInventoryRefresh={refreshInventory} onError={setError} onSelectUnit={(unitId) => { setSelectedUnitId(unitId); setView('units'); }} /> : view === 'connections' ? <ConnectionStatus integrationStatus={zabbixStatus} onRefresh={loadZabbixStatus} onOpenZabbix={() => { setView('zabbix'); void loadZabbixCandidates(); }} /> : view === 'zabbix' ? <ZabbixIntegration candidates={zabbixCandidates} integrationStatus={zabbixStatus} units={units} loading={zabbixLoading} onRefresh={loadZabbixCandidates} onStatusRefresh={loadZabbixStatus} onInventoryRefresh={refreshInventory} onAlertsRefresh={refreshAlerts} onError={setError} onToast={addToast} token={session.accessToken} /> : <><InventoryActions token={session.accessToken} units={units} selectedUnit={selectedUnit} onRefresh={refreshInventory} onError={(message) => { setError(message); addToast({ type: 'error', title: 'Falha no cadastro', detail: message }); }} onToast={addToast} /><UnitsView units={units} selectedUnit={selectedUnit} selectedEquipment={selectedEquipment} loading={loading} summary={summary} onSelectUnit={setSelectedUnitId} onBack={() => setSelectedUnitId(null)} onInventoryRefresh={refreshInventory} token={session.accessToken} onToast={addToast} /></>}
+          {view === 'alerts' ? <AlertsCenter alerts={alerts} mode={alertMode} loading={alertsLoading} onModeChange={setAlertMode} onAction={changeAlert} onRetry={() => void loadAlerts(alertMode).catch((r: Error) => setError(r.message))} /> : view === 'users' ? <UsersPanel users={managedUsers} requests={accessRequests} loading={usersLoading} token={session.accessToken} onRefresh={loadUsers} onChange={changeUser} onToast={addToast} /> : view === 'command' ? <CommandCenter units={units} equipment={equipment} agents={agents} alerts={activeAlerts} resolvedAlerts={resolvedAlerts} summary={summary} scope={commandScope} token={session.accessToken} onInventoryRefresh={refreshInventory} onError={setError} onSelectUnit={(unitId) => { setSelectedUnitId(unitId); setView('mobile-units'); }} /> : view === 'connections' ? <ConnectionStatus integrationStatus={zabbixStatus} onRefresh={loadZabbixStatus} onOpenZabbix={() => { setView('zabbix'); void loadZabbixCandidates(); }} /> : view === 'zabbix' ? <ZabbixIntegration candidates={zabbixCandidates} integrationStatus={zabbixStatus} units={units} loading={zabbixLoading} onRefresh={loadZabbixCandidates} onStatusRefresh={loadZabbixStatus} onInventoryRefresh={refreshInventory} onAlertsRefresh={refreshAlerts} onError={setError} onToast={addToast} token={session.accessToken} /> : <><InventoryActions unitType={view === 'mobile-units' ? 'mobile' : 'fixed'} token={session.accessToken} units={units} selectedUnit={selectedUnit} onRefresh={refreshInventory} onError={(message) => { setError(message); addToast({ type: 'error', title: 'Falha no cadastro', detail: message }); }} onToast={addToast} /><UnitsView units={units.filter((unit) => unit.unit_type === (view === 'mobile-units' ? 'mobile' : 'fixed'))} selectedUnit={selectedUnit} selectedEquipment={selectedEquipment} loading={loading} summary={{ online: units.filter((u) => u.unit_type === (view === 'mobile-units' ? 'mobile' : 'fixed') && u.operational_status === 'online').length, attention: units.filter((u) => u.unit_type === (view === 'mobile-units' ? 'mobile' : 'fixed') && u.operational_status === 'degraded').length, offline: units.filter((u) => u.unit_type === (view === 'mobile-units' ? 'mobile' : 'fixed') && u.operational_status === 'offline').length, unknown: units.filter((u) => u.unit_type === (view === 'mobile-units' ? 'mobile' : 'fixed') && u.operational_status === 'unknown').length }} onSelectUnit={setSelectedUnitId} onBack={() => setSelectedUnitId(null)} onInventoryRefresh={refreshInventory} token={session.accessToken} onToast={addToast} /></>}
         </section>
       </main>
       {profileModalOpen && <EditProfileModal session={session} onSave={(newName) => { setSession({ ...session, user: { ...session.user, displayName: newName } }); addToast({ type: 'success', title: 'Perfil atualizado', detail: 'Nome de exibição salvo com sucesso.' }); }} onClose={() => setProfileModalOpen(false)} />}
@@ -788,9 +787,9 @@ function CommandMetricIcon({ type }: { type: string }) {
   </svg>;
 }
 
-function InventoryActions({ token, units, selectedUnit, onRefresh, onError, onToast = () => undefined }: { token: string; units: Unit[]; selectedUnit?: Unit; onRefresh: () => Promise<void>; onError: (message: string) => void; onToast?: (toast: Omit<Toast, 'id'>) => void }) {
+function InventoryActions({ unitType, token, units, selectedUnit, onRefresh, onError, onToast = () => undefined }: { unitType: 'mobile' | 'fixed'; token: string; units: Unit[]; selectedUnit?: Unit; onRefresh: () => Promise<void>; onError: (message: string) => void; onToast?: (toast: Omit<Toast, 'id'>) => void }) {
   const [mode, setMode] = useState<'unit' | 'equipment' | null>(null);
-  return <>{!selectedUnit && <div className="admin-toolbar"><div><p className="eyebrow">ADMINISTRAÇÃO DE INVENTÁRIO</p><strong>Cadastre a estrutura antes de vincular ao Zabbix.</strong></div><button className="primary compact" onClick={() => setMode('unit')}><PlusIcon /> Cadastrar unidade</button></div>}{selectedUnit && <div className="admin-toolbar"><div><p className="eyebrow">UNIDADE SELECIONADA · {selectedUnit.code}</p><strong>{selectedUnit.name}</strong></div><button className="primary compact" onClick={() => setMode('equipment')}><PlusIcon /> Cadastrar equipamento</button></div>}{mode === 'unit' && <UnitForm token={token} onCreated={async () => { setMode(null); await onRefresh(); }} onCancel={() => setMode(null)} onToast={onToast} />}{mode === 'equipment' && selectedUnit && <EquipmentForm token={token} unit={selectedUnit} onCreated={async () => { setMode(null); await onRefresh(); }} onCancel={() => setMode(null)} onError={onError} onToast={onToast} />}</>;
+  return <>{!selectedUnit && <div className="admin-toolbar"><div><p className="eyebrow">ADMINISTRAÇÃO DE INVENTÁRIO</p><strong>Cadastre a estrutura antes de vincular ao Zabbix.</strong></div><button className="primary compact" onClick={() => setMode('unit')}><PlusIcon /> Cadastrar unidade</button></div>}{selectedUnit && <div className="admin-toolbar"><div><p className="eyebrow">UNIDADE SELECIONADA · {selectedUnit.code}</p><strong>{selectedUnit.name}</strong></div><button className="primary compact" onClick={() => setMode('equipment')}><PlusIcon /> Cadastrar equipamento</button></div>}{mode === 'unit' && <UnitForm unitType={unitType} token={token} onCreated={async () => { setMode(null); await onRefresh(); }} onCancel={() => setMode(null)} onToast={onToast} />}{mode === 'equipment' && selectedUnit && <EquipmentForm token={token} unit={selectedUnit} onCreated={async () => { setMode(null); await onRefresh(); }} onCancel={() => setMode(null)} onError={onError} onToast={onToast} />}</>;
 }
 
 function ConfirmDialog({ title, message, confirmLabel = 'Confirmar', confirmIcon = <TrashIcon />, tone = 'danger', busy = false, onConfirm, onCancel }: { title: string; message: string; confirmLabel?: string; confirmIcon?: ReactNode; tone?: 'danger' | 'warning' | 'positive'; busy?: boolean; onConfirm: () => void; onCancel: () => void }) {
@@ -819,7 +818,7 @@ function UnitFormLegacy({ token, onCreated, onCancel, onError = () => undefined 
   return <FormCard title="Nova unidade móvel" onCancel={onCancel}><form className="inline-form" onSubmit={submit}><label>Código<input required value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="UMS-011" /></label><label>Nome<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Unidade Móvel Manaus" /></label><label>UF<input required maxLength={2} value={form.stateCode} onChange={(e) => setForm({ ...form, stateCode: e.target.value.toUpperCase() })} placeholder="AM" /></label><label>Cidade<input required value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} placeholder="Manaus" /></label><div className="form-actions"><button type="button" onClick={onCancel}>Cancelar</button><button className="primary" disabled={saving}>{saving ? 'Salvando…' : <><PlusIcon /> Cadastrar unidade</>}</button></div></form></FormCard>;
 }
 
-function UnitForm({ token, initialStateCode = '', onCreated, onCancel, onError = () => undefined, onToast = () => undefined }: { token: string; initialStateCode?: string; onCreated: () => Promise<void>; onCancel: () => void; onError?: (message: string) => void; onToast?: (toast: Omit<Toast, 'id'>) => void }) {
+function UnitForm({ token, initialStateCode = '', unitType = 'mobile', onCreated, onCancel, onError = () => undefined, onToast = () => undefined }: { token: string; initialStateCode?: string; unitType?: 'mobile' | 'fixed'; onCreated: () => Promise<void>; onCancel: () => void; onError?: (message: string) => void; onToast?: (toast: Omit<Toast, 'id'>) => void }) {
   const [form, setForm] = useState({ code: '', name: '', stateCode: initialStateCode.toUpperCase(), city: '', latitude: '', longitude: '' });
   const [cities, setCities] = useState<string[]>([]);
   const [loadingCities, setLoadingCities] = useState(false);
@@ -846,7 +845,7 @@ function UnitForm({ token, initialStateCode = '', onCreated, onCancel, onError =
     if (Object.values(unitValidation).some(Boolean)) return;
     setSaving(true);
     try {
-      await api('/v1/units', token, { method: 'POST', body: JSON.stringify({ code: form.code, name: form.name, stateCode: form.stateCode.toUpperCase(), city: form.city, latitude: form.latitude.trim() ? Number(form.latitude) : undefined, longitude: form.longitude.trim() ? Number(form.longitude) : undefined }) });
+      await api('/v1/units', token, { method: 'POST', body: JSON.stringify({ code: form.code, name: form.name, unitType, stateCode: form.stateCode.toUpperCase(), city: form.city, latitude: form.latitude.trim() ? Number(form.latitude) : undefined, longitude: form.longitude.trim() ? Number(form.longitude) : undefined }) });
       await onCreated();
       onToast({ type: 'success', title: 'Unidade cadastrada', detail: `${form.name} foi adicionada ao inventário.` });
     } catch (reason) { setFormError(reason instanceof Error ? reason.message : 'Falha ao cadastrar unidade.'); }
@@ -1486,7 +1485,7 @@ function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onTo
             <span className="field-label">Perfil <b className="req">*</b></span>
             {editingIsGlobalAdmin
               ? <AppDropdown placeholder="Administrador global" value="" disabled onChange={() => undefined} options={[]} />
-              : <AppDropdown placeholder="Selecione um perfil" invalid={submitted && !form.role} value={form.role} onChange={(next) => setForm({ ...form, role: next })} options={[{ value: 'tenant_administrator', label: 'Administrador' }, { value: 'supervisor', label: 'Supervisor' }, { value: 'noc_operator', label: 'Operador NOC' }, { value: 'service_agent', label: 'Agente de integração' }, { value: 'viewer', label: 'Visualizador' }]} />}
+              : <AppDropdown placeholder="Selecione um perfil" invalid={submitted && !form.role} value={form.role} onChange={(next) => setForm({ ...form, role: next })} options={[{ value: 'tenant_administrator', label: 'Administrador' }, { value: 'supervisor', label: 'Supervisor' }, { value: 'mobile_unit_supervisor', label: 'Supervisor de unidades móveis' }, { value: 'noc_operator', label: 'Operador NOC' }, { value: 'service_agent', label: 'Agente de integração' }, { value: 'viewer', label: 'Visualizador' }]} />}
             {editingIsGlobalAdmin && <span className="field-hint">O perfil de administrador global não pode ser alterado por este formulário.</span>}
             {!editingIsGlobalAdmin && submitted && !form.role && <span className="field-error-text">Selecione o perfil.</span>}
           </label>
