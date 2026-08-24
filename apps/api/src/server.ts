@@ -23,7 +23,7 @@ const app = Fastify({
   ...(env.HTTPS ? { https: { key: readFileSync(resolve(process.cwd(), env.HTTPS_KEY_PATH)), cert: readFileSync(resolve(process.cwd(), env.HTTPS_CERT_PATH)) } } : {}),
 });
 await app.register(cors, {
-  origin: [/^https?:\/\/(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+):517[3-9]$/],
+  origin: [/^https?:\/\/(localhost|127\.0\.0\.1|aplicacao\.gbringel\.com|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+):(3002|3003|517[3-9])$/],
   methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 });

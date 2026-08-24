@@ -207,6 +207,8 @@ Atualização 2026-08-21: a aplicação HealthLink foi padronizada para escutar 
 
 Correção 2026-08-24: o healthcheck do Compose passou a detectar automaticamente se a API local está em HTTP ou HTTPS, respeitando `HTTPS=true` do ambiente local. Isso evita o container ficar como `unhealthy` quando a API usa certificado local.
 
+Correção adicional 2026-08-24: o CORS da API passou a aceitar as origens HTTPS locais e do domínio oficial nas portas `3002`/`3003`, mantendo as portas de desenvolvimento existentes. Isso permite o login quando o frontend é servido diretamente pela API em HTTPS.
+
 ## Documentação relacionada
 
 - [[00-Mapa Mestre do Vault]]
