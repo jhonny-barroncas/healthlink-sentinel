@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { parseAgentCli } from './cli.js';
 
 describe('agent command line', () => {
+  it('parses the version command', () => {
+    expect(parseAgentCli(['node', 'healthlink-agent.cjs', '--version'])).toEqual({ command: 'version' });
+  });
   it('parses a non-interactive enrollment with all installer-provided paths', () => {
     expect(parseAgentCli(['node', 'healthlink-agent.cjs', 'enroll',
       '--api', 'https://healthlink.example', '--token', 'hle_secret', '--config', '/etc/agent.json',

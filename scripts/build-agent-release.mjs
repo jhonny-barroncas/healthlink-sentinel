@@ -1,4 +1,4 @@
-import { readdir, readFile, mkdir } from 'node:fs/promises';
+import { readdir, readFile, appendFile, mkdir } from 'node:fs/promises';
 import { resolve, relative } from 'node:path';
 import { build } from 'esbuild';
 
@@ -33,5 +33,9 @@ await build({
     __HEALTHLINK_STARLINK_PROTOS__: JSON.stringify(protos),
   },
 });
+const marker = `HealthLink Sentinel Agent v${version}`;
+await appendFile(output, `\n// ${marker}\n`, 'utf8');
+const source = await readFile(output, 'utf8');
+if (!source.includes(marker)) throw new Error(`O bundle não contém o marcador da versão ${version}.`);
 process.stdout.write(`${output}\n`);
 

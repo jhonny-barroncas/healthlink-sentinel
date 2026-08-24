@@ -4,7 +4,7 @@ import { withTenant, database } from '../../platform/database.js';
 import { hashPassword, verifyPassword } from './password.js';
 import { consumeSession, createSession, findUserByEmail, hashRefreshToken, listMemberships, newRefreshToken, revokeSession } from './repository.js';
 
-const loginSchema = z.object({ email: z.string().email(), password: z.string().min(8), tenantId: z.string().uuid().optional() });
+const loginSchema = z.object({ email: z.string().trim().email().max(254), password: z.string().min(8).max(200), tenantId: z.string().uuid().optional() });
 const refreshSchema = z.object({ refreshToken: z.string().min(20) });
 const accessTtlSeconds = 15 * 60;
 const refreshTtlMs = 30 * 24 * 60 * 60 * 1000;
@@ -45,7 +45,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
 
   app.post('/v1/auth/hash-password', async (request) => {
     if (process.env.NODE_ENV === 'production') throw unauthorized('Endpoint indisponível.');
-    const body = z.object({ password: z.string().min(8) }).parse(request.body);
+    const body = z.object({ password: z.string().min(8).max(200) }).parse(request.body);
     return { hash: await hashPassword(body.password) };
   });
 };

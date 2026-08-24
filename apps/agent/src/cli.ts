@@ -1,4 +1,5 @@
 export type AgentCli =
+  | { command: 'version' }
   | { command: 'run'; configPath?: string; once: boolean }
   | { command: 'enroll'; apiUrl: string; enrollmentToken: string; configPath: string; dataDir: string; agentPath: string };
 
@@ -15,6 +16,7 @@ function requiredOption(args: string[], name: string): string {
 
 export function parseAgentCli(argv = process.argv): AgentCli {
   const args = argv.slice(2);
+  if (args[0] === '--version' || args[0] === '-v' || args[0] === 'version') return { command: 'version' };
   if (args[0] === 'enroll') {
     return {
       command: 'enroll',

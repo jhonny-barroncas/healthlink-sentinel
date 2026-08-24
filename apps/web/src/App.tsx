@@ -12,6 +12,7 @@ import { agentStatusLabel, type AgentRecord } from './agent-status.js';
 import { localAgentSourcePayload } from './starlink-source.js';
 import { canPublishAgentVersion, type AgentPlatform, type AgentVersionRecord } from './agent-version.js';
 import { agentInstallerFileName, extractAgentInstallerFileName, getAgentProvisioningRequirements } from './agent-provisioning.js';
+import { friendlyApiMessage } from './error-messages.js';
 
 type LoginResponse = { accessToken: string; user: { id: string; displayName: string; email: string }; tenant: { name: string } };
 type Unit = { unit_id: string; code: string; name: string; state_code: string; city: string; latitude: number | string | null; longitude: number | string | null; operational_status: 'online' | 'degraded' | 'offline' | 'unknown'; offline_equipment: number; degraded_equipment: number };
@@ -40,21 +41,21 @@ async function api<T>(path: string, token: string, init?: RequestInit): Promise<
       const payload = await response.json() as { message?: string; error?: string };
       detail = payload.message || payload.error || '';
     } catch { /* resposta sem JSON */ }
-    throw new Error(detail ? `Falha na plataforma: ${detail}` : `Falha na plataforma (HTTP ${response.status}).`);
+    throw new Error(friendlyApiMessage(detail || `Falha na plataforma (HTTP ${response.status}).`, 'Não foi possível concluir a operação. Tente novamente.'));
   }
   return response.json() as Promise<T>;
 }
 
 function friendlyMessage(reason: unknown, fallback: string): string {
   if (!(reason instanceof Error)) return fallback;
-  return reason.message.replace(/^Falha na plataforma:\s*/, '') || fallback;
+  return friendlyApiMessage(reason.message.replace(/^Falha na plataforma:\s*/, ''), fallback);
 }
 
 async function loginErrorMessage(response: Response): Promise<string> {
   try {
     const payload = await response.json() as { message?: string; error?: string };
-    return payload.message || payload.error || 'Credenciais inválidas.';
-  } catch { return 'Credenciais inválidas.'; }
+    return friendlyApiMessage(payload.message || payload.error, 'E-mail ou senha incorretos. Confira os dados e tente novamente.');
+  } catch { return 'Não foi possível interpretar a resposta da aplicação. Tente novamente.'; }
 }
 
 export function App() {
@@ -1262,7 +1263,6 @@ function StarlinkTelemetryPanel({ unit, equipment, token }: { unit: Unit; equipm
 function AgentVersionsPanel({ token, onToast }: { token: string; onToast: (toast: Omit<Toast, 'id'>) => void }) {
   const [versions, setVersions] = useState<AgentVersionRecord[]>([]);
   const [platform, setPlatform] = useState<AgentPlatform>('windows');
-  const [version, setVersion] = useState('1.0.0');
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -1275,12 +1275,12 @@ function AgentVersionsPanel({ token, onToast }: { token: string; onToast: (toast
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
       let binary = ''; bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
-      await api('/v1/integrations/zabbix/agent-versions', token, { method: 'POST', body: JSON.stringify({ version, platform, fileName: file.name, artifactBase64: btoa(binary) }) });
-      await load(); setFile(null); onToast({ type: 'success', title: `Agente ${platform === 'windows' ? 'Windows' : 'Linux'} publicado`, detail: `A versão ${version} estará disponível para novos agentes e atualizações automáticas.` });
+      const published = await api<AgentVersionRecord>('/v1/integrations/zabbix/agent-versions', token, { method: 'POST', body: JSON.stringify({ platform, fileName: file.name, artifactBase64: btoa(binary) }) });
+      await load(); setFile(null); onToast({ type: 'success', title: `Agente ${platform === 'windows' ? 'Windows' : 'Linux'} publicado`, detail: `A versão automática ${published.version} foi validada e está disponível para download.` });
     } catch (reason) { onToast({ type: 'error', title: 'Falha ao publicar agente', detail: reason instanceof Error ? reason.message : 'Não foi possível enviar o arquivo.' }); }
     finally { setBusy(false); }
   }
-  return <article className="agent-versions-panel"><div className="panel-title"><div><p className="eyebrow">REPOSITÓRIO DO AGENTE</p><h3>Versões Windows e Linux</h3><small>Publique o bundle `.cjs`; o instalador de cada plataforma já cuida do serviço e o agente valida SHA-256 antes de atualizar.</small></div><strong>{loaded ? `${versions.length} arquivo(s)` : '…'}</strong></div><div className="agent-version-form"><label>Sistema<select value={platform} onChange={(event) => setPlatform(event.target.value as AgentPlatform)}><option value="windows">Windows</option><option value="linux">Linux</option></select></label><label>Versão<input value={version} onChange={(event) => setVersion(event.target.value)} placeholder="1.0.0" /></label><label>Bundle `.cjs` do agente<input type="file" accept=".cjs,application/javascript" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label><button className="primary compact" disabled={busy} onClick={() => void publish()}>{busy ? 'Enviando…' : 'Publicar versão'}</button></div><div className="agent-version-list">{versions.length === 0 ? <small>Nenhuma versão publicada ainda. A primeira versão será Windows 1.0.0 e Linux 1.0.0.</small> : versions.map((item) => <div key={item.id}><span className={`legend-dot ${item.active ? 'online' : 'unknown'}`} /><strong>{item.platform === 'windows' ? 'Windows' : 'Linux'} · v{item.version}</strong><small>{item.file_name} · {Math.round(item.file_size / 1024)} KB · SHA-256 {item.checksum_sha256.slice(0, 12)}…</small></div>)}</div></article>;
+  return <article className="agent-versions-panel"><div className="panel-title"><div><p className="eyebrow">REPOSITÓRIO DO AGENTE</p><h3>Versões Windows e Linux</h3><small>Publique um bundle `.cjs`; a API calcula a próxima versão, embute a numeração no arquivo e valida o checksum.</small></div><strong>{loaded ? `${versions.length} arquivo(s)` : '…'}</strong></div><div className="agent-version-form"><label>Sistema<select value={platform} onChange={(event) => setPlatform(event.target.value as AgentPlatform)}><option value="windows">Windows</option><option value="linux">Linux</option></select></label><label>Bundle `.cjs` do agente<input type="file" accept=".cjs,application/javascript" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label><button className="primary compact" disabled={busy} onClick={() => void publish()}>{busy ? 'Enviando…' : 'Publicar próxima versão'}</button></div><div className="agent-version-list">{versions.length === 0 ? <small>Nenhuma versão publicada ainda. A primeira versão será 1.0.0.</small> : versions.map((item) => <div key={item.id}><span className={`legend-dot ${item.active ? 'online' : 'unknown'}`} /><strong>{item.platform === 'windows' ? 'Windows' : 'Linux'} · v{item.version}</strong><small>{item.file_name} · {Math.round(item.file_size / 1024)} KB · SHA-256 {item.checksum_sha256.slice(0, 12)}…</small></div>)}</div></article>;
 }
 
 function UnitDetail({ unit, equipment, onBack, onEdit, onRefresh, onToast = () => undefined }: { unit: Unit; equipment: Equipment[]; onBack: () => void; onEdit: (equipment: Equipment) => void; onRefresh: () => Promise<void>; onToast?: (toast: Omit<Toast, 'id'>) => void }) {
@@ -1765,8 +1765,12 @@ function Metric({ label, value, tone }: { label: string; value: number; tone: st
 }
 
 function LoginWithRequest({ onSuccess, showLogoutToast = false }: { onSuccess: (session: LoginResponse) => void; showLogoutToast?: boolean }) {
-  const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [error, setError] = useState(''); const [requestOpen, setRequestOpen] = useState(false);
-  const [showPassword, setShowPassword] = useState(false); const [submitted, setSubmitted] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [requestOpen, setRequestOpen] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   function addToast(toast: Omit<Toast, 'id'>) {
     const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -1782,13 +1786,17 @@ function LoginWithRequest({ onSuccess, showLogoutToast = false }: { onSuccess: (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const emailMissing = submitted && !email.trim();
-  const passwordMissing = submitted && !password.trim();
+  const passwordMissing = submitted && (!password.trim() || password.length > 200);
   async function submit(event: FormEvent) {
     event.preventDefault(); setSubmitted(true); setError('');
-    if (!email.trim() || !password.trim()) return;
-    try { const response = await fetch(`${apiBase}/v1/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, password }) }); if (!response.ok) throw new Error(await loginErrorMessage(response)); onSuccess(await response.json() as LoginResponse); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Falha de autenticação.'); }
+    if (!email.trim() || !password.trim() || password.length > 200) return;
+    try {
+      const response = await fetch(`${apiBase}/v1/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, password }) });
+      if (!response.ok) throw new Error(await loginErrorMessage(response));
+      onSuccess(await response.json() as LoginResponse);
+    } catch (reason) { setError(reason instanceof Error ? friendlyApiMessage(reason.message, 'Falha de autenticação. Tente novamente.') : 'Falha de autenticação. Tente novamente.'); }
   }
-  return <div className="login-page"><section className="login-context"><div className="brand large"><img className="brand-mark" src={brandIcon} alt="HealthLink Sentinel" width={46} height={46} /><div><strong>HealthLink</strong><small>SENTINEL</small></div></div><div className="context-copy"><p className="eyebrow">PLATAFORMA DE MISSÃO CRÍTICA</p><h1>Visibilidade para proteger cada unidade em campo.</h1><p>Monitoramento contínuo de conectividade, infraestrutura e disponibilidade operacional.</p></div></section><section className="login-panel"><form onSubmit={submit} noValidate><p className="eyebrow">ACESSO RESTRITO</p><h2>Entrar no centro de comando</h2><p className="muted">Utilize sua identidade corporativa.</p><label>E-mail corporativo<input type="email" value={email} className={emailMissing ? 'field-invalid' : ''} onChange={(event) => setEmail(event.target.value)} autoFocus />{emailMissing && <span className="field-error-text">Informe o e-mail.</span>}</label><label>Senha<div className="password-field"><input type={showPassword ? 'text' : 'password'} value={password} className={passwordMissing ? 'field-invalid' : ''} onChange={(event) => setPassword(event.target.value)} /><button type="button" className="password-toggle" onClick={() => setShowPassword((prev) => !prev)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOffIcon /> : <EyeIcon />}</button></div>{passwordMissing && <span className="field-error-text">Informe a senha.</span>}</label>{error && <div className="error-banner" role="alert"><span className="error-banner-icon"><WarningIcon /></span><span className="error-banner-text">{error}</span></div>}<button className="primary">Acessar plataforma</button><button type="button" className="request-access-link" onClick={() => setRequestOpen(true)}>Criar conta <span>(sujeito a aprovação)</span></button></form></section>{requestOpen && <RequestAccessModal onClose={() => setRequestOpen(false)} onToast={addToast} />}<ToastStack toasts={toasts} /></div>;
+  return <div className="login-page"><section className="login-context"><div className="brand large"><img className="brand-mark" src={brandIcon} alt="HealthLink Sentinel" width={46} height={46} /><div><strong>HealthLink</strong><small>SENTINEL</small></div></div><div className="context-copy"><p className="eyebrow">PLATAFORMA DE MISSÃO CRÍTICA</p><h1>Visibilidade para proteger cada unidade em campo.</h1><p>Monitoramento contínuo de conectividade, infraestrutura e disponibilidade operacional.</p></div></section><section className="login-panel"><form onSubmit={submit} noValidate><p className="eyebrow">ACESSO RESTRITO</p><h2>Entrar no centro de comando</h2><p className="muted">Utilize sua identidade corporativa.</p><label>E-mail corporativo<input type="email" maxLength={254} value={email} className={emailMissing ? 'field-invalid' : ''} onChange={(event) => setEmail(event.target.value)} autoFocus />{emailMissing && <span className="field-error-text">Informe o e-mail.</span>}</label><label>Senha<div className="password-field"><input type={showPassword ? 'text' : 'password'} maxLength={200} value={password} className={passwordMissing ? 'field-invalid' : ''} onChange={(event) => setPassword(event.target.value)} /><button type="button" className="password-toggle" onClick={() => setShowPassword((prev) => !prev)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOffIcon /> : <EyeIcon />}</button></div>{passwordMissing && <span className="field-error-text">A senha deve ter de 8 a 200 caracteres.</span>}</label>{error && <div className="error-banner" role="alert"><span className="error-banner-icon"><WarningIcon /></span><span className="error-banner-text">{error}</span></div>}<button className="primary">Acessar plataforma</button><button type="button" className="request-access-link" onClick={() => setRequestOpen(true)}>Criar conta <span>(sujeito a aprovação)</span></button></form></section>{requestOpen && <RequestAccessModal onClose={() => setRequestOpen(false)} onToast={addToast} />}<ToastStack toasts={toasts} /></div>;
 }
 
 function EyeIcon() {
@@ -1949,12 +1957,13 @@ function ClearFilterIcon() {
 
 function RequestAccessModal({ onClose, onToast }: { onClose: () => void; onToast: (toast: Omit<Toast, 'id'>) => void }) {
   const [form, setForm] = useState({ displayName: '', email: '', password: '', role: 'viewer' }); const [saving, setSaving] = useState(false); const [submitted, setSubmitted] = useState(false);
+  useEffect(() => { if (form.password.length > 200) setForm((previous) => ({ ...previous, password: previous.password.slice(0, 200) })); }, [form.password]);
   const nameMissing = submitted && !form.displayName.trim();
   const emailMissing = submitted && !form.email.trim();
-  const passwordMissing = submitted && form.password.trim().length < 8;
+  const passwordMissing = submitted && (form.password.trim().length < 8 || form.password.length > 200);
   async function submit(event: FormEvent) {
     event.preventDefault(); setSubmitted(true);
-    if (!form.displayName.trim() || !form.email.trim() || form.password.trim().length < 8) return;
+    if (!form.displayName.trim() || !form.email.trim() || form.password.trim().length < 8 || form.password.length > 200) return;
     setSaving(true);
     try {
       const response = await fetch(`${apiBase}/v1/access-requests`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(form) });
@@ -1982,11 +1991,11 @@ function Login({ onSuccess }: { onSuccess: (session: LoginResponse) => void }) {
       const response = await fetch(`${apiBase}/v1/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, password }) });
       if (!response.ok) throw new Error(await loginErrorMessage(response));
       onSuccess(await response.json() as LoginResponse);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Falha de autenticação.'); }
+    } catch (reason) { setError(reason instanceof Error ? friendlyApiMessage(reason.message, 'Falha de autenticação. Tente novamente.') : 'Falha de autenticação. Tente novamente.'); }
     finally { setLoading(false); }
   }
   return <div className="login-page">
     <section className="login-context"><div className="brand large"><img className="brand-mark" src={brandIcon} alt="HealthLink Sentinel" width={46} height={46} /><div><strong>HealthLink</strong><small>SENTINEL</small></div></div><div className="context-copy"><p className="eyebrow">PLATAFORMA DE MISSÃO CRÍTICA</p><h1>Visibilidade para proteger cada unidade em campo.</h1><p>Monitoramento contínuo de conectividade, infraestrutura e disponibilidade operacional das unidades móveis de saúde.</p></div><div className="context-status"><span className="pulse" /> Núcleo de monitoramento disponível</div></section>
-    <section className="login-panel"><form onSubmit={submit}><p className="eyebrow">ACESSO RESTRITO</p><h2>Entrar no centro de comando</h2><p className="muted">Utilize sua identidade corporativa.</p><label>E-mail corporativo<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoFocus /></label><label>Senha<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label>{error && <div className="error-banner" role="alert"><span className="error-banner-icon"><WarningIcon /></span><span className="error-banner-text">{error}</span></div>}<button className="primary" disabled={loading}>{loading ? 'Validando acesso…' : 'Acessar plataforma'}</button><small className="security-note">Sessão protegida · Acesso auditado</small></form></section>
+    <section className="login-panel"><form onSubmit={submit}><p className="eyebrow">ACESSO RESTRITO</p><h2>Entrar no centro de comando</h2><p className="muted">Utilize sua identidade corporativa.</p><label>E-mail corporativo<input type="email" maxLength={254} value={email} onChange={(event) => setEmail(event.target.value)} required autoFocus /></label><label>Senha<input type="password" maxLength={200} value={password} onChange={(event) => setPassword(event.target.value)} required /></label>{error && <div className="error-banner" role="alert"><span className="error-banner-icon"><WarningIcon /></span><span className="error-banner-text">{error}</span></div>}<button className="primary" disabled={loading}>{loading ? 'Validando acesso…' : 'Acessar plataforma'}</button><small className="security-note">Sessão protegida · Acesso auditado</small></form></section>
   </div>;
 }

@@ -84,6 +84,8 @@ Atualização 2026-08-21: o desenvolvimento local agora usa HTTPS ponta a ponta.
 
 Atualização 2026-08-24: o versionamento do agente passou a ser automático. A publicação calcula o próximo patch por tenant (`1.0.0` → `1.0.1`), embute a versão no bundle baixável, valida o marcador e recalcula o SHA-256. O bundle responde `node healthlink-agent-<versao>.cjs --version`.
 
+Atualização 2026-08-24: erros de validação no login e nos fluxos de usuários passaram a ser traduzidos para mensagens operacionais amigáveis, sem exibir JSON bruto ou detalhes internos. E-mails têm limite de 254 caracteres e senhas de 8 a 200 caracteres na API e nos formulários. As consultas de usuários foram revisadas e permanecem parametrizadas.
+
 Atualização 2026-08-21: o HTTPS direto do Docker foi isolado em `docker-compose.local-https.yml`. O Compose base permanece HTTP interno para não quebrar produção quando o proxy reverso existente termina o TLS e encaminha para o container.
 
 Correção 2026-08-21: o build Docker não depende mais da existência dos certificados locais; o Vite ativa HTTPS somente quando `.certs/localhost*.pem` está presente.

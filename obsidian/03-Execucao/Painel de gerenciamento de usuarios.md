@@ -47,3 +47,9 @@ Removido o botão visual de troca de tema do cabeçalho para manter o produto em
 O formulário deixou de exigir CPF e coligada, pois esses campos não fazem parte do contrato atual da API e impediam o cadastro de usuários válidos. A mensagem de sucesso também foi ajustada para refletir que a senha é definida diretamente no formulário. A API agora impede que o usuário logado bloqueie a própria conta, mantendo a proteção já existente contra autoexclusão.
 
 Foi adicionada validação automatizada para o formulário, cobrindo criação sem campos desconectados do modelo e senha obrigatória apenas no cadastro.
+
+## Validação e mensagens amigáveis (24/08/2026)
+
+As mensagens de erro de autenticação e da API não expõem mais o payload bruto de validação no painel. O frontend traduz erros conhecidos para textos operacionais, sem exibir JSON, detalhes internos ou SQL. E-mail passou a ter limite de 254 caracteres e senha de 8 a 200 caracteres na autenticação, criação/edição de usuários e solicitação de acesso. A API aplica os mesmos limites com Zod.
+
+As consultas de usuários continuam usando parâmetros posicionais; a atualização dinâmica de usuário aceita somente nomes de colunas definidos internamente pelo código. Foi adicionada cobertura automatizada para mensagens amigáveis, rejeição de e-mail inválido e limites de senha.

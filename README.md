@@ -125,6 +125,14 @@ O projeto não publica usuários ou senhas padrão. Crie o primeiro usuário pel
 
 ## Agente Starlink
 
+O versionamento do agente é automático. Ao publicar um bundle `.cjs` em **Integração Zabbix / Versões do agente**, a API calcula a próxima versão patch (`1.0.0` → `1.0.1`), embute a versão no arquivo baixável, recalcula o SHA-256 e valida o artefato. Para validar um bundle localmente:
+
+```powershell
+node dist/agent/healthlink-agent-1.0.0.cjs --version
+```
+
+O comando imprime `HealthLink Sentinel Agent v<versão>`.
+
 O agente roda no servidor local da unidade e consulta a antena pela API gRPC local, normalmente em `192.168.100.1:9200`. Ele mantém uma fila local quando a API central está indisponível.
 
 Para uma unidade com usuário de serviço, preencha no `.env`:

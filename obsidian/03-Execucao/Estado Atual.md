@@ -45,6 +45,7 @@ phase: foundation
 # Estado Atual
 
 > Atualização 2026-08-21: o ambiente de desenvolvimento local foi colocado em HTTPS ponta a ponta. A API Fastify usa `HTTPS=true` com certificado em `.certs/localhost*.pem`, e o Vite usa o mesmo par em `https://localhost:5173`; a API local fica em `https://localhost:3002`. Os certificados são gerados sob demanda por `npm.cmd run dev:cert` e não são versionados.
+> Atualização 2026-08-24: publicação de agente calcula automaticamente a próxima versão patch, embute a versão no `.cjs` baixável e valida o conteúdo com SHA-256. A conferência local usa `node <bundle>.cjs --version`.
 > O HTTPS direto no Docker usa o override `docker-compose.local-https.yml`. O Compose base continua HTTP interno, compatível com o proxy reverso do ambiente de produção.
 > Correção: o build de produção não exige certificados locais; o Vite só configura HTTPS quando encontra `.certs/`.
 

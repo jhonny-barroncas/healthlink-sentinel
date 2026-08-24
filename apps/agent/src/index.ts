@@ -101,6 +101,10 @@ export async function runAgent(config: AgentConfig, once = false): Promise<void>
 
 export async function main(argv = process.argv): Promise<void> {
   const cli = parseAgentCli(argv);
+  if (cli.command === 'version') {
+    console.log(`HealthLink Sentinel Agent v${bundledAgentVersion()}`);
+    return;
+  }
   if (cli.command === 'enroll') {
     const installed = await enrollAndSave({
       apiUrl: cli.apiUrl,

@@ -5,6 +5,7 @@ import { env } from '../../../platform/env.js';
 import { hasPermission, permission } from '../../../platform/authorization.js';
 import { database, withTenant } from '../../../platform/database.js';
 import { isDeployableAgentArtifact } from '../agent/provisioning.js';
+import { embedAgentVersion, extractEmbeddedAgentVersion, nextAgentVersion } from '../agent/versioning.js';
 import { ZabbixClient, ZabbixHttpTransport } from './client.js';
 import { selectLinkMetricCandidates, type LinkMetric, type ZabbixItem } from './telemetry.js';
 
@@ -444,16 +445,21 @@ export const zabbixRoutes: FastifyPluginAsync = async (app) => {
   app.post('/v1/integrations/zabbix/agent-versions', { preHandler: [app.authenticate] }, async (request, reply) => {
     requireAgentVersionAccess(request);
     const input = z.object({
-      version: z.string().regex(/^\d+\.\d+\.\d+$/),
       platform: z.enum(['windows', 'linux']),
       fileName: z.string().min(1).max(200),
       artifactBase64: z.string().min(1).max(25_000_000),
     }).parse(request.body);
     if (!isDeployableAgentArtifact(input.fileName)) throw Object.assign(new Error('Publique o bundle executável .cjs do agente; o instalador .ps1/.sh é gerado automaticamente por servidor.'), { statusCode: 422 });
-    const artifact = Buffer.from(input.artifactBase64, 'base64');
-    if (!artifact.length || artifact.length > 20 * 1024 * 1024) throw Object.assign(new Error('O arquivo precisa ter entre 1 byte e 20 MB.'), { statusCode: 422 });
-    const checksum = createHash('sha256').update(artifact).digest('hex');
+    const uploadedArtifact = Buffer.from(input.artifactBase64, 'base64');
+    if (!uploadedArtifact.length || uploadedArtifact.length > 20 * 1024 * 1024) throw Object.assign(new Error('O arquivo precisa ter entre 1 byte e 20 MB.'), { statusCode: 422 });
     return withTenant(request.auth.tenantId, async (db) => {
+      const versions = await db.query<{ version: string }>('SELECT version FROM agent_versions WHERE tenant_id = $1', [request.auth.tenantId]);
+      const version = nextAgentVersion(versions.rows.map((row) => row.version));
+      let artifact: Buffer;
+      try { artifact = embedAgentVersion(uploadedArtifact, version); }
+      catch (error) { throw Object.assign(new Error(error instanceof Error ? error.message : 'Bundle sem versão embutida.'), { statusCode: 422 }); }
+      if (extractEmbeddedAgentVersion(artifact) !== version) throw Object.assign(new Error('A versão embutida no bundle não pôde ser validada.'), { statusCode: 422 });
+      const checksum = createHash('sha256').update(artifact).digest('hex');
       const result = await db.query(`
         INSERT INTO agent_versions (tenant_id, version, platform, file_name, artifact, file_size, checksum_sha256)
         VALUES ($1,$2,$3,$4,$5,$6,$7)
@@ -461,7 +467,7 @@ export const zabbixRoutes: FastifyPluginAsync = async (app) => {
           artifact = EXCLUDED.artifact, file_size = EXCLUDED.file_size, checksum_sha256 = EXCLUDED.checksum_sha256,
           active = true, created_at = now()
         RETURNING id, version, platform, file_name, file_size, checksum_sha256, active, created_at
-      `, [request.auth.tenantId, input.version, input.platform, input.fileName, artifact, artifact.length, checksum]);
+      `, [request.auth.tenantId, version, input.platform, input.fileName, artifact, artifact.length, checksum]);
       return reply.code(201).send(result.rows[0]);
     });
   });

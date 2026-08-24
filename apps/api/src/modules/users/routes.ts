@@ -5,7 +5,7 @@ import { hasPermission, permission } from '../../platform/authorization.js';
 import { hashPassword } from '../auth/password.js';
 
 const userSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().email().max(254),
   displayName: z.string().trim().min(2).max(120),
   password: z.string().min(8).max(200),
   role: z.enum(['tenant_administrator', 'supervisor', 'noc_operator', 'viewer', 'service_agent']).default('viewer'),

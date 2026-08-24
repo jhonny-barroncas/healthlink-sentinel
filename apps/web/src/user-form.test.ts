@@ -10,4 +10,9 @@ describe('validateManagedUserForm', () => {
     expect(validateManagedUserForm({ displayName: 'Maria Silva', email: 'maria@healthlink.test', role: 'viewer', password: '', editing: false })).toContain('password');
     expect(validateManagedUserForm({ displayName: 'Maria Silva', email: 'maria@healthlink.test', role: 'viewer', password: '', editing: true })).not.toContain('password');
   });
+
+  it('rejects invalid email and passwords outside the allowed range', () => {
+    expect(validateManagedUserForm({ displayName: 'Maria Silva', email: 'nao-e-mail', role: 'viewer', password: 'senha-segura', editing: false })).toContain('email');
+    expect(validateManagedUserForm({ displayName: 'Maria Silva', email: 'maria@healthlink.test', role: 'viewer', password: 'a'.repeat(201), editing: false })).toContain('password');
+  });
 });
