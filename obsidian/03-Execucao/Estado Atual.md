@@ -168,3 +168,13 @@ Os itens abaixo descrevem o ponto de partida histórico e não representam o est
 Atualização 2026-08-24: filtros da tela principal ampliados com tipo de unidade (fixa/móvel), situação e UF. O bloco usa o padrão visual dark/glass existente, possui botão de limpeza e quebra responsiva; typecheck e build web aprovados.
 
 Atualização 2026-08-24: implementada a tela Relatórios de incidentes com filtros operacionais, resumo de indicadores, tabela auditável, atualização manual e impressão. A lógica foi coberta por `apps/web/src/incident-reports.test.ts`; suíte completa, typecheck e build web aprovados.
+
+Atualização 2026-08-25: a branch `codex/reestruturacao-visual` iniciou a fundação visual compartilhada. `apps/web/src/styles.css` agora concentra tokens semânticos para texto/estado, sombras, curva de movimento e animações de entrada/expansão/feedback, além da redução automática de movimento para acessibilidade. Próximas etapas aplicarão esses tokens por tela.
+
+Atualização 2026-08-25: o login passou a usar uma revelação única por névoa ciano e blur progressivo, com brilho suave de passagem e sem animação individual dos campos. O bundle foi rebuildado no Docker local e o serviço `healthlink` reiniciado para validar o comportamento.
+
+Atualização 2026-08-25: o hero do login agora usa título dividido em letras, com entrada vertical/blur inspirada na referência Apple Music. O estado final foi validado sem blur residual; o fundo usa gradientes ciano com movimento contínuo discreto.
+
+Atualização 2026-08-25: a animação do hero foi ajustada para o padrão corporativo aprovado: palavras em blocos, entrada única com elevação/blur mínimo e gradiente ciano sem loop contínuo. Typecheck e rebuild Docker foram validados.
+
+Atualização 2026-08-25: aplicado o primeiro refinamento visual no Centro Operacional: resumo, chamada de operação, mapa e ranking usam entrada coordenada e hover sutil, preservando o comportamento operacional existente. Typecheck, build web e rebuild Docker passaram.

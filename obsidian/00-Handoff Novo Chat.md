@@ -109,6 +109,16 @@ Atualização 2026-08-24: o versionamento do agente passou a ser automático. A 
 
 Atualização 2026-08-24: erros de validação no login e nos fluxos de usuários passaram a ser traduzidos para mensagens operacionais amigáveis, sem exibir JSON bruto ou detalhes internos. E-mails têm limite de 254 caracteres e senhas de 8 a 200 caracteres na API e nos formulários. As consultas de usuários foram revisadas e permanecem parametrizadas.
 
+Atualização 2026-08-25: iniciada a reestruturação visual geral na branch `codex/reestruturacao-visual`. A primeira camada consolidou tokens semânticos de texto/estado, sombras, curva de movimento e animações reutilizáveis (`motion-enter`, `motion-fade`, `motion-expand`, `status-live`), com fallback global para `prefers-reduced-motion`. Não houve alteração de regras de negócio, RBAC ou contratos da API.
+
+Atualização 2026-08-25: a animação do login foi refinada para uma entrada composta inspirada na referência Apple Music: névoa ciano difusa, brilho de passagem e revelação conjunta do layout por blur/opacidade. A entrada individual sequencial dos campos foi removida para preservar uma apresentação corporativa mais elegante.
+
+Atualização 2026-08-25: a tela de login passou a animar o título principal letra por letra, com deslocamento vertical e blur que termina em nitidez total. O fundo mantém gradientes ciano em movimento suave; a regra de animação foi corrigida para não deixar o texto borrado após a conclusão.
+
+Atualização 2026-08-25: refinada a direção do login para uma linguagem mais corporativa. O título agora entra por blocos de palavras, com deslocamento curto e blur mínimo; o fundo executa somente uma transição de gradiente, sem movimento contínuo ou efeito promocional.
+
+Atualização 2026-08-25: iniciado o segundo lote visual no Centro Operacional. Indicadores, chamada operacional, mapa e ranking agora entram com transição única e hierarquia de elevação/hover discreta, sem alteração no recorte de dados ou nas regras de monitoramento.
+
 Atualização 2026-08-21: o HTTPS direto do Docker foi isolado em `docker-compose.local-https.yml`. O Compose base permanece HTTP interno para não quebrar produção quando o proxy reverso existente termina o TLS e encaminha para o container.
 
 Correção 2026-08-21: o build Docker não depende mais da existência dos certificados locais; o Vite ativa HTTPS somente quando `.certs/localhost*.pem` está presente.
