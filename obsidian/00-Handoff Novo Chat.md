@@ -119,6 +119,8 @@ Atualização 2026-08-25: refinada a direção do login para uma linguagem mais 
 
 Atualização 2026-08-25: iniciado o segundo lote visual no Centro Operacional. Indicadores, chamada operacional, mapa e ranking agora entram com transição única e hierarquia de elevação/hover discreta, sem alteração no recorte de dados ou nas regras de monitoramento.
 
+Atualização 2026-08-25: o Centro Operacional recebeu um passe minimalista. Cards de indicadores perderam decoração e sombras pesadas, filtros usam divisores sutis e mapa/ranking passaram a ter mais espaço visual e menor ruído de borda.
+
 Atualização 2026-08-21: o HTTPS direto do Docker foi isolado em `docker-compose.local-https.yml`. O Compose base permanece HTTP interno para não quebrar produção quando o proxy reverso existente termina o TLS e encaminha para o container.
 
 Correção 2026-08-21: o build Docker não depende mais da existência dos certificados locais; o Vite ativa HTTPS somente quando `.certs/localhost*.pem` está presente.
@@ -243,6 +245,12 @@ Atualização 2026-08-21: a aplicação HealthLink foi padronizada para escutar 
 Correção 2026-08-24: o healthcheck do Compose passou a detectar automaticamente se a API local está em HTTP ou HTTPS, respeitando `HTTPS=true` do ambiente local. Isso evita o container ficar como `unhealthy` quando a API usa certificado local.
 
 Correção adicional 2026-08-24: o CORS da API passou a aceitar as origens HTTPS locais e do domínio oficial nas portas `3002`/`3003`, mantendo as portas de desenvolvimento existentes. Isso permite o login quando o frontend é servido diretamente pela API em HTTPS.
+
+Correção visual 2026-08-25: o modal de visão geográfica estadual passou a ser renderizado no `body` via portal. A animação do Centro Operacional aplicava `transform` ao contêiner da tela, fazendo um modal `position: fixed` usar a área interna como referência e ficar deslocado/cortado. O dimensionamento agora respeita a viewport e adapta cabeçalho, mapa, painel lateral e rodapé em telas menores.
+
+Ajuste visual 2026-08-25: o modal estadual ganhou dimensionamento fluido em viewports muito amplas, cenário comum quando o zoom do navegador está em 50%/67%. Assim ele não fica reduzido por um teto fixo de largura/altura; no zoom normal os limites anteriores permanecem.
+
+Atualização visual 2026-08-25: os marcadores georreferenciados do mapa estadual agora sinalizam incidentes ativos por unidade. Alertas de atenção usam pin âmbar com pulso discreto; severidades críticas usam pin vermelho com pulso mais evidente; alertas resolvidos não permanecem sinalizados. O marcador mantém a unidade como único ponto do mapa e expõe a contagem no rótulo acessível.
 
 ## Documentação relacionada
 

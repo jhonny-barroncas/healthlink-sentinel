@@ -178,3 +178,11 @@ Atualização 2026-08-25: o hero do login agora usa título dividido em letras, 
 Atualização 2026-08-25: a animação do hero foi ajustada para o padrão corporativo aprovado: palavras em blocos, entrada única com elevação/blur mínimo e gradiente ciano sem loop contínuo. Typecheck e rebuild Docker foram validados.
 
 Atualização 2026-08-25: aplicado o primeiro refinamento visual no Centro Operacional: resumo, chamada de operação, mapa e ranking usam entrada coordenada e hover sutil, preservando o comportamento operacional existente. Typecheck, build web e rebuild Docker passaram.
+
+Atualização 2026-08-25: aplicado o refinamento minimalista no Centro Operacional. Foram reduzidas sombras, contornos e elementos decorativos dos indicadores; filtros, mapa e ranking ganharam mais respiro sem alterar dados ou interações.
+
+Atualização 2026-08-25: corrigido o modal do mapa estadual que ficava deslocado e cortava o seletor de tema após a animação do Centro Operacional. A janela agora usa portal no `body`, limites de largura/altura baseados na viewport e regras responsivas para o painel de ativos. Typecheck, build web e rebuild Docker foram validados.
+
+Atualização 2026-08-25: o mapa estadual passou a ocupar a viewport em larguras CSS muito amplas, evitando que o zoom reduzido do navegador deixe o card visualmente pequeno. O comportamento padrão em zoom normal foi preservado; typecheck, build web e rebuild Docker passaram novamente.
+
+Atualização 2026-08-25: adicionada sinalização visual de incidentes no pin da unidade no mapa estadual. A severidade mais alta entre os alertas ativos define pin âmbar ou vermelho, com animação de pulso e rótulo acessível; alertas resolvidos são ignorados. A regra foi coberta por teste unitário e validada com typecheck, build web e rebuild Docker.
