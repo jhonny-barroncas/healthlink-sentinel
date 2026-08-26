@@ -3,7 +3,7 @@ type MapUnitRef = { unit_id: string; code: string; operational_status: 'online' 
 type MapAlertRef = { unit_id?: string | null; unit_code?: string; severity: number; status: string };
 
 export function selectMapAsset(unitId: string, equipmentId: string): MapAssetRef {
-  return { unitId, equipmentId };
+  return { unit_id: unitId, equipment_id: equipmentId };
 }
 
 export function hasUnitAssets(unitId: string, equipment: MapAssetRef[], telemetry: MapAssetRef[]): boolean {

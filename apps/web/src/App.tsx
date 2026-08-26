@@ -1,4 +1,4 @@
-import { FormEvent, ReactNode, type MouseEvent as ReactMouseEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, ReactNode, type CSSProperties, type MouseEvent as ReactMouseEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import brazilMap from '@svg-maps/brazil';
 import Map, { Marker, NavigationControl, Popup, type MapRef } from 'react-map-gl/maplibre';
@@ -6,7 +6,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import brandIcon from './assets/brand-icon.svg';
 import { validateManagedUserForm } from './user-form.js';
 import { groupTelemetryByUnit } from './state-map-telemetry.js';
-import { chooseDiagnosticTarget } from './diagnostic-target.js';
+import { chooseDiagnosticTarget, type DiagnosticTargetCandidate } from './diagnostic-target.js';
 import { getUnitMapAlertState, hasUnitAssets, selectMapAsset } from './state-map-interactions.js';
 import { agentStatusLabel, type AgentRecord } from './agent-status.js';
 import { localAgentSourcePayload } from './starlink-source.js';
@@ -14,7 +14,7 @@ import { canPublishAgentVersion, type AgentPlatform, type AgentVersionRecord } f
 import { agentInstallerFileName, extractAgentInstallerFileName, getAgentProvisioningRequirements } from './agent-provisioning.js';
 import { friendlyApiMessage } from './error-messages.js';
 import { filterIncidentReports, summarizeIncidentReports, type IncidentReportFilters } from './incident-reports.js';
-import { EyeIcon, EyeOffIcon, UserIcon, ChevronIcon, EditIcon, LogoutIcon, CloseIcon, BlockIcon, UnblockIcon, RejectIcon, CheckIcon, EyeCheckIcon, ResolveIcon, NavDashboardIcon, NavTruckIcon, NavBellIcon, NavActivityIcon, NavUsersIcon, NavReportIcon, SyncIcon, SunIcon, SearchIcon, HomeIcon, BreadcrumbChevronIcon, NavGeneralIcon, NavLinkIcon, NavVpnIcon, NavServerIcon, ClipboardIcon, MoonIcon, WarningIcon, ErrorIcon, InfoIcon, PingIcon, TracertIcon, TrashIcon, PlusIcon, RefreshIcon, ClearFilterIcon } from './icons.js';
+import { EyeIcon, EyeOffIcon, UserIcon, ChevronIcon, EditIcon, LogoutIcon, CloseIcon, BlockIcon, UnblockIcon, RejectIcon, CheckIcon, EyeCheckIcon, ResolveIcon, NavDashboardIcon, NavTruckIcon, NavBellIcon, NavActivityIcon, NavUsersIcon, NavReportIcon, SyncIcon, SunIcon, SearchIcon, HomeIcon, BreadcrumbChevronIcon, NavGeneralIcon, NavLinkIcon, NavVpnIcon, NavServerIcon, ClipboardIcon, MoonIcon, WarningIcon, ErrorIcon, InfoIcon, PingIcon, TracertIcon, TrashIcon, PlusIcon, RefreshIcon, ClearFilterIcon, AgentIcon, CalendarIcon, ChevronLeftIcon, ChevronRightIcon, PackageIcon, FolderIcon, UploadIcon } from './icons.js';
 
 type LoginResponse = { accessToken: string; user: { id: string; displayName: string; email: string }; tenant: { name: string; roles?: string[] } };
 type Unit = { unit_id: string; code: string; name: string; state_code: string; city: string; unit_type: 'mobile' | 'fixed'; latitude: number | string | null; longitude: number | string | null; operational_status: 'online' | 'degraded' | 'offline' | 'unknown'; offline_equipment: number; degraded_equipment: number };
@@ -261,7 +261,7 @@ export function App() {
   const selectedUnit = units.find((unit) => unit.unit_id === selectedUnitId);
   const selectedEquipment = equipment.filter((item) => item.unit_id === selectedUnitId);
   const scopeLabelFor = (scope: 'all' | 'links' | 'agents' | 'servers') => scope === 'all' ? 'Geral' : scope === 'links' ? 'Links' : scope === 'agents' ? 'Agentes' : 'Servidores';
-  const breadcrumbSectionLabel = view === 'command' ? 'Visão geral' : view === 'mobile-units' ? 'Unidades móveis' : view === 'fixed-units' ? 'Unidades' : view === 'alerts' ? 'Alertas' : view === 'reports' ? 'Relatórios' : view === 'connections' ? 'Status das conexões' : view === 'users' ? 'Usuários' : 'Integração Zabbix';
+  const breadcrumbSectionLabel = view === 'command' ? 'Visão geral' : view === 'mobile-units' ? 'Unidades móveis' : view === 'fixed-units' ? 'Unidades fixas' : view === 'alerts' ? 'Alertas' : view === 'reports' ? 'Relatórios' : view === 'connections' ? 'Status das conexões' : view === 'users' ? 'Usuários' : 'Integração Zabbix';
   async function refreshAlerts() {
     if (!session) return;
     await loadAlerts(alertMode);
@@ -329,7 +329,7 @@ export function App() {
           {commandMenuOpen && view === 'command' && <div className="nav-submenu" aria-label="Filtros do centro operacional">
             {([['all', 'Geral', <NavGeneralIcon />], ['links', 'Links', <NavLinkIcon />], ['agents', 'Agentes', <NavVpnIcon />], ['servers', 'Servidores', <NavServerIcon />]] as const).map(([scope, label, icon]) => <button key={scope} className={`nav-subitem ${commandScope === scope ? 'active' : ''}`} onClick={() => { setCommandScope(scope); setSelectedUnitId(null); }}><span className="nav-subitem-icon">{icon}</span>{label}</button>)}
           </div>}
-          {!(session.tenant.roles ?? []).includes('mobile_unit_supervisor') && <button title="Unidades" className={`nav-item ${view === 'fixed-units' ? 'active' : ''}`} onClick={() => { setView('fixed-units'); setSelectedUnitId(null); }}><span className="nav-icon"><NavServerIcon /></span><span className="nav-label">Unidades</span></button>}
+          {!(session.tenant.roles ?? []).includes('mobile_unit_supervisor') && <button title="Unidades fixas" className={`nav-item ${view === 'fixed-units' ? 'active' : ''}`} onClick={() => { setView('fixed-units'); setSelectedUnitId(null); }}><span className="nav-icon"><NavServerIcon /></span><span className="nav-label">Unidades fixas</span></button>}
           <button title="Unidades móveis" className={`nav-item ${view === 'mobile-units' ? 'active' : ''}`} onClick={() => { setView('mobile-units'); setSelectedUnitId(null); }}><span className="nav-icon"><NavTruckIcon /></span><span className="nav-label">Unidades móveis</span></button>
           <button title="Alertas" className={`nav-item ${view === 'alerts' ? 'active' : ''}`} onClick={() => { setView('alerts'); setSelectedUnitId(null); }}><span className="nav-icon"><NavBellIcon /></span><span className="nav-label">Alertas</span>{activeAlertCount > 0 && <b className="nav-badge">{activeAlertCount}</b>}</button>
           <button title="Status das conexões" className={`nav-item ${view === 'connections' ? 'active' : ''}`} onClick={() => { setView('connections'); setSelectedUnitId(null); void loadZabbixStatus(); }}><span className="nav-icon"><NavActivityIcon /></span><span className="nav-label">Status das conexões</span><i className={`nav-health-dot ${zabbixStatus?.health_status ?? 'unknown'}`} /></button>
@@ -383,7 +383,7 @@ export function App() {
               <button className="error-banner-close" onClick={() => setError('')} title="Fechar"><CloseIcon /></button>
             </div>
           )}
-          {view === 'alerts' ? <AlertsCenter alerts={alerts} mode={alertMode} loading={alertsLoading} onModeChange={setAlertMode} onAction={changeAlert} onRetry={() => void loadAlerts(alertMode).catch((r: Error) => setError(r.message))} /> : view === 'reports' ? <IncidentReports alerts={[...activeAlerts, ...resolvedAlerts]} units={units} onRefresh={() => { void Promise.all([loadAlerts('active'), loadResolvedAlerts()]); }} /> : view === 'users' ? <UsersPanel users={managedUsers} requests={accessRequests} loading={usersLoading} token={session.accessToken} onRefresh={loadUsers} onChange={changeUser} onToast={addToast} /> : view === 'command' ? <CommandCenter units={units} equipment={equipment} agents={agents} alerts={activeAlerts} resolvedAlerts={resolvedAlerts} summary={summary} scope={commandScope} token={session.accessToken} onInventoryRefresh={refreshInventory} onError={setError} onSelectUnit={(unitId) => { setSelectedUnitId(unitId); setView('mobile-units'); }} /> : view === 'connections' ? <ConnectionStatus integrationStatus={zabbixStatus} onRefresh={loadZabbixStatus} onOpenZabbix={() => { setView('zabbix'); void loadZabbixCandidates(); }} /> : view === 'zabbix' ? <ZabbixIntegration candidates={zabbixCandidates} integrationStatus={zabbixStatus} units={units} loading={zabbixLoading} onRefresh={loadZabbixCandidates} onStatusRefresh={loadZabbixStatus} onInventoryRefresh={refreshInventory} onAlertsRefresh={refreshAlerts} onError={setError} onToast={addToast} token={session.accessToken} /> : <><InventoryActions unitType={view === 'mobile-units' ? 'mobile' : 'fixed'} token={session.accessToken} units={units} selectedUnit={selectedUnit} onRefresh={refreshInventory} onError={(message) => { setError(message); addToast({ type: 'error', title: 'Falha no cadastro', detail: message }); }} onToast={addToast} /><UnitsView units={units.filter((unit) => unit.unit_type === (view === 'mobile-units' ? 'mobile' : 'fixed'))} selectedUnit={selectedUnit} selectedEquipment={selectedEquipment} loading={loading} summary={{ online: units.filter((u) => u.unit_type === (view === 'mobile-units' ? 'mobile' : 'fixed') && u.operational_status === 'online').length, attention: units.filter((u) => u.unit_type === (view === 'mobile-units' ? 'mobile' : 'fixed') && u.operational_status === 'degraded').length, offline: units.filter((u) => u.unit_type === (view === 'mobile-units' ? 'mobile' : 'fixed') && u.operational_status === 'offline').length, unknown: units.filter((u) => u.unit_type === (view === 'mobile-units' ? 'mobile' : 'fixed') && u.operational_status === 'unknown').length }} onSelectUnit={setSelectedUnitId} onBack={() => setSelectedUnitId(null)} onInventoryRefresh={refreshInventory} token={session.accessToken} onToast={addToast} /></>}
+          {view === 'alerts' ? <AlertsCenter alerts={alerts} mode={alertMode} loading={alertsLoading} onModeChange={setAlertMode} onAction={changeAlert} onRetry={() => void loadAlerts(alertMode).catch((r: Error) => setError(r.message))} /> : view === 'reports' ? <IncidentReports alerts={[...activeAlerts, ...resolvedAlerts]} units={units} onRefresh={() => { void Promise.all([loadAlerts('active'), loadResolvedAlerts()]); }} /> : view === 'users' ? <UsersPanel users={managedUsers} requests={accessRequests} loading={usersLoading} token={session.accessToken} onRefresh={loadUsers} onChange={changeUser} onToast={addToast} /> : view === 'command' ? <CommandCenter units={units} equipment={equipment} agents={agents} alerts={activeAlerts} resolvedAlerts={resolvedAlerts} summary={summary} scope={commandScope} token={session.accessToken} onInventoryRefresh={refreshInventory} onError={setError} onSelectUnit={(unitId) => { setSelectedUnitId(unitId); setView('mobile-units'); }} onToast={addToast} /> : view === 'connections' ? <ConnectionStatus integrationStatus={zabbixStatus} onRefresh={loadZabbixStatus} onOpenZabbix={() => { setView('zabbix'); void loadZabbixCandidates(); }} /> : view === 'zabbix' ? <ZabbixIntegration candidates={zabbixCandidates} integrationStatus={zabbixStatus} units={units} loading={zabbixLoading} onRefresh={loadZabbixCandidates} onStatusRefresh={loadZabbixStatus} onInventoryRefresh={refreshInventory} onAlertsRefresh={refreshAlerts} onError={setError} onToast={addToast} token={session.accessToken} /> : <><InventoryActions unitType={view === 'mobile-units' ? 'mobile' : 'fixed'} token={session.accessToken} units={units} selectedUnit={selectedUnit} onRefresh={refreshInventory} onError={(message) => { setError(message); addToast({ type: 'error', title: 'Falha no cadastro', detail: message }); }} onToast={addToast} /><UnitsView units={units.filter((unit) => unit.unit_type === (view === 'mobile-units' ? 'mobile' : 'fixed'))} selectedUnit={selectedUnit} selectedEquipment={selectedEquipment} loading={loading} summary={{ online: units.filter((u) => u.unit_type === (view === 'mobile-units' ? 'mobile' : 'fixed') && u.operational_status === 'online').length, attention: units.filter((u) => u.unit_type === (view === 'mobile-units' ? 'mobile' : 'fixed') && u.operational_status === 'degraded').length, offline: units.filter((u) => u.unit_type === (view === 'mobile-units' ? 'mobile' : 'fixed') && u.operational_status === 'offline').length, unknown: units.filter((u) => u.unit_type === (view === 'mobile-units' ? 'mobile' : 'fixed') && u.operational_status === 'unknown').length }} onSelectUnit={setSelectedUnitId} onBack={() => setSelectedUnitId(null)} onInventoryRefresh={refreshInventory} token={session.accessToken} onToast={addToast} /></>}
         </section>
       </main>
       {profileModalOpen && <EditProfileModal session={session} onSave={(newName) => { setSession({ ...session, user: { ...session.user, displayName: newName } }); addToast({ type: 'success', title: 'Perfil atualizado', detail: 'Nome de exibição salvo com sucesso.' }); }} onClose={() => setProfileModalOpen(false)} />}
@@ -458,7 +458,7 @@ function AgentOverview({ agents, onSelectUnit }: { agents: AgentRecord[]; onSele
   return <div className="agent-overview"><div className="command-summary"><CommandMetric label="Unidades móveis" value={String(agents.length)} note="no recorte atual" tone="neutral" /><CommandMetric label="Agentes em execução" value={String(online)} note="heartbeat ≤ 30s" tone="ok" /><CommandMetric label="Agentes parados" value={String(offline)} note="sem heartbeat recente" tone="danger" /><CommandMetric label="Sem vínculo" value={String(unlinked + pending)} note={pending ? `${pending} aguardando instalação` : 'nenhuma instalação pendente'} tone="warn" /></div><div className="agent-list">{agents.length === 0 ? <div className="empty-state"><h3>Nenhuma unidade móvel encontrada</h3><p>Cadastre um servidor e uma fonte para gerar o agente.</p></div> : agents.map((agent) => <button className="agent-row" key={agent.unitId} onClick={() => onSelectUnit(agent.unitId)}><span className={`legend-dot ${agent.status === 'online' || agent.status === 'offline' ? agent.status : 'unknown'}`} /><span><strong>{agent.unitCode} · {agent.unitName}</strong><small>{agent.city}/{agent.stateCode} · {agent.equipmentName ?? 'Nenhum servidor vinculado'}{agent.version ? ` · v${agent.version}` : ''}</small></span><em className={`status ${agent.status === 'online' || agent.status === 'offline' ? agent.status : 'unknown'}`}>{agentStatusLabel(agent.status)}</em></button>)}</div></div>;
 }
 
-function CommandCenter({ units, equipment, agents, alerts: _alerts, resolvedAlerts, summary: _summary, scope, token, onInventoryRefresh, onError, onSelectUnit }: { units: Unit[]; equipment: Equipment[]; agents: AgentRecord[]; alerts: Alert[]; resolvedAlerts: Alert[]; summary: { online: number; attention: number; offline: number; unknown: number }; scope: 'all' | 'links' | 'agents' | 'servers'; token: string; onInventoryRefresh: () => Promise<void>; onError: (message: string) => void; onSelectUnit: (unitId: string) => void }) {
+function CommandCenter({ units, equipment, agents, alerts: _alerts, resolvedAlerts, summary: _summary, scope, token, onInventoryRefresh, onError, onSelectUnit, onToast = () => undefined }: { units: Unit[]; equipment: Equipment[]; agents: AgentRecord[]; alerts: Alert[]; resolvedAlerts: Alert[]; summary: { online: number; attention: number; offline: number; unknown: number }; scope: 'all' | 'links' | 'agents' | 'servers'; token: string; onInventoryRefresh: () => Promise<void>; onError: (message: string) => void; onSelectUnit: (unitId: string) => void; onToast?: (toast: Omit<Toast, 'id'>) => void }) {
   const [selectedStateCode, setSelectedStateCode] = useState<string | null>(null);
   const [stateMapCode, setStateMapCode] = useState<string | null>(null);
   const [hoveredStateCode, setHoveredStateCode] = useState<string | null>(null);
@@ -506,9 +506,9 @@ function CommandCenter({ units, equipment, agents, alerts: _alerts, resolvedAler
   }, [mapContext]);
   return <section className="command-center">
     {scope === 'agents' ? <AgentOverview agents={agents.filter((agent) => visibleUnitCodes.has(agent.unitCode))} onSelectUnit={onSelectUnit} /> : stateMapCode && createPortal(<StateLocationMap stateCode={stateMapCode} units={filteredUnits.filter((unit) => unit.state_code.toUpperCase() === stateMapCode)} equipment={visibleEquipment} telemetry={linkTelemetry} alerts={[..._alerts, ...resolvedAlerts]} onClose={() => setStateMapCode(null)} onSelectUnit={onSelectUnit} onLocateUnit={onSelectUnit} onAddEquipment={setEquipmentModalUnit} onDiagnostic={async (target, action) => api<DiagnosticResult>(`/v1/equipment/${target.equipment_id}/diagnostics`, token, { method: 'POST', body: JSON.stringify({ action }) })} />, document.body)}
-    {equipmentModalUnit && <div className="form-modal-backdrop" role="presentation" onMouseDown={() => setEquipmentModalUnit(null)}><div className="form-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}><EquipmentForm token={token} unit={equipmentModalUnit} onCreated={async () => { setEquipmentModalUnit(null); await onInventoryRefresh(); }} onCancel={() => setEquipmentModalUnit(null)} onError={onError} /></div></div>}
+    {equipmentModalUnit && createPortal(<EquipmentForm token={token} unit={equipmentModalUnit} onCreated={async () => { setEquipmentModalUnit(null); await onInventoryRefresh(); }} onCancel={() => setEquipmentModalUnit(null)} onError={onError} onToast={onToast} />, document.body)}
     <div className="command-scope-heading"><p className="eyebrow">CENTRO OPERACIONAL · VISÃO FILTRADA</p><h2>{scopeLabel}</h2><small>{scope === 'all' ? 'Todas as unidades e equipamentos monitorados.' : `Unidades com equipamentos classificados como ${scopeLabel.toLowerCase()}.`}</small></div>
-    {quickCreateStateCode && <div className="map-quick-create"><UnitForm token={token} initialStateCode={quickCreateStateCode} onCreated={async () => { setQuickCreateStateCode(null); await onInventoryRefresh(); }} onCancel={() => setQuickCreateStateCode(null)} /></div>}
+    {quickCreateStateCode && <div className="map-quick-create"><UnitForm token={token} initialStateCode={quickCreateStateCode} onCreated={async () => { setQuickCreateStateCode(null); await onInventoryRefresh(); }} onCancel={() => setQuickCreateStateCode(null)} onToast={onToast} /></div>}
     <div className="command-summary">
       <CommandMetric label="Total unidades" value={String(visibleUnits.length)} note="inventário monitorado" tone="neutral" />
       <CommandMetric label="Online" value={String(summary.online)} note={`${availability}% respondendo`} tone="ok" />
@@ -532,7 +532,7 @@ function CommandCenter({ units, equipment, agents, alerts: _alerts, resolvedAler
           })}
         </svg>{hoveredStateCode && <div className="map-tooltip"><span>{hoveredStateCode}</span><strong>{stateNameByCode[hoveredStateCode] ?? mapLocations.find((location) => location.id.toUpperCase() === hoveredStateCode)?.name}</strong><small>{hoveredUnits.length ? `${hoveredUnits.length} unidade(s) · ${statusLabel[hoveredStatus]}` : 'Nenhuma unidade cadastrada'}</small></div>}</div>
         <div className="map-selection">{selectedStateCode ? <><strong>{selectedStateCode}</strong><span>{selectedUnits.length ? `${selectedUnits.length} unidade(s) · ${statusLabel[hoveredStatus]}` : 'Nenhuma unidade cadastrada neste estado'}</span><button className="map-open-detail" onClick={() => setStateMapCode(selectedStateCode)}>Explorar mapa</button></> : <span>Selecione um estado no mapa para consultar a prontidão local.</span>}</div>
-        {selectedStateCode && selectedUnits.length > 0 && <div className="map-unit-list">{selectedUnits.map((unit) => <button key={unit.unit_id} className={unit.operational_status} onClick={() => onSelectUnit(unit.unit_id)}><span className={`legend-dot ${unit.operational_status}`} /><span><strong>{unit.code}</strong><small>{unit.name}</small></span><em>{statusLabel[unit.operational_status]}</em></button>)}</div>}
+        {selectedStateCode && selectedUnits.length > 0 && <div className="map-unit-list">{selectedUnits.map((unit) => <button key={unit.unit_id} className={unit.operational_status} onClick={() => onSelectUnit(unit.unit_id)}><span className={`legend-dot ${unit.operational_status}`} /><span><strong>{unit.code}</strong><small>{unit.name}</small></span><span className={`status ${unit.operational_status}`}>{statusLabel[unit.operational_status]}</span></button>)}</div>}
         <div className="map-legend"><span><i className="legend-dot online" /> 100% online</span><span><i className="legend-dot degraded" /> Atenção / instável</span><span><i className="legend-dot offline" /> &gt;50% offline</span><span><i className="legend-dot unknown" /> Sem unidades</span><span><i className="legend-dot selected" /> UF selecionada</span></div>
       </article>
       <OperationalOverview units={filteredUnits} equipment={visibleEquipment} alerts={alerts} resolvedAlerts={scopedResolvedAlerts} summary={summary} onSelectUnit={onSelectUnit} />
@@ -651,13 +651,13 @@ function LinkAnalysisPanel({ unit, link, alerts, diagnosticLatencyMs, targetEqui
         <article className={`link-analysis-identity ${unit.operational_status}`}><div className="link-analysis-title"><div><span>LINK MONITORADO</span><strong>{link?.equipment_name ?? unit.name}</strong><small>Unidade {unit.code}</small></div><i /></div><div className="link-analysis-status-grid"><div><span>STATUS ATUAL</span><strong>{statusLabel[unit.operational_status]}</strong></div><div><span>{effectiveDiagnosticLatency === undefined ? 'ÚLTIMA AMOSTRA' : 'ÚLTIMO PING'}</span><strong>{effectiveDiagnosticLatency !== undefined ? `${formatLatencyMs(effectiveDiagnosticLatency)} · medição manual` : stale ? 'Telemetria zerada' : link?.observed_at ? new Date(link.observed_at).toLocaleString('pt-BR') : 'Sem telemetria'}</strong></div></div>{stale && <div className="link-analysis-zero-warning"><WarningIcon /> {link?.telemetry_error ?? 'Telemetria zerada: sem comunicação recente.'}</div>}<div className="link-analysis-command-actions"><button type="button" disabled={!targetEquipment?.management_address} onClick={() => onDiagnostic?.('ping')}><PingIcon /> Ping</button><button type="button" disabled={!targetEquipment?.management_address} onClick={() => onDiagnostic?.('tracert')}><TracertIcon /> Tracert</button></div>{!targetEquipment?.management_address && <small className="link-analysis-command-hint">Cadastre o endereço de gerenciamento para habilitar os comandos.</small>}<button onClick={onOpenInventory}>Abrir inventário completo</button></article>
         <article className="link-analysis-chart"><div className="link-analysis-section-head"><div><h3>Latência (ms)</h3><small>{effectiveDiagnosticLatency === undefined ? 'AMOSTRAS RECENTES DO ZABBIX · passe o mouse nos pontos' : 'ÚLTIMO PING LOCAL · MEDIÇÃO MANUAL'}</small></div><strong>{formatLatencyMs(hoveredLatency?.value ?? latency)}</strong></div><div className="link-chart-stage"><span>{formatLatencyMs(maximum)}</span><span>0 ms</span><svg viewBox="0 0 680 210" preserveAspectRatio="none" onMouseLeave={() => setHoveredLatency(null)}><line x1="0" y1="35" x2="680" y2="35" /><line x1="0" y1="87" x2="680" y2="87" /><line x1="0" y1="139" x2="680" y2="139" /><line x1="0" y1="190" x2="680" y2="190" /><polyline className={unit.operational_status} points={chartPoints} />{chartHistory.map((point, index) => { const x = (index / Math.max(1, chartHistory.length - 1)) * 680; const y = 190 - (point.value / maximum) * 155; const showTooltip = (event: ReactMouseEvent<SVGCircleElement>) => { const stage = event.currentTarget.ownerSVGElement?.parentElement; if (!stage) return; const bounds = stage.getBoundingClientRect(); setHoveredLatency({ value: point.value, observedAt: point.observed_at, left: Math.max(74, Math.min(bounds.width - 74, event.clientX - bounds.left)), top: Math.max(52, event.clientY - bounds.top) }); }; return <circle className="link-chart-point" key={`${point.observed_at}-${index}`} cx={x} cy={y} r="5" onMouseEnter={showTooltip} onMouseMove={showTooltip}><title>{`${formatLatencyMs(point.value)} · ${new Date(point.observed_at).toLocaleString('pt-BR')}`}</title></circle>; })}</svg>{hoveredLatency && <div className="link-chart-tooltip" style={{ left: hoveredLatency.left, top: hoveredLatency.top }}><strong>{formatLatencyMs(hoveredLatency.value)}</strong><small>{new Date(hoveredLatency.observedAt).toLocaleString('pt-BR')}</small></div>}{chartHistory.length < 2 && effectiveDiagnosticLatency === undefined && <div className="link-chart-empty">{stale ? 'Telemetria zerada: aguardando comunicação' : 'Aguardando histórico da coleta rápida'}</div>}</div></article>
         <div className="link-analysis-metrics"><article><span>PERDA DE PACOTES</span><strong>{formatPercent(loss, 2)}</strong><small>última amostra válida</small></article><article><span>DOWNLOAD ATUAL</span><strong>{formatLinkRate(inbound)}</strong><small>tráfego recebido na interface WAN</small></article><article><span>UPLOAD ATUAL</span><strong>{formatLinkRate(outbound)}</strong><small>tráfego enviado pela interface WAN</small></article><article><span>VELOCIDADE CONTRATADA</span><strong>↓ {formatContractedMbps(link?.contracted_download_mbps)}<br />↑ {formatContractedMbps(link?.contracted_upload_mbps)}</strong><small>download e upload cadastrados</small></article></div>
-        <article className="link-error-history"><div className="link-error-history-head"><div><span>HISTÓRICO DE ERROS</span><strong>Ocorrências do link</strong></div><small>{linkErrors.length + (stale ? 1 : 0)} registro(s)</small></div>{stale && <div className="link-error-row severity-4 telemetry-zero-error"><span className="link-error-indicator" /><div><strong>Telemetria zerada: sem comunicação</strong><small>{link?.telemetry_error ?? 'Nenhuma amostra válida recebida nos últimos 30 segundos.'}</small></div><span className="status offline">Aberto</span></div>}{linkErrors.length === 0 && !stale ? <div className="link-error-empty"><i>✓</i><div><strong>Nenhum erro registrado</strong><small>Alertas do Zabbix vinculados a este link aparecerão aqui.</small></div></div> : linkErrors.length > 0 && <div className="link-error-list">{linkErrors.map((alert) => <div className={`link-error-row severity-${alert.severity}`} key={alert.id}><span className="link-error-indicator" /><div><strong>{alert.title}</strong><small>{new Date(alert.opened_at).toLocaleString('pt-BR')}{alert.resolved_at ? ` · resolvido em ${new Date(alert.resolved_at).toLocaleString('pt-BR')}` : ''}</small></div><span className={`status ${alert.status === 'resolved' ? 'online' : alert.status === 'acknowledged' ? 'degraded' : 'offline'}`}>{alert.status === 'resolved' ? 'Resolvido' : alert.status === 'acknowledged' ? 'Reconhecido' : 'Aberto'}</span></div>)}</div>}</article>
+        <article className="link-error-history"><div className="link-error-history-head"><div><span>HISTÓRICO DE ERROS</span><strong>Ocorrências do link</strong></div><small>{linkErrors.length + (stale ? 1 : 0)} registro(s)</small></div>{linkErrors.length === 0 && !stale ? <div className="link-error-empty"><i>✓</i><div><strong>Nenhum erro registrado</strong><small>Alertas do Zabbix vinculados a este link aparecerão aqui.</small></div></div> : <div className="link-error-list">{stale && <div className="link-error-row offline telemetry-zero-error"><span className="link-error-indicator" /><div><strong>Telemetria zerada: sem comunicação</strong><small>{link?.telemetry_error ?? 'Nenhuma amostra válida recebida nos últimos 30 segundos.'}</small></div><span className="status offline">Aberto</span></div>}{linkErrors.map((alert) => { const statusTone = alert.status === 'resolved' ? 'online' : alert.status === 'acknowledged' ? 'degraded' : 'offline'; return <div className={`link-error-row ${statusTone}`} key={alert.id}><span className="link-error-indicator" /><div><strong>{alert.title}</strong><small>{new Date(alert.opened_at).toLocaleString('pt-BR')}{alert.resolved_at ? ` · resolvido em ${new Date(alert.resolved_at).toLocaleString('pt-BR')}` : ''}</small></div><span className={`status ${statusTone}`}>{alert.status === 'resolved' ? 'Resolvido' : alert.status === 'acknowledged' ? 'Reconhecido' : 'Aberto'}</span></div>; })}</div>}</article>
       </div>
     </section>
   </div>;
 }
 
-function StateLocationMap({ stateCode, units, equipment = [], telemetry = [], alerts = [], onClose, onSelectUnit, onLocateUnit, onAddEquipment, onDiagnostic }: { stateCode: string; units: Unit[]; equipment?: Equipment[]; telemetry?: LinkTelemetry[]; alerts?: Alert[]; onClose: () => void; onSelectUnit: (unitId: string) => void; onLocateUnit: (unitId: string) => void; onAddEquipment: (unit: Unit) => void; onDiagnostic: (equipment: Equipment, action: 'ping' | 'tracert') => Promise<DiagnosticResult> }) {
+function StateLocationMap({ stateCode, units, equipment = [], telemetry = [], alerts = [], onClose, onSelectUnit, onLocateUnit, onAddEquipment, onDiagnostic }: { stateCode: string; units: Unit[]; equipment?: Equipment[]; telemetry?: LinkTelemetry[]; alerts?: Alert[]; onClose: () => void; onSelectUnit: (unitId: string) => void; onLocateUnit: (unitId: string) => void; onAddEquipment: (unit: Unit) => void; onDiagnostic: (equipment: DiagnosticTargetCandidate, action: 'ping' | 'tracert') => Promise<DiagnosticResult> }) {
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
   const [selectedLink, setSelectedLink] = useState<LinkTelemetry | null>(null);
   const [diagnosticEquipmentId, setDiagnosticEquipmentId] = useState<string | null>(null);
@@ -691,7 +691,7 @@ function StateLocationMap({ stateCode, units, equipment = [], telemetry = [], al
     const selection = selectMapAsset(unit.unit_id, equipmentId);
     setSelectedUnit(unit);
     setSelectedLink(link ?? null);
-    setDiagnosticEquipmentId(selection.equipmentId);
+    setDiagnosticEquipmentId(selection.equipment_id);
     setExpandedUnitIds((current) => new Set(current).add(unit.unit_id));
     setDetailUnit(link ? unit : null);
   };
@@ -740,7 +740,7 @@ function StateLocationMap({ stateCode, units, equipment = [], telemetry = [], al
       <header className="state-map-header"><div><p className="eyebrow">VISÃO GEOGRÁFICA · {stateCode}</p><h2>{stateNameByCode[stateCode] ?? stateCode}</h2><small>{units.length} unidade(s) no estado · {locatedUnits.length} georreferenciada(s)</small></div><div className="state-map-header-actions"><div className="map-theme-switch" role="group" aria-label="Tema do mapa"><span className={`map-theme-thumb ${mapTheme}`} /><button className={mapTheme === 'dark' ? 'active' : ''} onClick={() => changeMapTheme('dark')} aria-pressed={mapTheme === 'dark'}><MoonIcon /> Dark</button><button className={mapTheme === 'light' ? 'active' : ''} onClick={() => changeMapTheme('light')} aria-pressed={mapTheme === 'light'}><SunIcon /> Claro</button></div><button className="state-map-close" onClick={onClose} aria-label="Fechar mapa"><CloseIcon /></button></div></header>
       <div className="state-map-body">
         <div className={`state-map-canvas ${mapTheme === 'light' ? 'map-theme-light' : ''}`}>
-          <Map ref={mapRef} key={`${stateCode}-${mapTheme}-${mapFallback ? 'raster' : 'vector'}`} initialViewState={{ longitude, latitude, zoom: locatedUnits.length > 1 ? 8 : locatedUnits.length === 1 ? 12 : 6 }} mapStyle={mapFallback ? (mapTheme === 'dark' ? mapRasterFallbackStyle : mapRasterLightFallbackStyle) : (mapTheme === 'dark' ? 'https://tiles.openfreemap.org/styles/dark' : 'https://tiles.openfreemap.org/styles/bright')} onLoad={(event) => { setMapReady(true); if (mapBounds) { event.target.fitBounds([[mapBounds.minLng, mapBounds.minLat], [mapBounds.maxLng, mapBounds.maxLat]], { padding: 90, maxZoom: 12, duration: 0 }); } else if (locatedUnits.length === 1) { event.target.setZoom(12); } }} onIdle={() => setMapReady(true)} onError={() => setMapFallback(true)} attributionControl>
+          <Map ref={mapRef} key={`${stateCode}-${mapTheme}-${mapFallback ? 'raster' : 'vector'}`} initialViewState={{ longitude, latitude, zoom: locatedUnits.length > 1 ? 8 : locatedUnits.length === 1 ? 12 : 6 }} mapStyle={mapFallback ? (mapTheme === 'dark' ? mapRasterFallbackStyle : mapRasterLightFallbackStyle) : (mapTheme === 'dark' ? 'https://tiles.openfreemap.org/styles/dark' : 'https://tiles.openfreemap.org/styles/bright')} onLoad={(event) => { setMapReady(true); if (mapBounds) { event.target.fitBounds([[mapBounds.minLng, mapBounds.minLat], [mapBounds.maxLng, mapBounds.maxLat]], { padding: 90, maxZoom: 12, duration: 0 }); } else if (locatedUnits.length === 1) { event.target.setZoom(12); } }} onIdle={() => setMapReady(true)} onError={() => setMapFallback(true)} attributionControl={{}}>
             <NavigationControl position="bottom-right" showCompass={false} />
             {locatedUnits.map((unit) => { const alertState = mapAlertState(unit); const alertLabel = alertState.alertCount ? ` · ${alertState.alertCount} alerta(s) ativo(s)` : ''; return <Marker key={unit.unit_id} longitude={Number(unit.longitude)} latitude={Number(unit.latitude)} anchor="center" onClick={(event) => { event.originalEvent.stopPropagation(); setSelectedUnit(unit); setSelectedLink(null); setDiagnosticEquipmentId(null); setExpandedUnitIds(new Set([unit.unit_id])); }}><button className={`unit-map-marker ${unit.operational_status} ${alertState.alertCount ? `has-alert ${alertState.tone}` : ''}`} aria-label={`Abrir ${unit.name}${alertLabel}`} title={`${unit.name}${alertLabel}`} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); openUnitContext(unit, Math.max(12, Math.min(event.clientX, window.innerWidth - 250)), Math.max(12, Math.min(event.clientY, window.innerHeight - 210))); }}><span /></button></Marker>; })}
             {selectedUnit && <Popup longitude={Number(selectedUnit.longitude)} latitude={Number(selectedUnit.latitude)} anchor="bottom" closeButton={false} offset={18} onClose={() => { setSelectedUnit(null); setSelectedLink(null); setUnitContext(null); setExpandedUnitIds(new Set()); }}><div className="unit-map-popup"><span className={`status ${selectedUnit.operational_status}`}>{statusLabel[selectedUnit.operational_status]}</span><strong>{selectedUnit.name}</strong><small>{selectedUnit.code} · {selectedUnit.city}/{selectedUnit.state_code}</small><div className="unit-map-popup-actions"><button onClick={() => { setSelectedLink(null); setDetailUnit(selectedUnit); }}>Abrir unidade</button><button onClick={() => { const unit = selectedUnit; setSelectedUnit(null); setSelectedLink(null); onAddEquipment(unit); }}><PlusIcon /> Adicionar equipamento</button></div></div></Popup>}
@@ -817,7 +817,7 @@ function CommandMetricIcon({ type }: { type: string }) {
 
 function InventoryActions({ unitType, token, units, selectedUnit, onRefresh, onError, onToast = () => undefined }: { unitType: 'mobile' | 'fixed'; token: string; units: Unit[]; selectedUnit?: Unit; onRefresh: () => Promise<void>; onError: (message: string) => void; onToast?: (toast: Omit<Toast, 'id'>) => void }) {
   const [mode, setMode] = useState<'unit' | 'equipment' | null>(null);
-  return <>{!selectedUnit && <div className="admin-toolbar"><div><p className="eyebrow">ADMINISTRAÇÃO DE INVENTÁRIO</p><strong>Cadastre a estrutura antes de vincular ao Zabbix.</strong></div><button className="primary compact" onClick={() => setMode('unit')}><PlusIcon /> Cadastrar unidade</button></div>}{selectedUnit && <div className="admin-toolbar"><div><p className="eyebrow">UNIDADE SELECIONADA · {selectedUnit.code}</p><strong>{selectedUnit.name}</strong></div><button className="primary compact" onClick={() => setMode('equipment')}><PlusIcon /> Cadastrar equipamento</button></div>}{mode === 'unit' && <UnitForm unitType={unitType} token={token} onCreated={async () => { setMode(null); await onRefresh(); }} onCancel={() => setMode(null)} onToast={onToast} />}{mode === 'equipment' && selectedUnit && <EquipmentForm token={token} unit={selectedUnit} onCreated={async () => { setMode(null); await onRefresh(); }} onCancel={() => setMode(null)} onError={onError} onToast={onToast} />}</>;
+  return <>{!selectedUnit && <div className="admin-toolbar"><div><p className="eyebrow">ADMINISTRAÇÃO DE INVENTÁRIO</p><strong>Cadastre a estrutura antes de vincular ao Zabbix.</strong></div><button className="primary compact" onClick={() => setMode('unit')}><PlusIcon /> Cadastrar unidade {unitType === 'fixed' ? 'fixa' : 'móvel'}</button></div>}{selectedUnit && <div className="admin-toolbar"><div><p className="eyebrow">UNIDADE SELECIONADA · {selectedUnit.code}</p><strong>{selectedUnit.name}</strong></div><button className="primary compact" onClick={() => setMode('equipment')}><PlusIcon /> Cadastrar equipamento</button></div>}{mode === 'unit' && <UnitForm unitType={unitType} lockType token={token} onCreated={async () => { setMode(null); await onRefresh(); }} onCancel={() => setMode(null)} onToast={onToast} />}{mode === 'equipment' && selectedUnit && <EquipmentForm token={token} unit={selectedUnit} onCreated={async () => { setMode(null); await onRefresh(); }} onCancel={() => setMode(null)} onError={onError} onToast={onToast} />}</>;
 }
 
 function ConfirmDialog({ title, message, confirmLabel = 'Confirmar', confirmIcon = <TrashIcon />, tone = 'danger', busy = false, onConfirm, onCancel }: { title: string; message: string; confirmLabel?: string; confirmIcon?: ReactNode; tone?: 'danger' | 'warning' | 'positive'; busy?: boolean; onConfirm: () => void; onCancel: () => void }) {
@@ -846,7 +846,8 @@ function UnitFormLegacy({ token, onCreated, onCancel, onError = () => undefined 
   return <FormCard title="Nova unidade móvel" onCancel={onCancel}><form className="inline-form" onSubmit={submit}><label>Código<input required value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="UMS-011" /></label><label>Nome<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Unidade Móvel Manaus" /></label><label>UF<input required maxLength={2} value={form.stateCode} onChange={(e) => setForm({ ...form, stateCode: e.target.value.toUpperCase() })} placeholder="AM" /></label><label>Cidade<input required value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} placeholder="Manaus" /></label><div className="form-actions"><button type="button" onClick={onCancel}>Cancelar</button><button className="primary" disabled={saving}>{saving ? 'Salvando…' : <><PlusIcon /> Cadastrar unidade</>}</button></div></form></FormCard>;
 }
 
-function UnitForm({ token, initialStateCode = '', unitType = 'mobile', onCreated, onCancel, onError = () => undefined, onToast = () => undefined }: { token: string; initialStateCode?: string; unitType?: 'mobile' | 'fixed'; onCreated: () => Promise<void>; onCancel: () => void; onError?: (message: string) => void; onToast?: (toast: Omit<Toast, 'id'>) => void }) {
+function UnitForm({ token, initialStateCode = '', unitType = 'mobile', lockType = false, onCreated, onCancel, onError = () => undefined, onToast = () => undefined }: { token: string; initialStateCode?: string; unitType?: 'mobile' | 'fixed'; lockType?: boolean; onCreated: () => Promise<void>; onCancel: () => void; onError?: (message: string) => void; onToast?: (toast: Omit<Toast, 'id'>) => void }) {
+  const [type, setType] = useState<'mobile' | 'fixed'>(unitType);
   const [form, setForm] = useState({ code: '', name: '', stateCode: initialStateCode.toUpperCase(), city: '', latitude: '', longitude: '' });
   const [cities, setCities] = useState<string[]>([]);
   const [loadingCities, setLoadingCities] = useState(false);
@@ -873,16 +874,17 @@ function UnitForm({ token, initialStateCode = '', unitType = 'mobile', onCreated
     if (Object.values(unitValidation).some(Boolean)) return;
     setSaving(true);
     try {
-      await api('/v1/units', token, { method: 'POST', body: JSON.stringify({ code: form.code, name: form.name, unitType, stateCode: form.stateCode.toUpperCase(), city: form.city, latitude: form.latitude.trim() ? Number(form.latitude) : undefined, longitude: form.longitude.trim() ? Number(form.longitude) : undefined }) });
+      await api('/v1/units', token, { method: 'POST', body: JSON.stringify({ code: form.code, name: form.name, unitType: type, stateCode: form.stateCode.toUpperCase(), city: form.city, latitude: form.latitude.trim() ? Number(form.latitude) : undefined, longitude: form.longitude.trim() ? Number(form.longitude) : undefined }) });
       await onCreated();
-      onToast({ type: 'success', title: 'Unidade cadastrada', detail: `${form.name} foi adicionada ao inventário.` });
+      onToast({ type: 'success', title: type === 'fixed' ? 'Unidade fixa cadastrada' : 'Unidade móvel cadastrada', detail: `${form.name} foi adicionada ao inventário.` });
     } catch (reason) { setFormError(reason instanceof Error ? reason.message : 'Falha ao cadastrar unidade.'); }
     finally { setSaving(false); }
   }
-  return <FormCard title="Nova unidade móvel" onCancel={onCancel}><form className="inline-form validated-form" noValidate onSubmit={submit}>
+  return <FormCard title={`Nova unidade ${type === 'fixed' ? 'fixa' : 'móvel'}`} onCancel={onCancel}><form className="inline-form validated-form" noValidate onSubmit={submit}>
     <div className="required-fields-note"><strong>Dados da unidade</strong><small>Os campos marcados com <b>*</b> são obrigatórios.</small></div>{formError && <div className="form-error" role="alert">{formError}</div>}
+    <label><span className="field-label">Tipo de unidade <b>*</b></span><AppDropdown value={type} disabled={lockType} onChange={(next) => setType(next as 'mobile' | 'fixed')} options={[{ value: 'fixed', label: 'Unidade fixa' }, { value: 'mobile', label: 'Unidade móvel' }]} />{lockType && <small className="field-hint">Definido pelo módulo atual.</small>}</label>
     <label><span className="field-label">Código <b>*</b></span><input required className={validationRequested && unitValidation.code ? 'field-invalid' : ''} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="Ex.: UMS-011" />{validationRequested && unitValidation.code && <small className="field-error">Informe o código da unidade.</small>}</label>
-    <label><span className="field-label">Nome <b>*</b></span><input required className={validationRequested && unitValidation.name ? 'field-invalid' : ''} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex.: Unidade Móvel Manaus" />{validationRequested && unitValidation.name && <small className="field-error">Informe o nome da unidade.</small>}</label>
+    <label><span className="field-label">Nome <b>*</b></span><input required className={validationRequested && unitValidation.name ? 'field-invalid' : ''} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder={type === 'fixed' ? 'Ex.: Unidade Fixa Manaus' : 'Ex.: Unidade Móvel Manaus'} />{validationRequested && unitValidation.name && <small className="field-error">Informe o nome da unidade.</small>}</label>
     <label><span className="field-label">UF <b>*</b></span><GlassCombobox value={form.stateCode} options={brazilStateCodes.map((code) => ({ value: code, label: stateNameByCode[code] }))} onChange={(value) => setForm({ ...form, stateCode: value.toUpperCase().slice(0, 2), city: '' })} placeholder="Escolha ou digite a UF" invalid={validationRequested && unitValidation.stateCode} compact />{validationRequested && unitValidation.stateCode && <small className="field-error">Selecione ou informe uma UF válida.</small>}</label>
     <label><span className="field-label">Cidade <b>*</b></span><GlassCombobox value={form.city} options={cities.map((city) => ({ value: city, label: city }))} onChange={(value) => setForm({ ...form, city: value })} placeholder={loadingCities ? 'Carregando cidades…' : 'Escolha ou digite a cidade'} invalid={validationRequested && unitValidation.city} disabled={!validState || loadingCities} />{validationRequested && unitValidation.city ? <small className="field-error">Selecione ou informe a cidade.</small> : <small className="field-hint">{loadingCities ? 'Consultando municípios da UF…' : cities.length ? `${cities.length} cidades disponíveis para ${form.stateCode}` : 'Informe uma UF válida para carregar as cidades.'}</small>}</label>
     <label><span className="field-label">Latitude <em>opcional</em></span><input inputMode="decimal" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} placeholder="-3.1186" />{validationRequested && unitValidation.coordinates && <small className="field-error">Informe latitude entre -90 e 90.</small>}</label>
@@ -916,6 +918,60 @@ function UnitFormWithoutLocation({ token, initialStateCode = '', onCreated, onCa
   }, [form.stateCode]);
   async function submit(event: FormEvent) { event.preventDefault(); setValidationRequested(true); if (Object.values(unitValidation).some(Boolean)) return; setSaving(true); try { await api('/v1/units', token, { method: 'POST', body: JSON.stringify({ code: form.code, name: form.name, stateCode: form.stateCode.toUpperCase(), city: form.city, latitude: form.latitude.trim() ? Number(form.latitude) : undefined, longitude: form.longitude.trim() ? Number(form.longitude) : undefined }) }); await onCreated(); } catch (reason) { onError(reason instanceof Error ? reason.message : 'Falha ao cadastrar unidade.'); } finally { setSaving(false); } }
   return <FormCard title="Nova unidade móvel" onCancel={onCancel}><form className="inline-form validated-form" noValidate onSubmit={submit}><div className="required-fields-note"><strong>Dados da unidade</strong><small>Os campos marcados com <b>*</b> são obrigatórios.</small></div><label><span className="field-label">Código <b>*</b></span><input required className={validationRequested && unitValidation.code ? 'field-invalid' : ''} aria-invalid={validationRequested && unitValidation.code} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="Ex.: UMS-011" />{validationRequested && unitValidation.code && <small className="field-error">Informe o código da unidade.</small>}</label><label><span className="field-label">Nome <b>*</b></span><input required className={validationRequested && unitValidation.name ? 'field-invalid' : ''} aria-invalid={validationRequested && unitValidation.name} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex.: Unidade Móvel Manaus" />{validationRequested && unitValidation.name && <small className="field-error">Informe o nome da unidade.</small>}</label><label><span className="field-label">UF <b>*</b></span><GlassCombobox value={form.stateCode} options={brazilStateCodes.map((code) => ({ value: code, label: stateNameByCode[code] }))} onChange={(value) => setForm({ ...form, stateCode: value.toUpperCase().slice(0, 2), city: '' })} placeholder="Escolha ou digite a UF" invalid={validationRequested && unitValidation.stateCode} compact />{validationRequested && unitValidation.stateCode && <small className="field-error">Selecione ou informe uma UF válida.</small>}</label><label><span className="field-label">Cidade <b>*</b></span><GlassCombobox value={form.city} options={cities.map((city) => ({ value: city, label: city }))} onChange={(value) => setForm({ ...form, city: value })} placeholder={loadingCities ? 'Carregando cidades…' : 'Escolha ou digite a cidade'} invalid={validationRequested && unitValidation.city} disabled={!form.stateCode || loadingCities} />{validationRequested && unitValidation.city ? <small className="field-error">Selecione ou informe a cidade.</small> : <small className="field-hint">{loadingCities ? 'Consultando municípios da UF…' : cities.length ? `${cities.length} cidades disponíveis para ${form.stateCode}` : 'Informe uma UF válida para carregar as cidades.'}</small>}</label><div className="form-actions"><button type="button" onClick={onCancel}>Cancelar</button><button className="primary" disabled={saving}>{saving ? 'Salvando…' : <><PlusIcon /> Cadastrar unidade</>}</button></div></form></FormCard>;
+}
+
+function isoDate(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function DateField({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder?: string }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const parsed = value ? new Date(`${value}T00:00:00`) : null;
+  const [viewDate, setViewDate] = useState(() => parsed ?? new Date());
+  useEffect(() => { if (open) setViewDate(parsed ?? new Date()); }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: MouseEvent) => { if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false); };
+    const onEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false); };
+    window.addEventListener('mousedown', close);
+    window.addEventListener('keydown', onEscape);
+    return () => { window.removeEventListener('mousedown', close); window.removeEventListener('keydown', onEscape); };
+  }, [open]);
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const rawMonthLabel = viewDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  const monthLabel = rawMonthLabel.charAt(0).toUpperCase() + rawMonthLabel.slice(1);
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells: Array<{ date: Date; inMonth: boolean }> = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push({ date: new Date(year, month, i - firstWeekday + 1), inMonth: false });
+  for (let day = 1; day <= daysInMonth; day++) cells.push({ date: new Date(year, month, day), inMonth: true });
+  while (cells.length < 42) cells.push({ date: new Date(year, month, cells.length - firstWeekday + 1), inMonth: false });
+  const today = new Date();
+  const todayIso = isoDate(today);
+  const isNextMonthDisabled = year > today.getFullYear() || (year === today.getFullYear() && month >= today.getMonth());
+  return (
+    <div className={`date-field ${open ? 'open' : ''}`} ref={rootRef}>
+      <input type="date" value={value} max={todayIso} onChange={(event) => onChange(event.target.value)} onClick={() => setOpen(true)} onFocus={() => setOpen(true)} placeholder={placeholder} />
+      <button type="button" className="date-field-trigger" aria-label="Abrir calendário" onClick={() => setOpen((current) => !current)}><CalendarIcon /></button>
+      <div className={`date-picker-panel ${open ? 'open' : ''}`}>
+        <div className="date-picker-header">
+          <strong>{monthLabel}</strong>
+          <div className="date-picker-nav">
+            <button type="button" aria-label="Mês anterior" onClick={() => setViewDate(new Date(year, month - 1, 1))}><ChevronLeftIcon /></button>
+            <button type="button" aria-label="Próximo mês" disabled={isNextMonthDisabled} onClick={() => setViewDate(new Date(year, month + 1, 1))}><ChevronRightIcon /></button>
+          </div>
+        </div>
+        <div className="date-picker-weekdays">{['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((label, index) => <span key={index}>{label}</span>)}</div>
+        <div className="date-picker-grid">{cells.map(({ date, inMonth }, index) => { const iso = isoDate(date); const isFuture = iso > todayIso; return <button type="button" key={index} disabled={isFuture} className={`date-picker-day ${inMonth ? '' : 'outside'} ${iso === value ? 'selected' : ''} ${iso === todayIso ? 'today' : ''} ${isFuture ? 'future' : ''}`} onClick={() => { onChange(iso); setOpen(false); }}>{date.getDate()}</button>; })}</div>
+        <div className="date-picker-footer">
+          <button type="button" className="date-picker-clear" onClick={() => { onChange(''); setOpen(false); }}>Limpar</button>
+          <button type="button" className="date-picker-today" onClick={() => { onChange(todayIso); setOpen(false); }}>Hoje</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 type AppDropdownOption = { value: string; label: string; group?: string };
@@ -1179,10 +1235,12 @@ function UnitsViewLegacy({ units, selectedUnit, selectedEquipment, loading, summ
 }
 
 function UnitEditForm({ unit, token, onSaved, onCancel, onToast = () => undefined }: { unit: Unit; token: string; onSaved: () => Promise<void>; onCancel: () => void; onToast?: (toast: Omit<Toast, 'id'>) => void }) {
-  const [form, setForm] = useState({ code: unit.code, name: unit.name, stateCode: unit.state_code, city: unit.city, latitude: unit.latitude == null ? '' : String(unit.latitude), longitude: unit.longitude == null ? '' : String(unit.longitude) });
+  const initialForm = useRef({ code: unit.code, name: unit.name, stateCode: unit.state_code, city: unit.city, latitude: unit.latitude == null ? '' : String(unit.latitude), longitude: unit.longitude == null ? '' : String(unit.longitude) }).current;
+  const [form, setForm] = useState(initialForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [validationRequested, setValidationRequested] = useState(false);
+  const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm);
   const hasLatitude = Boolean(form.latitude.trim());
   const hasLongitude = Boolean(form.longitude.trim());
   const validCoordinates = (!hasLatitude && !hasLongitude) || (hasLatitude && hasLongitude && Number.isFinite(Number(form.latitude)) && Number(form.latitude) >= -90 && Number(form.latitude) <= 90 && Number.isFinite(Number(form.longitude)) && Number(form.longitude) >= -180 && Number(form.longitude) <= 180);
@@ -1190,6 +1248,7 @@ function UnitEditForm({ unit, token, onSaved, onCancel, onToast = () => undefine
   async function submit(event: FormEvent) {
     event.preventDefault(); setValidationRequested(true); setError('');
     if (Object.values(unitValidation).some(Boolean)) return;
+    if (!isDirty) { onCancel(); return; }
     setSaving(true);
     try { await api(`/v1/units/${unit.unit_id}`, token, { method: 'PATCH', body: JSON.stringify({ code: form.code, name: form.name, stateCode: form.stateCode.toUpperCase(), city: form.city, latitude: form.latitude.trim() ? Number(form.latitude) : undefined, longitude: form.longitude.trim() ? Number(form.longitude) : undefined }) }); await onSaved(); onToast({ type: 'success', title: 'Unidade atualizada', detail: `As alterações em ${form.name} foram salvas.` }); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Falha ao atualizar unidade.'); }
@@ -1205,7 +1264,7 @@ function UnitEditForm({ unit, token, onSaved, onCancel, onToast = () => undefine
     <label><span className="field-label">Latitude <em>opcional</em></span><input inputMode="decimal" className={validationRequested && unitValidation.coordinates ? 'field-invalid' : ''} value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} placeholder="-3.1186" />{validationRequested && unitValidation.coordinates && <small className="field-error">Informe latitude entre -90 e 90.</small>}</label>
     <label><span className="field-label">Longitude <em>opcional</em></span><input inputMode="decimal" className={validationRequested && unitValidation.coordinates ? 'field-invalid' : ''} value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} placeholder="-60.0217" />{validationRequested && unitValidation.coordinates && <small className="field-error">Informe longitude entre -180 e 180.</small>}</label>
     <small className="field-hint location-hint" style={{ gridColumn: '1 / -1' }}>Informe as coordenadas para posicionar a unidade no mapa. Deixe ambas vazias para remover a localização.</small>
-    <div className="form-actions"><button type="button" className="secondary-button clear-filters-button" onClick={onCancel}><CloseIcon /> Cancelar</button><button className="primary" disabled={saving}>{saving ? 'Salvando…' : <><CheckIcon /> Salvar alterações</>}</button></div>
+    <div className="form-actions"><button type="button" className="secondary-button clear-filters-button" onClick={onCancel}><CloseIcon /> Cancelar</button><button className="primary" disabled={saving || !isDirty}>{saving ? 'Salvando…' : <><CheckIcon /> Salvar alterações</>}</button></div>
   </form></FormCard>;
 }
 
@@ -1223,14 +1282,16 @@ function UnitEditFormWithoutLocation({ unit, token, onSaved, onCancel }: { unit:
 }
 
 function EquipmentEditForm({ equipment, token, onSaved, onCancel, onToast = () => undefined }: { equipment: Equipment; token: string; onSaved: () => Promise<void>; onCancel: () => void; onToast?: (toast: Omit<Toast, 'id'>) => void }) {
-  const [form, setForm] = useState({ equipmentTypeCode: equipment.equipment_type, name: equipment.name, serialNumber: equipment.serial_number ?? '', managementAddress: equipment.management_address ?? '', contractedDownloadMbps: equipment.contracted_download_mbps?.toString() ?? '', contractedUploadMbps: equipment.contracted_upload_mbps?.toString() ?? '' });
+  const initialForm = useRef({ equipmentTypeCode: equipment.equipment_type, name: equipment.name, serialNumber: equipment.serial_number ?? '', managementAddress: equipment.management_address ?? '', contractedDownloadMbps: equipment.contracted_download_mbps?.toString() ?? '', contractedUploadMbps: equipment.contracted_upload_mbps?.toString() ?? '' }).current;
+  const [form, setForm] = useState(initialForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [validationRequested, setValidationRequested] = useState(false);
+  const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm);
   const linkFieldsVisible = isLinkEquipmentType(form.equipmentTypeCode);
   const equipmentValidation = { name: !form.name.trim(), contractedDownloadMbps: Boolean(form.contractedDownloadMbps) && Number(form.contractedDownloadMbps) <= 0, contractedUploadMbps: Boolean(form.contractedUploadMbps) && Number(form.contractedUploadMbps) <= 0 };
-  async function submit(event: FormEvent) { event.preventDefault(); setValidationRequested(true); setError(''); if (Object.values(equipmentValidation).some(Boolean)) return; setSaving(true); try { await api(`/v1/equipment/${equipment.equipment_id}`, token, { method: 'PATCH', body: JSON.stringify({ equipmentTypeCode: form.equipmentTypeCode, name: form.name, serialNumber: form.serialNumber || undefined, managementAddress: form.managementAddress || undefined, contractedDownloadMbps: linkFieldsVisible && form.contractedDownloadMbps ? Number(form.contractedDownloadMbps) : undefined, contractedUploadMbps: linkFieldsVisible && form.contractedUploadMbps ? Number(form.contractedUploadMbps) : undefined }) }); await onSaved(); onToast({ type: 'success', title: 'Equipamento atualizado', detail: `As alterações em ${form.name} foram salvas.` }); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Falha ao atualizar equipamento.'); } finally { setSaving(false); } }
-  return <FormCard title={`Editar equipamento · ${equipment.name}`} onCancel={onCancel}><form className="inline-form validated-form" noValidate onSubmit={submit}><div className="required-fields-note"><strong>Dados do equipamento</strong><small>Os campos marcados com <b>*</b> são obrigatórios.</small></div>{error && <div className="error-banner">{error}</div>}<label><span className="field-label">Tipo <b>*</b></span><AppDropdown value={form.equipmentTypeCode} onChange={(next) => setForm({ ...form, equipmentTypeCode: next })} options={[{ value: 'linux_server', label: 'Servidor Linux' }, { value: 'mikrotik', label: 'Mikrotik' }, { value: 'starlink', label: 'Starlink' }, { value: 'vpn', label: 'VPN' }, { value: 'internet_link', label: 'Link de internet' }]} /></label><label><span className="field-label">Nome <b>*</b></span><input className={validationRequested && equipmentValidation.name ? 'field-invalid' : ''} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />{validationRequested && equipmentValidation.name && <small className="field-error">Informe o nome do equipamento.</small>}</label><label><span className="field-label">Endereço de gerenciamento <em>opcional</em></span><input value={form.managementAddress} onChange={(e) => setForm({ ...form, managementAddress: e.target.value })} /></label><label><span className="field-label">Número de série <em>opcional</em></span><input value={form.serialNumber} onChange={(e) => setForm({ ...form, serialNumber: e.target.value })} /></label>{linkFieldsVisible && <><div className="bandwidth-fields-note"><strong>Plano contratado</strong><small>Campos vazios são apresentados como N/D e nunca preenchidos pela telemetria.</small></div><label><span className="field-label">Download contratado <em>Mbps · opcional</em></span><input type="number" min="0.001" max="1000000" step="0.001" className={validationRequested && equipmentValidation.contractedDownloadMbps ? 'field-invalid' : ''} value={form.contractedDownloadMbps} onChange={(e) => setForm({ ...form, contractedDownloadMbps: e.target.value })} placeholder="Ex.: 500" />{validationRequested && equipmentValidation.contractedDownloadMbps && <small className="field-error">Informe um valor maior que zero.</small>}</label><label><span className="field-label">Upload contratado <em>Mbps · opcional</em></span><input type="number" min="0.001" max="1000000" step="0.001" className={validationRequested && equipmentValidation.contractedUploadMbps ? 'field-invalid' : ''} value={form.contractedUploadMbps} onChange={(e) => setForm({ ...form, contractedUploadMbps: e.target.value })} placeholder="Ex.: 250" />{validationRequested && equipmentValidation.contractedUploadMbps && <small className="field-error">Informe um valor maior que zero.</small>}</label></>}<div className="form-actions"><button type="button" className="secondary-button clear-filters-button" onClick={onCancel}><CloseIcon /> Cancelar</button><button className="primary" disabled={saving}>{saving ? 'Salvando…' : <><CheckIcon /> Salvar alterações</>}</button></div></form></FormCard>;
+  async function submit(event: FormEvent) { event.preventDefault(); setValidationRequested(true); setError(''); if (Object.values(equipmentValidation).some(Boolean)) return; if (!isDirty) { onCancel(); return; } setSaving(true); try { await api(`/v1/equipment/${equipment.equipment_id}`, token, { method: 'PATCH', body: JSON.stringify({ equipmentTypeCode: form.equipmentTypeCode, name: form.name, serialNumber: form.serialNumber || undefined, managementAddress: form.managementAddress || undefined, contractedDownloadMbps: linkFieldsVisible && form.contractedDownloadMbps ? Number(form.contractedDownloadMbps) : undefined, contractedUploadMbps: linkFieldsVisible && form.contractedUploadMbps ? Number(form.contractedUploadMbps) : undefined }) }); await onSaved(); onToast({ type: 'success', title: 'Equipamento atualizado', detail: `As alterações em ${form.name} foram salvas.` }); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Falha ao atualizar equipamento.'); } finally { setSaving(false); } }
+  return <FormCard title={`Editar equipamento · ${equipment.name}`} onCancel={onCancel}><form className="inline-form validated-form" noValidate onSubmit={submit}><div className="required-fields-note"><strong>Dados do equipamento</strong><small>Os campos marcados com <b>*</b> são obrigatórios.</small></div>{error && <div className="error-banner">{error}</div>}<label><span className="field-label">Tipo <b>*</b></span><AppDropdown value={form.equipmentTypeCode} onChange={(next) => setForm({ ...form, equipmentTypeCode: next })} options={[{ value: 'linux_server', label: 'Servidor Linux' }, { value: 'mikrotik', label: 'Mikrotik' }, { value: 'starlink', label: 'Starlink' }, { value: 'vpn', label: 'VPN' }, { value: 'internet_link', label: 'Link de internet' }]} /></label><label><span className="field-label">Nome <b>*</b></span><input className={validationRequested && equipmentValidation.name ? 'field-invalid' : ''} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />{validationRequested && equipmentValidation.name && <small className="field-error">Informe o nome do equipamento.</small>}</label><label><span className="field-label">Endereço de gerenciamento <em>opcional</em></span><input value={form.managementAddress} onChange={(e) => setForm({ ...form, managementAddress: e.target.value })} /></label><label><span className="field-label">Número de série <em>opcional</em></span><input value={form.serialNumber} onChange={(e) => setForm({ ...form, serialNumber: e.target.value })} /></label>{linkFieldsVisible && <><div className="bandwidth-fields-note"><strong>Plano contratado</strong><small>Campos vazios são apresentados como N/D e nunca preenchidos pela telemetria.</small></div><label><span className="field-label">Download contratado <em>Mbps · opcional</em></span><input type="number" min="0.001" max="1000000" step="0.001" className={validationRequested && equipmentValidation.contractedDownloadMbps ? 'field-invalid' : ''} value={form.contractedDownloadMbps} onChange={(e) => setForm({ ...form, contractedDownloadMbps: e.target.value })} placeholder="Ex.: 500" />{validationRequested && equipmentValidation.contractedDownloadMbps && <small className="field-error">Informe um valor maior que zero.</small>}</label><label><span className="field-label">Upload contratado <em>Mbps · opcional</em></span><input type="number" min="0.001" max="1000000" step="0.001" className={validationRequested && equipmentValidation.contractedUploadMbps ? 'field-invalid' : ''} value={form.contractedUploadMbps} onChange={(e) => setForm({ ...form, contractedUploadMbps: e.target.value })} placeholder="Ex.: 250" />{validationRequested && equipmentValidation.contractedUploadMbps && <small className="field-error">Informe um valor maior que zero.</small>}</label></>}<div className="form-actions"><button type="button" className="secondary-button clear-filters-button" onClick={onCancel}><CloseIcon /> Cancelar</button><button className="primary" disabled={saving || !isDirty}>{saving ? 'Salvando…' : <><CheckIcon /> Salvar alterações</>}</button></div></form></FormCard>;
 }
 
 const starlinkMetricLabels: Record<string, string> = {
@@ -1283,7 +1344,7 @@ function StarlinkTelemetryPanel({ unit, equipment, token }: { unit: Unit; equipm
   }
   useEffect(() => { void refresh(); const timer = window.setInterval(() => void refresh(), 15_000); return () => window.clearInterval(timer); }, [equipment, token]);
   if (!starlinks.length) return null;
-  return <section className="starlink-telemetry-panel panel"><div className="panel-title"><div><p className="eyebrow">TELEMETRIA STARLINK</p><h3>Métricas da antena</h3><small className="starlink-unit-location">Unidade vinculada: {unit.name} · {unit.city}/{unit.state_code}</small></div><button className="secondary-button compact" onClick={() => void refresh()} disabled={loading}>{loading ? 'Atualizando…' : 'Atualizar'}</button></div>{error && <div className="error-banner">{error}</div>}{sourceMessage && <div className="success-banner">{sourceMessage}</div>}{telemetry.map((item) => { const stale = !item.observedAt || Date.now() - new Date(item.observedAt).getTime() > 30_000; const latitude = starlinkSampleValue(item.metrics, 'starlink.location.latitude', stale); const longitude = starlinkSampleValue(item.metrics, 'starlink.location.longitude', stale); const linked = linkedAgents[item.equipmentId] === true; return <article className="starlink-telemetry-card" key={item.equipmentId}><div className="starlink-telemetry-card-head"><strong>{item.equipmentName}</strong><button className="secondary-button compact" onClick={() => void toggleLocalAgent(item.equipmentId)} disabled={sourceBusy === item.equipmentId}>{sourceBusy === item.equipmentId ? 'Salvando…' : linked ? 'Desvincular agente' : 'Vincular agente local'}</button></div>{(item.collectorError || stale) && <div className="error-banner starlink-collector-error">{item.collectorError ?? 'Agente Starlink sem comunicação recente.'}</div>}{item.metrics.length ? <div className="starlink-table-wrap"><table className="starlink-collector-table"><thead><tr><th>Hora</th><th>Latência</th><th>Perda</th><th>Download</th><th>Upload</th><th>Obstrução</th><th>Localização da antena</th><th>Origem</th></tr></thead><tbody><tr><td>{item.observedAt ? new Date(item.observedAt).toLocaleTimeString('pt-BR') : 'N/D'}</td><td>{starlinkSampleValue(item.metrics, 'starlink.latency.ms', stale)}</td><td>{starlinkSampleValue(item.metrics, 'starlink.loss.pct', stale)}</td><td>{starlinkSampleValue(item.metrics, 'starlink.download.bps', stale)}</td><td>{starlinkSampleValue(item.metrics, 'starlink.upload.bps', stale)}</td><td>{starlinkSampleValue(item.metrics, 'starlink.obstruction.pct', stale)}</td><td>{latitude !== 'N/D' && longitude !== 'N/D' ? `${latitude} · ${longitude}` : 'N/D'}</td><td>local_agent</td></tr></tbody></table></div> : <p className="muted">Aguardando o agente enviar a primeira amostra.</p>}<div className="starlink-collector-log"><div className="starlink-collector-log-head"><span>ÚLTIMA COLETA</span><small>{item.observedAt ? new Date(item.observedAt).toLocaleTimeString('pt-BR') : 'aguardando'}</small></div><div className="starlink-log-empty">A linha acima é atualizada a cada coleta. A localidade da unidade permanece {unit.city}/{unit.state_code}; a localização da antena usa a última latitude/longitude recebida.</div></div></article>; })}</section>;
+  return <section className="starlink-telemetry-panel panel"><div className="panel-title"><div><p className="eyebrow">TELEMETRIA STARLINK</p><h3>Métricas da antena</h3><small className="starlink-unit-location">Unidade vinculada: {unit.name} · {unit.city}/{unit.state_code}</small></div><button className="secondary-button compact" onClick={() => void refresh()} disabled={loading}><RefreshIcon /> {loading ? 'Atualizando…' : 'Atualizar'}</button></div>{error && <div className="error-banner">{error}</div>}{sourceMessage && <div className="success-banner">{sourceMessage}</div>}{telemetry.map((item) => { const stale = !item.observedAt || Date.now() - new Date(item.observedAt).getTime() > 30_000; const latitude = starlinkSampleValue(item.metrics, 'starlink.location.latitude', stale); const longitude = starlinkSampleValue(item.metrics, 'starlink.location.longitude', stale); const linked = linkedAgents[item.equipmentId] === true; return <article className="starlink-telemetry-card" key={item.equipmentId}><div className="starlink-telemetry-card-head"><strong>{item.equipmentName}</strong><button className="secondary-button compact" onClick={() => void toggleLocalAgent(item.equipmentId)} disabled={sourceBusy === item.equipmentId}>{sourceBusy === item.equipmentId ? 'Salvando…' : linked ? <><CloseIcon /> Desvincular agente</> : <><PlusIcon /> Vincular agente local</>}</button></div>{(item.collectorError || stale) && <div className="error-banner starlink-collector-error">{item.collectorError ?? 'Agente Starlink sem comunicação recente.'}</div>}{item.metrics.length ? <div className="starlink-table-wrap"><table className="starlink-collector-table"><thead><tr><th>Hora</th><th>Latência</th><th>Perda</th><th>Download</th><th>Upload</th><th>Obstrução</th><th>Localização da antena</th><th>Origem</th></tr></thead><tbody><tr><td>{item.observedAt ? new Date(item.observedAt).toLocaleTimeString('pt-BR') : 'N/D'}</td><td>{starlinkSampleValue(item.metrics, 'starlink.latency.ms', stale)}</td><td>{starlinkSampleValue(item.metrics, 'starlink.loss.pct', stale)}</td><td>{starlinkSampleValue(item.metrics, 'starlink.download.bps', stale)}</td><td>{starlinkSampleValue(item.metrics, 'starlink.upload.bps', stale)}</td><td>{starlinkSampleValue(item.metrics, 'starlink.obstruction.pct', stale)}</td><td>{latitude !== 'N/D' && longitude !== 'N/D' ? `${latitude} · ${longitude}` : 'N/D'}</td><td>local_agent</td></tr></tbody></table></div> : <p className="muted">Aguardando o agente enviar a primeira amostra.</p>}<div className="starlink-collector-log"><div className="starlink-collector-log-head"><span>ÚLTIMA COLETA</span><small>{item.observedAt ? new Date(item.observedAt).toLocaleTimeString('pt-BR') : 'aguardando'}</small></div><div className="starlink-log-empty">A linha acima é atualizada a cada coleta. A localidade da unidade permanece {unit.city}/{unit.state_code}; a localização da antena usa a última latitude/longitude recebida.</div></div></article>; })}</section>;
 }
 
 function AgentVersionsPanel({ token, onToast }: { token: string; onToast: (toast: Omit<Toast, 'id'>) => void }) {
@@ -1292,6 +1353,8 @@ function AgentVersionsPanel({ token, onToast }: { token: string; onToast: (toast
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const dragCounter = useRef(0);
   const load = async () => { try { setVersions(await api<AgentVersionRecord[]>('/v1/integrations/zabbix/agent-versions', token)); } catch { /* área pode aguardar a migração */ } finally { setLoaded(true); } };
   useEffect(() => { void load(); }, [token]);
   async function publish() {
@@ -1315,7 +1378,7 @@ function AgentVersionsPanel({ token, onToast }: { token: string; onToast: (toast
           <small>Publique um bundle <code>.cjs</code>; a API calcula a versão automaticamente, embute a numeração e valida o checksum SHA-256.</small>
         </div>
         <div className="agent-versions-badge">
-          <span className="badge-count-icon">📦</span>
+          <span className="badge-count-icon"><PackageIcon /></span>
           <span>{loaded ? `${versions.length} pacote(s)` : '…'}</span>
         </div>
       </div>
@@ -1323,15 +1386,18 @@ function AgentVersionsPanel({ token, onToast }: { token: string; onToast: (toast
       <div className="agent-version-form-card">
         <div className="agent-form-field">
           <label className="field-label">Sistema Operacional</label>
-          <select className="agent-select" value={platform} onChange={(event) => setPlatform(event.target.value as AgentPlatform)}>
-            <option value="windows">🪟 Windows (x64)</option>
-            <option value="linux">🐧 Linux (x64 / ARM)</option>
-          </select>
+          <AppDropdown value={platform} onChange={(next) => setPlatform(next as AgentPlatform)} options={[{ value: 'windows', label: 'Windows (x64)' }, { value: 'linux', label: 'Linux (x64 / ARM)' }]} />
         </div>
 
         <div className="agent-form-field file-field">
           <label className="field-label">Bundle <code>.cjs</code> do Agente</label>
-          <div className="agent-file-picker">
+          <div
+            className={`agent-file-picker${dragActive ? ' dragging' : ''}`}
+            onDragEnter={(event) => { event.preventDefault(); dragCounter.current += 1; setDragActive(true); }}
+            onDragOver={(event) => event.preventDefault()}
+            onDragLeave={(event) => { event.preventDefault(); dragCounter.current -= 1; if (dragCounter.current <= 0) { dragCounter.current = 0; setDragActive(false); } }}
+            onDrop={(event) => { event.preventDefault(); dragCounter.current = 0; setDragActive(false); const dropped = event.dataTransfer.files?.[0]; if (dropped) setFile(dropped); }}
+          >
             <input
               type="file"
               id="agent-bundle-file"
@@ -1339,16 +1405,16 @@ function AgentVersionsPanel({ token, onToast }: { token: string; onToast: (toast
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             />
             <label htmlFor="agent-bundle-file" className="agent-file-label">
-              <span className="file-icon">📁</span>
-              <span className="file-name-text">{file ? file.name : 'Selecionar bundle .cjs…'}</span>
-              <span className="file-browse-btn">Procurar</span>
+              <span className="file-icon"><FolderIcon /></span>
+              <span className="file-name-text">{file ? file.name : dragActive ? 'Solte o arquivo aqui…' : 'Selecionar bundle .cjs…'}</span>
+              <span className="file-browse-btn"><SearchIcon /> Procurar</span>
             </label>
           </div>
         </div>
 
         <div className="agent-form-action">
           <button className="primary" disabled={busy || !file} onClick={() => void publish()}>
-            {busy ? 'Validando e publicando…' : 'Publicar versão'}
+            {busy ? 'Validando e publicando…' : <><UploadIcon /> Publicar versão</>}
           </button>
         </div>
       </div>
@@ -1361,7 +1427,7 @@ function AgentVersionsPanel({ token, onToast }: { token: string; onToast: (toast
         <div className="agent-version-list">
           {versions.length === 0 ? (
             <div className="agent-version-empty">
-              <span>🚀</span>
+              <span className="agent-version-empty-icon"><PackageIcon /></span>
               <p>Nenhuma versão publicada ainda. A primeira versão será <strong>v1.0.0</strong>.</p>
             </div>
           ) : (
@@ -1446,19 +1512,19 @@ function UnitDetail({ unit, equipment, onBack, onEdit, onRefresh, onToast = () =
   async function confirmDeactivate() {
     if (!blockTarget) return;
     setProcessingId(blockTarget.equipment_id);
-    try { await api(`/v1/equipment/${blockTarget.equipment_id}`, token, { method: 'DELETE' }); window.location.reload(); }
+    try { await api(`/v1/equipment/${blockTarget.equipment_id}`, token, { method: 'DELETE' }); await onRefresh(); onToast({ type: 'success', title: 'Equipamento bloqueado', detail: `${blockTarget.name} parou de contar para o status da unidade.` }); setProcessingId(null); setBlockTarget(null); }
     catch (reason) { onToast({ type: 'error', title: 'Falha ao bloquear equipamento', detail: reason instanceof Error ? reason.message : 'Tente novamente em instantes.' }); setProcessingId(null); setBlockTarget(null); }
   }
   async function confirmReactivate() {
     if (!unblockTarget) return;
     setProcessingId(unblockTarget.equipment_id);
-    try { await api(`/v1/equipment/${unblockTarget.equipment_id}/reactivate`, token, { method: 'POST' }); window.location.reload(); }
+    try { await api(`/v1/equipment/${unblockTarget.equipment_id}/reactivate`, token, { method: 'POST' }); await onRefresh(); onToast({ type: 'success', title: 'Equipamento desbloqueado', detail: `${unblockTarget.name} voltou a contar para o status da unidade.` }); setProcessingId(null); setUnblockTarget(null); }
     catch (reason) { onToast({ type: 'error', title: 'Falha ao desbloquear equipamento', detail: reason instanceof Error ? reason.message : 'Tente novamente em instantes.' }); setProcessingId(null); setUnblockTarget(null); }
   }
   async function confirmRemove() {
     if (!deleteTarget) return;
     setProcessingId(deleteTarget.equipment_id);
-    try { await api(`/v1/equipment/${deleteTarget.equipment_id}/permanent`, token, { method: 'DELETE' }); window.location.reload(); }
+    try { await api(`/v1/equipment/${deleteTarget.equipment_id}/permanent`, token, { method: 'DELETE' }); await onRefresh(); onToast({ type: 'success', title: 'Equipamento excluído', detail: `${deleteTarget.name} foi removido definitivamente.` }); setProcessingId(null); setDeleteTarget(null); }
     catch (reason) { onToast({ type: 'error', title: 'Falha ao excluir equipamento', detail: reason instanceof Error ? reason.message : 'Tente novamente em instantes.' }); setProcessingId(null); setDeleteTarget(null); }
   }
   return <section className="unit-detail">
@@ -1467,10 +1533,10 @@ function UnitDetail({ unit, equipment, onBack, onEdit, onRefresh, onToast = () =
     {editingUnit && <UnitEditForm unit={unit} token={token} onSaved={async () => { setEditingUnit(false); await onRefresh(); }} onCancel={() => setEditingUnit(false)} onToast={onToast} />}
     <div className="detail-grid"><article className="equipment-panel"><div className="panel-title"><div><p className="eyebrow">ATIVOS MONITORADOS</p><h3>Infraestrutura da unidade</h3></div><div className="panel-title-actions"><strong>{equipment.length}</strong></div></div>
       <div className="agent-provisioning"><div><p className="eyebrow">AGENTE DE COLETA</p><h4>Instalação em arquivo único</h4><small>{missingAgentRequirements.length ? `Requisitos pendentes: ${missingAgentRequirements.join(' ')}` : `${servers.length} servidor(es) e ${agentRequirements.sources.length} fonte(s) elegíveis. Use o botão no servidor escolhido.`}</small></div>{missingAgentRequirements.length > 0 && <button className="secondary-button compact" onClick={() => onToast({ type: 'warning', title: 'Requisitos ausentes', detail: missingAgentRequirements.join(' ') })}>Ver requisitos</button>}</div>
-      <div className="equipment-list">{equipment.map((item) => { const blocked = item.active === false; const isServer = item.equipment_type === 'server' || item.equipment_type === 'linux_server'; return <div className={`equipment-row ${blocked ? 'blocked' : ''}`} key={item.equipment_id}><span className={`equipment-indicator ${blocked ? 'blocked' : item.operational_status}`} /><div><strong>{item.name}</strong><small>{item.equipment_type.replaceAll('_', ' ')} · {item.management_address ?? 'sem endereço'}</small></div><div className="equipment-state"><span className={`status ${blocked ? 'blocked' : item.operational_status}`}>{blocked ? 'Bloqueado' : statusLabel[item.operational_status]}</span><small>{blocked ? 'telemetria desativada' : item.observed_at ? new Date(item.observed_at).toLocaleString('pt-BR') : 'aguardando coleta'}</small></div><div className="equipment-actions">{isServer && !blocked && <button className="primary compact" onClick={() => openAgentGenerator(item)}>Gerar agente</button>}<button className="secondary-button compact" onClick={() => onEdit(item)}><EditIcon /> Editar</button>{blocked ? <button className="secondary-button compact" disabled={processingId === item.equipment_id} onClick={() => setUnblockTarget(item)}><UnblockIcon /> Desbloquear</button> : <button className="secondary-button compact warning-action-button" disabled={processingId === item.equipment_id} onClick={() => setBlockTarget(item)}><BlockIcon /> Bloquear</button>}<button className="secondary-button compact clear-filters-button" disabled={processingId === item.equipment_id} onClick={() => setDeleteTarget(item)}><TrashIcon /> Excluir</button></div></div>; })}</div>
+      <div className="equipment-list">{equipment.map((item) => { const blocked = item.active === false; const isServer = item.equipment_type === 'server' || item.equipment_type === 'linux_server'; return <div className={`equipment-row ${blocked ? 'blocked' : ''}`} key={item.equipment_id}><span className={`equipment-indicator ${blocked ? 'blocked' : item.operational_status}`} /><div><strong>{item.name}</strong><small>{item.equipment_type.replaceAll('_', ' ')} · {item.management_address ?? 'sem endereço'}</small></div><div className="equipment-state"><span className={`status ${blocked ? 'blocked' : item.operational_status}`}>{blocked ? 'Bloqueado' : statusLabel[item.operational_status]}</span><small>{blocked ? 'telemetria desativada' : item.observed_at ? new Date(item.observed_at).toLocaleString('pt-BR') : 'aguardando coleta'}</small></div><div className="equipment-actions">{isServer && !blocked && <button className="secondary-button compact" onClick={() => openAgentGenerator(item)}><AgentIcon /> Gerar agente</button>}<button className="secondary-button compact" onClick={() => onEdit(item)}><EditIcon /> Editar</button>{blocked ? <button className="secondary-button compact" disabled={processingId === item.equipment_id} onClick={() => setUnblockTarget(item)}><UnblockIcon /> Desbloquear</button> : <button className="secondary-button compact warning-action-button" disabled={processingId === item.equipment_id} onClick={() => setBlockTarget(item)}><BlockIcon /> Bloquear</button>}<button className="secondary-button compact clear-filters-button" disabled={processingId === item.equipment_id} onClick={() => setDeleteTarget(item)}><TrashIcon /> Excluir</button></div></div>; })}</div>
     </article><aside className="readiness-panel"><p className="eyebrow">PRONTIDÃO OPERACIONAL</p><div className="readiness-score"><strong>{equipment.filter((item) => item.operational_status === 'online').length}</strong><span>de {equipment.length}<small>ativos confirmados</small></span></div><div className="readiness-line"><i style={{ width: `${equipment.length ? equipment.filter((item) => item.operational_status === 'online').length / equipment.length * 100 : 0}%` }} /></div><dl><div><dt>Indisponíveis</dt><dd>{equipment.filter((item) => item.operational_status === 'offline').length}</dd></div><div><dt>Em atenção</dt><dd>{equipment.filter((item) => item.operational_status === 'degraded').length}</dd></div><div><dt>Sem telemetria</dt><dd>{equipment.filter((item) => item.operational_status === 'unknown').length}</dd></div></dl></aside></div>
     <StarlinkTelemetryPanel unit={unit} equipment={equipment} token={token} />
-    {agentServer && <FormCard title={`Gerar agente · ${agentServer.name}`} onCancel={() => { if (!agentGenerating) setAgentServer(null); }}><form className="inline-form" onSubmit={(event) => { event.preventDefault(); void generateAgentInstaller(); }}><div className="agent-installer-summary"><p className="eyebrow">ARQUIVO ÚNICO · SEM CONFIGURAÇÃO MANUAL</p><p>O instalador já leva o vínculo desta unidade, o servidor e as fontes elegíveis. Execute uma única vez no equipamento servidor; depois o serviço coleta, envia heartbeat e atualiza o agente sozinho.</p><small>O link de instalação expira em 30 minutos e só pode ser consumido uma vez.</small></div><label>Sistema operacional<select value={agentPlatform} onChange={(event) => setAgentPlatform(event.target.value as AgentPlatform)} disabled={agentGenerating}><option value="windows">Windows · PowerShell</option><option value="linux">Linux · systemd</option></select></label><div className="agent-installer-sources"><span className="field-label">Fontes que serão vinculadas</span>{agentRequirements.sources.map((source) => <small key={source.equipment_id}>● {equipment.find((item) => item.equipment_id === source.equipment_id)?.name ?? source.equipment_type} · {source.equipment_type.replaceAll('_', ' ')}</small>)}</div>{agentGenerationError && <div className="error-banner" role="alert">{agentGenerationError}</div>}<div className="form-actions"><button type="button" className="secondary-button clear-filters-button" onClick={() => setAgentServer(null)} disabled={agentGenerating}><CloseIcon /> Cancelar</button><button className="primary" disabled={agentGenerating}>{agentGenerating ? 'Gerando e preparando download…' : 'Gerar e baixar instalador'}</button></div></form></FormCard>}
+    {agentServer && <FormCard title={`Gerar agente · ${agentServer.name}`} onCancel={() => { if (!agentGenerating) setAgentServer(null); }}><form className="inline-form" onSubmit={(event) => { event.preventDefault(); void generateAgentInstaller(); }}><div className="agent-installer-summary"><p className="eyebrow">ARQUIVO ÚNICO · SEM CONFIGURAÇÃO MANUAL</p><p>O instalador já leva o vínculo desta unidade, o servidor e as fontes elegíveis. Execute uma única vez no equipamento servidor; depois o serviço coleta, envia heartbeat e atualiza o agente sozinho.</p><small>O link de instalação expira em 30 minutos e só pode ser consumido uma vez.</small></div><label>Sistema operacional<AppDropdown value={agentPlatform} onChange={(next) => setAgentPlatform(next as AgentPlatform)} disabled={agentGenerating} options={[{ value: 'windows', label: 'Windows · PowerShell' }, { value: 'linux', label: 'Linux · systemd' }]} /></label><div className="agent-installer-sources"><span className="field-label">Fontes que serão vinculadas</span>{agentRequirements.sources.map((source) => <small key={source.equipment_id}>● {equipment.find((item) => item.equipment_id === source.equipment_id)?.name ?? source.equipment_type} · {source.equipment_type.replaceAll('_', ' ')}</small>)}</div>{agentGenerationError && <div className="error-banner" role="alert">{agentGenerationError}</div>}<div className="form-actions"><button type="button" className="secondary-button clear-filters-button" onClick={() => setAgentServer(null)} disabled={agentGenerating}><CloseIcon /> Cancelar</button><button className="primary" disabled={agentGenerating}>{agentGenerating ? 'Gerando e preparando download…' : 'Gerar e baixar instalador'}</button></div></form></FormCard>}
     {blockTarget && <ConfirmDialog title="Bloquear equipamento" message={`Bloquear o equipamento "${blockTarget.name}"? Ele para de contar para o status da unidade e para de receber telemetria, assim como um usuário bloqueado. O histórico será preservado.`} confirmLabel="Bloquear" confirmIcon={<BlockIcon />} tone="warning" busy={processingId === blockTarget.equipment_id} onConfirm={() => void confirmDeactivate()} onCancel={() => setBlockTarget(null)} />}
     {unblockTarget && <ConfirmDialog title="Desbloquear equipamento" message={`Desbloquear o equipamento "${unblockTarget.name}"? Ele volta a contar para o status da unidade e a receber telemetria normalmente.`} confirmLabel="Desbloquear" confirmIcon={<UnblockIcon />} tone="positive" busy={processingId === unblockTarget.equipment_id} onConfirm={() => void confirmReactivate()} onCancel={() => setUnblockTarget(null)} />}
     {deleteTarget && <ConfirmDialog title="Excluir equipamento" message={`Excluir definitivamente o equipamento "${deleteTarget.name}"? Esta ação não pode ser desfeita.`} confirmLabel="Excluir" confirmIcon={<TrashIcon />} busy={processingId === deleteTarget.equipment_id} onConfirm={() => void confirmRemove()} onCancel={() => setDeleteTarget(null)} />}
@@ -1478,11 +1544,18 @@ function UnitDetail({ unit, equipment, onBack, onEdit, onRefresh, onToast = () =
 }
 
 function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onToast }: { users: ManagedUser[]; requests: AccessRequest[]; loading: boolean; token: string; onRefresh: () => Promise<void>; onChange: (id: string, action: 'block' | 'unblock' | 'delete') => Promise<void>; onToast: (toast: Omit<Toast, 'id'>) => void }) {
-  const [form, setForm] = useState({ displayName: '', email: '', password: '', role: '', cpf: '', coligada: 'HealthLink Sentinel', active: true });
-  const [editing, setEditing] = useState<string | null>(null);
-  const editingIsGlobalAdmin = editing ? users.find((user) => user.id === editing)?.roles.includes('global_administrator') ?? false : false;
+  const emptyUserForm = { displayName: '', email: '', password: '', role: '', cpf: '', coligada: 'HealthLink Sentinel', active: true };
+  const [form, setForm] = useState(emptyUserForm);
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState(emptyUserForm);
+  const [initialEditForm, setInitialEditForm] = useState(emptyUserForm);
+  const [editSubmitted, setEditSubmitted] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const isDirty = JSON.stringify(editForm) !== JSON.stringify(initialEditForm);
+  const editingIsGlobalAdmin = editing ? users.find((user) => user.id === editing)?.roles.includes('global_administrator') ?? false : false;
+  useEffect(() => { if (!editing) return; const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') cancelEdit(); }; window.addEventListener('keydown', closeOnEscape); return () => window.removeEventListener('keydown', closeOnEscape); }, [editing]);
   const [approvalOpen, setApprovalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ManagedUser | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -1534,31 +1607,46 @@ function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onTo
 
   async function submit(event: FormEvent) {
     event.preventDefault(); setSubmitted(true);
-    if (validateManagedUserForm({ displayName: form.displayName, email: form.email, role: editingIsGlobalAdmin ? 'global_administrator' : form.role, password: form.password, editing: Boolean(editing) }).length > 0) {
+    if (validateManagedUserForm({ displayName: form.displayName, email: form.email, role: form.role, password: form.password, editing: false }).length > 0) {
       return;
     }
     setSaving(true);
     try {
-      if (editing) await api(`/v1/users/${editing}`, token, { method: 'PATCH', body: JSON.stringify({ displayName: form.displayName, password: form.password || undefined, role: editingIsGlobalAdmin ? undefined : form.role, active: form.active }) });
-      else await api('/v1/users', token, { method: 'POST', body: JSON.stringify({ displayName: form.displayName, email: form.email, password: form.password, role: form.role }) });
-      const wasEditing = Boolean(editing);
-      setForm({ displayName: '', email: '', password: '', role: '', cpf: '', coligada: 'HealthLink Sentinel', active: true });
-      setEditing(null); setSubmitted(false); await onRefresh();
-      onToast({ type: 'success', title: wasEditing ? 'Usuário atualizado' : 'Usuário criado', detail: wasEditing ? 'As alterações foram salvas com sucesso.' : 'O novo usuário foi cadastrado com a senha definida no formulário.' });
-    } catch (reason) { onToast({ type: 'error', title: editing ? 'Falha ao atualizar usuário' : 'Falha ao criar usuário', detail: friendlyMessage(reason, 'Não foi possível salvar o usuário. Tente novamente.') }); }
+      await api('/v1/users', token, { method: 'POST', body: JSON.stringify({ displayName: form.displayName, email: form.email, password: form.password, role: form.role }) });
+      setForm(emptyUserForm);
+      setSubmitted(false); await onRefresh();
+      onToast({ type: 'success', title: 'Usuário criado', detail: 'O novo usuário foi cadastrado com a senha definida no formulário.' });
+    } catch (reason) { onToast({ type: 'error', title: 'Falha ao criar usuário', detail: friendlyMessage(reason, 'Não foi possível salvar o usuário. Tente novamente.') }); }
     finally { setSaving(false); }
+  }
+
+  async function submitEdit(event: FormEvent) {
+    event.preventDefault(); setEditSubmitted(true);
+    if (!editing) return;
+    if (validateManagedUserForm({ displayName: editForm.displayName, email: editForm.email, role: editingIsGlobalAdmin ? 'global_administrator' : editForm.role, password: editForm.password, editing: true }).length > 0) {
+      return;
+    }
+    if (!isDirty) { cancelEdit(); return; }
+    setEditSaving(true);
+    try {
+      await api(`/v1/users/${editing}`, token, { method: 'PATCH', body: JSON.stringify({ displayName: editForm.displayName, password: editForm.password || undefined, role: editingIsGlobalAdmin ? undefined : editForm.role, active: editForm.active }) });
+      setEditing(null); setEditSubmitted(false); await onRefresh();
+      onToast({ type: 'success', title: 'Usuário atualizado', detail: 'As alterações foram salvas com sucesso.' });
+    } catch (reason) { onToast({ type: 'error', title: 'Falha ao atualizar usuário', detail: friendlyMessage(reason, 'Não foi possível salvar o usuário. Tente novamente.') }); }
+    finally { setEditSaving(false); }
   }
 
   function startEdit(user: ManagedUser) {
     setEditing(user.id);
-    setForm({ displayName: user.display_name, email: user.email, password: '', role: user.roles[0] ?? 'viewer', cpf: '000.000.000-00', coligada: 'HealthLink Sentinel', active: user.active });
-    setSubmitted(false);
+    const nextForm = { displayName: user.display_name, email: user.email, password: '', role: user.roles[0] ?? 'viewer', cpf: '000.000.000-00', coligada: 'HealthLink Sentinel', active: user.active };
+    setEditForm(nextForm);
+    setInitialEditForm(nextForm);
+    setEditSubmitted(false);
   }
 
   function cancelEdit() {
     setEditing(null);
-    setForm({ displayName: '', email: '', password: '', role: '', cpf: '', coligada: 'HealthLink Sentinel', active: true });
-    setSubmitted(false);
+    setEditSubmitted(false);
   }
 
   return <section className="users-page">
@@ -1568,15 +1656,60 @@ function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onTo
     {unblockTarget && <ConfirmDialog title="Desbloquear usuário" message={`Desbloquear "${unblockTarget.display_name}"? O acesso dele à plataforma será restaurado imediatamente.`} confirmLabel="Desbloquear" confirmIcon={<UnblockIcon />} tone="positive" busy={unblocking} onConfirm={() => void confirmUnblock()} onCancel={() => setUnblockTarget(null)} />}
     <div className="section-heading"><div><p className="eyebrow">GOVERNANÇA DE ACESSO</p><h2>Gerenciamento de usuários</h2><small>Controle de identidades, perfis e acesso ao cliente.</small></div></div>
     <button className="secondary-button approval-launch" onClick={() => setApprovalOpen(true)}>Aprovações {requests.length > 0 && <b className="nav-badge approval-count">{requests.length}</b>}</button>
+    {editing && <div className="form-modal-backdrop" role="presentation" onMouseDown={cancelEdit}>
+      <article className="form-card" role="dialog" aria-modal="true" aria-label="Editar identidade" onMouseDown={(event) => event.stopPropagation()}>
+        <form className="user-form" onSubmit={submitEdit} noValidate>
+          <div className="panel-title">
+            <div>
+              <p className="eyebrow">EDITAR IDENTIDADE</p>
+              <h3>Atualizar usuário</h3>
+              <small className="muted" style={{ margin: 0 }}>Os campos marcados com <b className="req">*</b> são obrigatórios.</small>
+            </div>
+            <button type="button" className="icon-button clear-filters-button" aria-label="Fechar edição" onClick={cancelEdit}><CloseIcon /></button>
+          </div>
+          <div className="user-form-grid">
+            <label>
+              <span className="field-label">Nome completo <b className="req">*</b></span>
+              <input value={editForm.displayName} className={editSubmitted && !editForm.displayName.trim() ? 'field-invalid' : ''} onChange={(e) => setEditForm({ ...editForm, displayName: e.target.value })} placeholder="Ex.: Nome" required />
+              {editSubmitted && !editForm.displayName.trim() && <span className="field-error-text">Informe o nome completo.</span>}
+            </label>
+            <label>
+              <span className="field-label">E-mail <b className="req">*</b></span>
+              <input type="text" inputMode="email" name="hl-account-email-field" autoComplete="off" data-lpignore="true" data-1p-ignore value={editForm.email} className={editSubmitted && !editForm.email.trim() ? 'field-invalid' : ''} disabled onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} placeholder="nome@empresa.com" required />
+              {editSubmitted && !editForm.email.trim() && <span className="field-error-text">Informe o e-mail.</span>}
+            </label>
+            <label>
+              <span className="field-label">Perfil <b className="req">*</b></span>
+              {editingIsGlobalAdmin
+                ? <AppDropdown placeholder="Administrador global" value="" disabled onChange={() => undefined} options={[]} />
+                : <AppDropdown placeholder="Selecione um perfil" invalid={editSubmitted && !editForm.role} value={editForm.role} onChange={(next) => setEditForm({ ...editForm, role: next })} options={[{ value: 'tenant_administrator', label: 'Administrador' }, { value: 'supervisor', label: 'Supervisor' }, { value: 'mobile_unit_supervisor', label: 'Supervisor de unidades móveis' }, { value: 'noc_operator', label: 'Operador NOC' }, { value: 'service_agent', label: 'Agente de integração' }, { value: 'viewer', label: 'Visualizador' }]} />}
+              {editingIsGlobalAdmin && <span className="field-hint">O perfil de administrador global não pode ser alterado por este formulário.</span>}
+              {!editingIsGlobalAdmin && editSubmitted && !editForm.role && <span className="field-error-text">Selecione o perfil.</span>}
+            </label>
+            <label>
+              <span className="field-label">Status <b className="req">*</b></span>
+              <AppDropdown value={editForm.active ? 'active' : 'inactive'} onChange={(next) => setEditForm({ ...editForm, active: next === 'active' })} options={[{ value: 'active', label: 'Ativo' }, { value: 'inactive', label: 'Bloqueado' }]} />
+            </label>
+            <label>
+              <span className="field-label">Nova senha (opcional)</span>
+              <input type="password" name="hl-new-account-password" autoComplete="new-password" data-lpignore="true" data-1p-ignore minLength={8} value={editForm.password} onChange={(e) => setEditForm({ ...editForm, password: e.target.value })} placeholder="Deixe em branco para manter a atual" />
+            </label>
+          </div>
+          <div className="form-actions">
+            <button type="button" className="secondary-button clear-filters-button" onClick={cancelEdit}><CloseIcon /> Cancelar</button>
+            <button className="primary" disabled={editSaving || !isDirty}>{editSaving ? 'Salvando…' : <><CheckIcon /> Salvar alterações</>}</button>
+          </div>
+        </form>
+      </article>
+    </div>}
     <div className="users-layout">
-      <form className={`user-form panel ${editing ? 'user-edit-modal' : ''}`} onSubmit={submit} noValidate>
+      <form className="user-form panel" onSubmit={submit} noValidate>
         <div className="panel-title">
           <div>
-            <p className="eyebrow">{editing ? 'EDITAR IDENTIDADE' : 'DADOS DO USUÁRIO'}</p>
-            <h3>{editing ? 'Atualizar usuário' : 'Dados do usuário'}</h3>
+            <p className="eyebrow">DADOS DO USUÁRIO</p>
+            <h3>Dados do usuário</h3>
             <small className="muted" style={{ margin: 0 }}>Os campos marcados com <b className="req">*</b> são obrigatórios.</small>
           </div>
-          {editing && <button type="button" className="icon-button clear-filters-button" aria-label="Fechar edição" onClick={cancelEdit}><CloseIcon /></button>}
         </div>
         <div className="user-form-grid">
           <label>
@@ -1586,30 +1719,27 @@ function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onTo
           </label>
           <label>
             <span className="field-label">E-mail <b className="req">*</b></span>
-            <input type="text" inputMode="email" name="hl-account-email-field" autoComplete="off" data-lpignore="true" data-1p-ignore value={form.email} className={submitted && !form.email.trim() ? 'field-invalid' : ''} disabled={Boolean(editing)} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="nome@empresa.com" required />
+            <input type="text" inputMode="email" name="hl-account-email-field" autoComplete="off" data-lpignore="true" data-1p-ignore value={form.email} className={submitted && !form.email.trim() ? 'field-invalid' : ''} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="nome@empresa.com" required />
             {submitted && !form.email.trim() && <span className="field-error-text">Informe o e-mail.</span>}
           </label>
           <label>
             <span className="field-label">Perfil <b className="req">*</b></span>
-            {editingIsGlobalAdmin
-              ? <AppDropdown placeholder="Administrador global" value="" disabled onChange={() => undefined} options={[]} />
-              : <AppDropdown placeholder="Selecione um perfil" invalid={submitted && !form.role} value={form.role} onChange={(next) => setForm({ ...form, role: next })} options={[{ value: 'tenant_administrator', label: 'Administrador' }, { value: 'supervisor', label: 'Supervisor' }, { value: 'mobile_unit_supervisor', label: 'Supervisor de unidades móveis' }, { value: 'noc_operator', label: 'Operador NOC' }, { value: 'service_agent', label: 'Agente de integração' }, { value: 'viewer', label: 'Visualizador' }]} />}
-            {editingIsGlobalAdmin && <span className="field-hint">O perfil de administrador global não pode ser alterado por este formulário.</span>}
-            {!editingIsGlobalAdmin && submitted && !form.role && <span className="field-error-text">Selecione o perfil.</span>}
+            <AppDropdown placeholder="Selecione um perfil" invalid={submitted && !form.role} value={form.role} onChange={(next) => setForm({ ...form, role: next })} options={[{ value: 'tenant_administrator', label: 'Administrador' }, { value: 'supervisor', label: 'Supervisor' }, { value: 'mobile_unit_supervisor', label: 'Supervisor de unidades móveis' }, { value: 'noc_operator', label: 'Operador NOC' }, { value: 'service_agent', label: 'Agente de integração' }, { value: 'viewer', label: 'Visualizador' }]} />
+            {submitted && !form.role && <span className="field-error-text">Selecione o perfil.</span>}
           </label>
           <label>
             <span className="field-label">Status <b className="req">*</b></span>
             <AppDropdown value={form.active ? 'active' : 'inactive'} onChange={(next) => setForm({ ...form, active: next === 'active' })} options={[{ value: 'active', label: 'Ativo' }, { value: 'inactive', label: 'Bloqueado' }]} />
           </label>
           <label>
-            <span className="field-label">{editing ? 'Nova senha (opcional)' : <>Senha <b className="req">*</b></>}</span>
-            <input type="password" name="hl-new-account-password" autoComplete="new-password" data-lpignore="true" data-1p-ignore minLength={8} value={form.password} className={submitted && !editing && !form.password ? 'field-invalid' : ''} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder={editing ? 'Deixe em branco para manter a atual' : 'Mínimo de 8 caracteres'} required={!editing} />
-            {submitted && !editing && !form.password && <span className="field-error-text">Informe uma senha para o usuário.</span>}
+            <span className="field-label">Senha <b className="req">*</b></span>
+            <input type="password" name="hl-new-account-password" autoComplete="new-password" data-lpignore="true" data-1p-ignore minLength={8} value={form.password} className={submitted && !form.password ? 'field-invalid' : ''} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Mínimo de 8 caracteres" required />
+            {submitted && !form.password && <span className="field-error-text">Informe uma senha para o usuário.</span>}
           </label>
         </div>
         <div className="form-actions">
-          <button type="button" className="secondary-button clear-filters-button" onClick={cancelEdit}>{editing ? <><CloseIcon /> Cancelar</> : <><ClearFilterIcon /> Limpar</>}</button>
-          <button className="primary" disabled={saving}>{saving ? 'Salvando…' : editing ? <><CheckIcon /> Salvar alterações</> : <><PlusIcon /> Criar usuário</>}</button>
+          <button type="button" className="secondary-button clear-filters-button" onClick={() => { setForm(emptyUserForm); setSubmitted(false); }}><ClearFilterIcon /> Limpar</button>
+          <button className="primary" disabled={saving}>{saving ? 'Salvando…' : <><PlusIcon /> Criar usuário</>}</button>
         </div>
       </form>
       <div className="users-list panel">
@@ -1635,6 +1765,9 @@ function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onTo
 function ApprovalModal({ requests, token, onClose, onRefresh, onToast }: { requests: AccessRequest[]; token: string; onClose: () => void; onRefresh: () => Promise<void>; onToast: (toast: Omit<Toast, 'id'>) => void }) {
   const [rejectTarget, setRejectTarget] = useState<AccessRequest | null>(null);
   const [rejecting, setRejecting] = useState(false);
+  const [approveTarget, setApproveTarget] = useState<AccessRequest | null>(null);
+  const [approving, setApproving] = useState(false);
+  useEffect(() => { const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); }; window.addEventListener('keydown', closeOnEscape); return () => window.removeEventListener('keydown', closeOnEscape); }, [onClose]);
 
   async function review(id: string, approve: boolean) {
     try {
@@ -1653,7 +1786,15 @@ function ApprovalModal({ requests, token, onClose, onRefresh, onToast }: { reque
     finally { setRejecting(false); }
   }
 
-  return <div className="approval-modal" role="dialog" aria-modal="true"><div className="approval-modal-card panel"><div className="panel-title"><div><p className="eyebrow">CONTROLE DE ACESSO</p><h3>Solicitações de cadastro</h3></div><button className="icon-button clear-filters-button" onClick={onClose} aria-label="Fechar"><CloseIcon /></button></div>{requests.length === 0 ? <div className="empty-state compact-empty"><p>Nenhuma solicitação pendente.</p></div> : <div className="request-list">{requests.map((item) => <article className="request-row" key={item.id}><div><strong>{item.display_name}</strong><small>{item.email} · {item.requested_role.replaceAll('_', ' ')}</small></div><div className="user-actions"><button className="primary compact" onClick={() => void review(item.id, true)}><CheckIcon /> Aprovar</button><button className="delete-button compact" onClick={() => setRejectTarget(item)}><RejectIcon /> Rejeitar</button></div></article>)}</div>}</div>
+  async function confirmApprove() {
+    if (!approveTarget) return;
+    setApproving(true);
+    try { await review(approveTarget.id, true); setApproveTarget(null); }
+    finally { setApproving(false); }
+  }
+
+  return <div className="approval-modal" role="dialog" aria-modal="true" onMouseDown={onClose}><div className="approval-modal-card panel" onMouseDown={(event) => event.stopPropagation()}><div className="panel-title"><div><p className="eyebrow">CONTROLE DE ACESSO</p><h3>Solicitações de cadastro</h3></div><button className="icon-button clear-filters-button" onClick={onClose} aria-label="Fechar"><CloseIcon /></button></div>{requests.length === 0 ? <div className="empty-state compact-empty"><p>Nenhuma solicitação pendente.</p></div> : <div className="request-list">{requests.map((item) => <article className="request-row" key={item.id}><div><strong>{item.display_name}</strong><small>{item.email} · {item.requested_role.replaceAll('_', ' ')}</small></div><div className="user-actions"><button className="primary compact" onClick={() => setApproveTarget(item)}><CheckIcon /> Aprovar</button><button className="delete-button compact" onClick={() => setRejectTarget(item)}><RejectIcon /> Rejeitar</button></div></article>)}</div>}</div>
+  {approveTarget && <ConfirmDialog title="Aprovar solicitação" message={`Aprovar o cadastro de "${approveTarget.display_name}"? O acesso à plataforma será liberado imediatamente.`} confirmLabel="Aprovar" confirmIcon={<CheckIcon />} tone="positive" busy={approving} onConfirm={() => void confirmApprove()} onCancel={() => setApproveTarget(null)} />}
   {rejectTarget && <ConfirmDialog title="Rejeitar solicitação" message={`Rejeitar o cadastro de "${rejectTarget.display_name}"? O solicitante não terá acesso à plataforma.`} confirmLabel="Rejeitar" confirmIcon={<RejectIcon />} busy={rejecting} onConfirm={() => void confirmReject()} onCancel={() => setRejectTarget(null)} />}</div>;
 }
 
@@ -1788,11 +1929,16 @@ function IncidentReports({ alerts, units, onRefresh }: { alerts: Alert[]; units:
   const [filters, setFilters] = useState<IncidentReportFilters>({ status: 'all', severity: 'all', unitId: '', from: '', to: '' });
   const filteredAlerts = useMemo(() => filterIncidentReports(alerts, filters), [alerts, filters]);
   const summary = useMemo(() => summarizeIncidentReports(filteredAlerts), [filteredAlerts]);
-  const updateFilter = <K extends keyof IncidentReportFilters>(key: K, value: IncidentReportFilters[K]) => setFilters((current) => ({ ...current, [key]: value }));
+  const updateFilter = <K extends keyof IncidentReportFilters>(key: K, value: IncidentReportFilters[K]) => { setFilters((current) => ({ ...current, [key]: value })); setPage(1); };
   const hasFilters = filters.status !== 'all' || filters.severity !== 'all' || Boolean(filters.unitId || filters.from || filters.to);
   const formatDate = (value?: string | null) => value ? new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
   const resolutionTime = (alert: Alert) => alert.resolved_at ? `${Math.max(0, Math.round((new Date(alert.resolved_at).getTime() - new Date(alert.opened_at).getTime()) / 60000))} min` : 'Em aberto';
-  const clearFilters = () => setFilters({ status: 'all', severity: 'all', unitId: '', from: '', to: '' });
+  const clearFilters = () => { setFilters({ status: 'all', severity: 'all', unitId: '', from: '', to: '' }); setPage(1); };
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
+  const totalPages = Math.max(1, Math.ceil(filteredAlerts.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedAlerts = filteredAlerts.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return <section className="incident-reports">
     <div className="reports-header">
@@ -1801,8 +1947,8 @@ function IncidentReports({ alerts, units, onRefresh }: { alerts: Alert[]; units:
     </div>
     <div className="report-filters">
       <div className="report-filter-heading"><p className="eyebrow">RECORTE DO RELATÓRIO</p><strong>{filteredAlerts.length} incidente(s) encontrado(s)</strong></div>
-      <label>Período inicial<input type="date" value={filters.from} onChange={(event) => updateFilter('from', event.target.value)} /></label>
-      <label>Período final<input type="date" value={filters.to} onChange={(event) => updateFilter('to', event.target.value)} /></label>
+      <label>Período inicial<DateField value={filters.from} onChange={(value) => updateFilter('from', value)} /></label>
+      <label>Período final<DateField value={filters.to} onChange={(value) => updateFilter('to', value)} /></label>
       <label>Situação<AppDropdown value={filters.status} onChange={(value) => updateFilter('status', value as IncidentReportFilters['status'])} options={[{ value: 'all', label: 'Todas' }, { value: 'open', label: 'Abertos' }, { value: 'acknowledged', label: 'Reconhecidos' }, { value: 'resolved', label: 'Resolvidos' }]} /></label>
       <label>Severidade<AppDropdown value={filters.severity} onChange={(value) => updateFilter('severity', value as IncidentReportFilters['severity'])} options={[{ value: 'all', label: 'Todas' }, { value: 'critical', label: 'Crítica (S5)' }, { value: 'high', label: 'Alta (S4)' }, { value: 'medium', label: 'Média (S2–S3)' }, { value: 'low', label: 'Baixa (S0–S1)' }]} /></label>
       <label>Unidade<AppDropdown value={filters.unitId} onChange={(value) => updateFilter('unitId', value)} options={[{ value: '', label: 'Todas as unidades' }, ...units.map((unit) => ({ value: unit.unit_id, label: `${unit.code} · ${unit.name}` }))]} /></label>
@@ -1818,7 +1964,12 @@ function IncidentReports({ alerts, units, onRefresh }: { alerts: Alert[]; units:
     </div>
     <div className="report-table-panel">
       <div className="panel-title"><div><p className="eyebrow">REGISTRO CONSOLIDADO</p><h3>Incidentes monitorados</h3></div><span className="problem-count neutral-count">{filteredAlerts.length} registro(s)</span></div>
-      {filteredAlerts.length === 0 ? <div className="empty-state compact-empty"><span className="empty-glyph"><CheckIcon /></span><strong>Nenhum incidente no recorte</strong><small>Ajuste os filtros ou atualize os dados para consultar novamente.</small></div> : <div className="report-table-wrap"><table className="incident-report-table"><thead><tr><th>Incidente</th><th>Severidade</th><th>Unidade / ativo</th><th>Abertura</th><th>Encerramento</th><th>Tempo</th><th>Status</th></tr></thead><tbody>{filteredAlerts.map((alert) => { const statusTone = alert.status === 'resolved' ? 'online' : alert.status === 'acknowledged' ? 'degraded' : 'offline'; const statusText = alert.status === 'resolved' ? 'Resolvido' : alert.status === 'acknowledged' ? 'Reconhecido' : 'Aberto'; return <tr key={alert.id}><td><strong>{alert.title}</strong><small>{alert.id.slice(0, 8)} · registro auditável</small></td><td><AlertSeverityBadge severity={alert.severity} /></td><td><strong>{alert.unit_code ?? 'Unidade não associada'}</strong><small>{alert.equipment_name ?? 'Ativo não informado'}</small></td><td>{formatDate(alert.opened_at)}</td><td>{formatDate(alert.resolved_at)}</td><td>{resolutionTime(alert)}</td><td><span className={`status ${statusTone}`}>{statusText}</span></td></tr>; })}</tbody></table></div>}
+      {filteredAlerts.length === 0 ? <div className="empty-state compact-empty"><span className="empty-glyph"><CheckIcon /></span><strong>Nenhum incidente no recorte</strong><small>Ajuste os filtros ou atualize os dados para consultar novamente.</small></div> : <div className="report-table-wrap"><div className="incident-report-table"><div className="incident-report-head"><span>Incidente</span><span>Severidade</span><span>Unidade / ativo</span><span>Abertura</span><span>Encerramento</span><span>Tempo</span><span>Status</span></div><div className="incident-report-list">{pagedAlerts.map((alert) => { const statusTone = alert.status === 'resolved' ? 'online' : alert.status === 'acknowledged' ? 'degraded' : 'offline'; const statusText = alert.status === 'resolved' ? 'Resolvido' : alert.status === 'acknowledged' ? 'Reconhecido' : 'Aberto'; return <div key={alert.id} className={`incident-row ${statusTone}`}><div><strong>{alert.title}</strong><small>{alert.id.slice(0, 8)} · registro auditável</small></div><div><AlertSeverityBadge severity={alert.severity} /></div><div><strong>{alert.unit_code ?? 'Unidade não associada'}</strong><small>{alert.equipment_name ?? 'Ativo não informado'}</small></div><div>{formatDate(alert.opened_at)}</div><div>{formatDate(alert.resolved_at)}</div><div>{resolutionTime(alert)}</div><div><span className={`status ${statusTone}`}>{statusText}</span></div></div>; })}</div></div></div>}
+      {totalPages > 1 && <div className="pagination">
+        <button type="button" className="secondary-button compact" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Anterior</button>
+        <span>Página {currentPage} de {totalPages}</span>
+        <button type="button" className="secondary-button compact" disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)}>Próxima</button>
+      </div>}
     </div>
   </section>;
 }
@@ -1856,12 +2007,15 @@ function EditProfileModal({ session, onSave, onClose }: { session: LoginResponse
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  useEffect(() => { const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); }; window.addEventListener('keydown', closeOnEscape); return () => window.removeEventListener('keydown', closeOnEscape); }, [onClose]);
   const nameMissing = submitted && !displayName.trim();
   const passwordInvalid = submitted && password.length > 0 && password.length < 8;
+  const isDirty = displayName.trim() !== session.user.displayName || password.length > 0;
 
   async function submit(e: FormEvent) {
     e.preventDefault(); setSubmitted(true); setError('');
     if (!displayName.trim() || (password.length > 0 && password.length < 8)) return;
+    if (!isDirty) { onClose(); return; }
     setSaving(true);
     try {
       await api(`/v1/users/${session.user.id}`, session.accessToken, { method: 'PATCH', body: JSON.stringify({ displayName: displayName.trim(), password: password || undefined }) });
@@ -1903,7 +2057,7 @@ function EditProfileModal({ session, onSave, onClose }: { session: LoginResponse
         {error && <div className="form-error">{error}</div>}
         <div className="form-actions">
           <button type="button" className="secondary-button clear-filters-button" onClick={onClose}><CloseIcon /> Cancelar</button>
-          <button className="primary" disabled={saving}>{saving ? 'Salvando…' : <><CheckIcon /> Salvar alterações</>}</button>
+          <button className="primary" disabled={saving || !isDirty}>{saving ? 'Salvando…' : <><CheckIcon /> Salvar alterações</>}</button>
         </div>
       </form>
     </div>
@@ -1936,17 +2090,18 @@ function LoginWithRequest({ onSuccess, showLogoutToast = false }: { onSuccess: (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const emailMissing = submitted && !email.trim();
-  const passwordMissing = submitted && (!password.trim() || password.length > 200);
+  const emailInvalid = submitted && !emailMissing && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const passwordMissing = submitted && (!password.trim() || password.length < 8 || password.length > 200);
   async function submit(event: FormEvent) {
     event.preventDefault(); setSubmitted(true); setError('');
-    if (!email.trim() || !password.trim() || password.length > 200) return;
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) || !password.trim() || password.length < 8 || password.length > 200) return;
     try {
       const response = await fetch(`${apiBase}/v1/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, password }) });
       if (!response.ok) throw new Error(await loginErrorMessage(response));
       onSuccess(await response.json() as LoginResponse);
-    } catch (reason) { setError(reason instanceof Error ? friendlyApiMessage(reason.message, 'Falha de autenticação. Tente novamente.') : 'Falha de autenticação. Tente novamente.'); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'E-mail ou senha incorretos. Confira os dados e tente novamente.'); }
   }
-  return <div className="login-page"><section className="login-context"><div className="brand large"><img className="brand-mark" src={brandIcon} alt="HealthLink Sentinel" width={46} height={46} /><div><strong>HealthLink</strong><small>SENTINEL</small></div></div><div className="context-copy"><p className="eyebrow">PLATAFORMA DE MISSÃO CRÍTICA</p><AnimatedHeroTitle /><p>Monitoramento contínuo de conectividade, infraestrutura e disponibilidade operacional.</p></div></section><section className="login-panel"><form onSubmit={submit} noValidate><p className="eyebrow">ACESSO RESTRITO</p><h2>Entrar no centro de comando</h2><p className="muted">Utilize sua identidade corporativa.</p><label>E-mail corporativo<input type="email" maxLength={254} value={email} className={emailMissing ? 'field-invalid' : ''} onChange={(event) => setEmail(event.target.value)} autoFocus />{emailMissing && <span className="field-error-text">Informe o e-mail.</span>}</label><label>Senha<div className="password-field"><input type={showPassword ? 'text' : 'password'} maxLength={200} value={password} className={passwordMissing ? 'field-invalid' : ''} onChange={(event) => setPassword(event.target.value)} /><button type="button" className="password-toggle" onClick={() => setShowPassword((prev) => !prev)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOffIcon /> : <EyeIcon />}</button></div>{passwordMissing && <span className="field-error-text">A senha deve ter de 8 a 200 caracteres.</span>}</label>{error && <div className="error-banner" role="alert"><span className="error-banner-icon"><WarningIcon /></span><span className="error-banner-text">{error}</span></div>}<button className="primary">Acessar plataforma</button><button type="button" className="request-access-link" onClick={() => setRequestOpen(true)}>Criar conta <span>(sujeito a aprovação)</span></button></form></section>{requestOpen && <RequestAccessModal onClose={() => setRequestOpen(false)} onToast={addToast} />}<ToastStack toasts={toasts} /></div>;
+  return <div className="login-page"><section className="login-context"><div className="brand large"><img className="brand-mark" src={brandIcon} alt="HealthLink Sentinel" width={46} height={46} /><div><strong>HealthLink</strong><small>SENTINEL</small></div></div><div className="context-copy"><p className="eyebrow">PLATAFORMA DE MISSÃO CRÍTICA</p><AnimatedHeroTitle /><p>Monitoramento contínuo de conectividade, infraestrutura e disponibilidade operacional.</p></div></section><section className="login-panel"><form onSubmit={submit} noValidate><p className="eyebrow">ACESSO RESTRITO</p><h2>Entrar no centro de comando</h2><p className="muted">Utilize sua identidade corporativa.</p><label>E-mail corporativo<input type="email" maxLength={254} value={email} className={emailMissing || emailInvalid ? 'field-invalid' : ''} onChange={(event) => setEmail(event.target.value)} autoFocus />{emailMissing && <span className="field-error-text">Informe o e-mail.</span>}{emailInvalid && <span className="field-error-text">Informe um e-mail válido, como nome@dominio.com.</span>}</label><label>Senha<div className="password-field"><input type={showPassword ? 'text' : 'password'} maxLength={200} value={password} className={passwordMissing ? 'field-invalid' : ''} onChange={(event) => setPassword(event.target.value)} /><button type="button" className="password-toggle" onClick={() => setShowPassword((prev) => !prev)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOffIcon /> : <EyeIcon />}</button></div>{passwordMissing && <span className="field-error-text">Pelo menos 8 caracteres.</span>}</label>{error && <div className="error-banner" role="alert"><span className="error-banner-icon"><WarningIcon /></span><span className="error-banner-text">{error}</span></div>}<button className="primary">Acessar plataforma</button><button type="button" className="request-access-link" onClick={() => setRequestOpen(true)}>Criar conta <span>(sujeito a aprovação)</span></button></form></section>{requestOpen && <RequestAccessModal onClose={() => setRequestOpen(false)} onToast={addToast} />}<ToastStack toasts={toasts} /></div>;
 }
 
 function AnimatedHeroTitle() {
@@ -1958,12 +2113,14 @@ function AnimatedHeroTitle() {
 function RequestAccessModal({ onClose, onToast }: { onClose: () => void; onToast: (toast: Omit<Toast, 'id'>) => void }) {
   const [form, setForm] = useState({ displayName: '', email: '', password: '', role: 'viewer' }); const [saving, setSaving] = useState(false); const [submitted, setSubmitted] = useState(false);
   useEffect(() => { if (form.password.length > 200) setForm((previous) => ({ ...previous, password: previous.password.slice(0, 200) })); }, [form.password]);
+  useEffect(() => { const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); }; window.addEventListener('keydown', closeOnEscape); return () => window.removeEventListener('keydown', closeOnEscape); }, [onClose]);
   const nameMissing = submitted && !form.displayName.trim();
   const emailMissing = submitted && !form.email.trim();
+  const emailInvalid = submitted && !emailMissing && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
   const passwordMissing = submitted && (form.password.trim().length < 8 || form.password.length > 200);
   async function submit(event: FormEvent) {
     event.preventDefault(); setSubmitted(true);
-    if (!form.displayName.trim() || !form.email.trim() || form.password.trim().length < 8 || form.password.length > 200) return;
+    if (!form.displayName.trim() || !form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()) || form.password.trim().length < 8 || form.password.length > 200) return;
     setSaving(true);
     try {
       const response = await fetch(`${apiBase}/v1/access-requests`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(form) });
@@ -1976,7 +2133,7 @@ function RequestAccessModal({ onClose, onToast }: { onClose: () => void; onToast
       onClose();
     } catch (reason) { onToast({ type: 'error', title: 'Falha ao solicitar acesso', detail: friendlyMessage(reason, 'Não foi possível enviar a solicitação. Tente novamente.') }); } finally { setSaving(false); }
   }
-  return <div className="approval-modal" role="dialog" aria-modal="true"><form className="request-access-modal panel" onSubmit={submit} noValidate><div className="panel-title"><div><p className="eyebrow">SOLICITAÇÃO DE ACESSO</p><h3>Criar conta</h3></div><button type="button" className="icon-button clear-filters-button" onClick={onClose} aria-label="Fechar"><CloseIcon /></button></div><p className="muted">Seu cadastro será analisado por um administrador.</p><label><span className="field-label">Nome completo <b className="req">*</b></span><input className={nameMissing ? 'field-invalid' : ''} value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} placeholder="Ex.: Nome" />{nameMissing && <span className="field-error-text">Informe o nome completo.</span>}</label><label><span className="field-label">E-mail corporativo <b className="req">*</b></span><input type="text" inputMode="email" name="hl-account-email-field" autoComplete="off" data-lpignore="true" data-1p-ignore className={emailMissing ? 'field-invalid' : ''} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="nome@empresa.com" />{emailMissing && <span className="field-error-text">Informe o e-mail.</span>}</label><label><span className="field-label">Perfil solicitado <b className="req">*</b></span><AppDropdown value={form.role} onChange={(next) => setForm({ ...form, role: next })} options={[{ value: 'viewer', label: 'Visualizador' }, { value: 'supervisor', label: 'Supervisor' }, { value: 'noc_operator', label: 'Operador NOC' }]} /></label><label><span className="field-label">Senha <b className="req">*</b></span><input type="password" name="hl-new-account-password" autoComplete="new-password" data-lpignore="true" data-1p-ignore minLength={8} className={passwordMissing ? 'field-invalid' : ''} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Mínimo de 8 caracteres" />{passwordMissing && <span className="field-error-text">A senha deve ter ao menos 8 caracteres.</span>}</label><div className="form-actions request-access-actions"><button type="button" className="secondary-button clear-filters-button" onClick={onClose}><CloseIcon /> Cancelar</button><button className="primary" disabled={saving}>{saving ? 'Enviando…' : 'Solicitar Acesso'}</button></div></form></div>;
+  return <div className="approval-modal" role="dialog" aria-modal="true" onMouseDown={onClose}><form className="request-access-modal panel" onSubmit={submit} noValidate onMouseDown={(event) => event.stopPropagation()}><div className="panel-title"><div><p className="eyebrow">SOLICITAÇÃO DE ACESSO</p><h3>Criar conta</h3></div><button type="button" className="icon-button clear-filters-button" onClick={onClose} aria-label="Fechar"><CloseIcon /></button></div><p className="muted">Seu cadastro será analisado por um administrador.</p><label><span className="field-label">Nome completo <b className="req">*</b></span><input className={nameMissing ? 'field-invalid' : ''} value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} placeholder="Ex.: Nome" />{nameMissing && <span className="field-error-text">Informe o nome completo.</span>}</label><label><span className="field-label">E-mail corporativo <b className="req">*</b></span><input type="text" inputMode="email" name="hl-account-email-field" autoComplete="off" data-lpignore="true" data-1p-ignore className={emailMissing || emailInvalid ? 'field-invalid' : ''} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="nome@empresa.com" />{emailMissing && <span className="field-error-text">Informe o e-mail.</span>}{emailInvalid && <span className="field-error-text">Informe um e-mail válido, como nome@dominio.com.</span>}</label><label><span className="field-label">Perfil solicitado <b className="req">*</b></span><AppDropdown value={form.role} onChange={(next) => setForm({ ...form, role: next })} options={[{ value: 'viewer', label: 'Visualizador' }, { value: 'supervisor', label: 'Supervisor' }, { value: 'noc_operator', label: 'Operador NOC' }]} /></label><label><span className="field-label">Senha <b className="req">*</b></span><input type="password" name="hl-new-account-password" autoComplete="new-password" data-lpignore="true" data-1p-ignore minLength={8} className={passwordMissing ? 'field-invalid' : ''} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Mínimo de 8 caracteres" />{passwordMissing && <span className="field-error-text">A senha deve ter ao menos 8 caracteres.</span>}</label><div className="form-actions request-access-actions"><button type="button" className="secondary-button clear-filters-button" onClick={onClose}><CloseIcon /> Cancelar</button><button className="primary" disabled={saving}>{saving ? 'Enviando…' : 'Solicitar Acesso'}</button></div></form></div>;
 }
 
 function Login({ onSuccess }: { onSuccess: (session: LoginResponse) => void }) {
