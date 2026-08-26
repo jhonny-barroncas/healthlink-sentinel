@@ -126,7 +126,7 @@ button { cursor: pointer; }
   *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: 1ms !important; }
   .status-live { animation: none; }
 }
-.command-center, .agent-overview, .connections-page, .integration-page, .users-page, .reports-page, .units-page, .unit-detail, .alerts-page { animation: healthlink-fade-in var(--motion-slow) var(--ease-standard) both; }
+.command-center, .agent-overview, .connections-page, .integration-page, .users-page, .incident-reports, .unit-detail, .alerts-center { animation: healthlink-fade-in var(--motion-slow) var(--ease-standard) both; }
 .command-metric, .unit-card, .agent-row, .connection-card, .host-row, .problem-row, .user-row, .equipment-card { transition: var(--transition-base); }
 .command-metric:hover, .connection-card:hover, .equipment-card:hover { border-color: rgba(53, 211, 208, .42); box-shadow: var(--shadow-panel); transform: translateY(-2px); }
 .unit-card:focus-visible, .agent-row:focus-visible, .host-row:focus-visible, .problem-row:focus-visible { outline: 2px solid rgba(53, 211, 208, .65); outline-offset: 3px; }
@@ -143,7 +143,16 @@ button { cursor: pointer; }
 .login-context { animation-delay: .05s; }
 .login-panel { animation-delay: .14s; }
 .hero-word { display: inline-block; opacity: 0; transform: translateY(12px); filter: blur(4px); animation: healthlink-corporate-reveal .52s var(--ease-standard) var(--word-delay) both; will-change: transform, opacity, filter; }
-.command-center .command-summary, .command-center .command-grid, .command-center .mission-callout { animation: healthlink-corporate-reveal .65s var(--ease-standard) both; }
+.command-center .command-summary, .command-center .command-grid, .command-center .mission-callout,
+.summary-grid, .unit-grid, .unit-detail .detail-hero, .unit-detail .detail-grid,
+.alerts-center .alerts-center-header, .alerts-center .alert-tabs, .alerts-center .alert-list,
+.incident-reports .report-filters, .incident-reports .report-summary-grid, .incident-reports .report-table-panel,
+.users-page .users-layout,
+.connections-page .connections-grid,
+.integration-page .zabbix-status-panel, .integration-page .agent-versions-panel, .integration-page .integration-stats, .integration-page .integration-grid,
+.agent-overview .command-summary, .agent-overview .agent-list {
+  animation: healthlink-corporate-reveal .65s var(--ease-standard) both;
+}
 .command-center .command-summary { animation-delay: .06s; }
 .command-center .mission-callout { animation-delay: .12s; }
 .command-center .command-grid { animation-delay: .18s; }
