@@ -11,7 +11,7 @@ Internet
    │ HTTPS
 DNS + proxy reverso
    │ HTTPS público :3002
-   │ HTTP interno :3003
+   │ HTTPS interno :3003
 HealthLink container ─── PostgreSQL
                       └─ Redis
 ```
@@ -60,7 +60,7 @@ cd /opt/healthlink-sentinel
 docker compose -f docker-compose.yml -f docker-compose.server.yml up -d --build
 ```
 
-O proxy reverso deve escutar HTTPS na porta externa `3002` e encaminhar o domínio do HealthLink para `http://127.0.0.1:3003`.
+O proxy reverso deve escutar HTTPS na porta externa `3002` e encaminhar o domínio do HealthLink para `https://127.0.0.1:3003`.
 
 ## 4. Criar o ambiente de produção
 
@@ -102,7 +102,7 @@ Regras obrigatórias:
 O serviço `migrate` aplica as migrations automaticamente antes da API iniciar.
 
 ```bash
-docker compose up -d --build
+docker compose -f docker-compose.yml -f docker-compose.server.yml up -d --build
 docker compose ps
 ```
 
@@ -120,7 +120,7 @@ O serviço `healthlink` deve estar `Up` e o `migrate` deve terminar com código 
 No próprio servidor:
 
 ```bash
-curl -i http://127.0.0.1:3003/health
+curl -k -i https://127.0.0.1:3003/health
 ```
 
 Resposta esperada:
@@ -143,7 +143,15 @@ https://healthlink.seudominio.com
 
 ## 7. HTTPS e proxy reverso
 
-O Docker entrega a aplicação na porta interna `3002`, publicada pelo override do servidor em `127.0.0.1:3003`. Em produção, o TLS deve terminar no proxy reverso na porta externa `3002`, encaminhando para `127.0.0.1:3003`.
+O Docker entrega a aplicação na porta interna `3002`, publicada pelo override do servidor em `127.0.0.1:3003`. Em produção, o TLS é usado no proxy reverso e também no próprio container, na porta externa `3002` e no upstream `127.0.0.1:3003`.
+
+Configure os certificados no `.env` sem versioná-los no Git:
+
+```env
+HEALTHLINK_TLS_DIR=/etc/healthlink/certs
+HEALTHLINK_TLS_KEY_FILE=privkey.pem
+HEALTHLINK_TLS_CERT_FILE=fullchain.pem
+```
 
 Exemplo conceitual de Nginx:
 
@@ -156,7 +164,8 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/healthlink.seudominio.com/privkey.pem;
 
     location / {
-        proxy_pass http://127.0.0.1:3003;
+        proxy_pass https://127.0.0.1:3003;
+        proxy_ssl_verify off;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto https;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -209,7 +218,7 @@ Para atualizar a aplicação:
 
 ```bash
 git pull
-docker compose up -d --build
+docker compose -f docker-compose.yml -f docker-compose.server.yml up -d --build
 docker compose ps
 curl -f https://healthlink.seudominio.com/health
 ```

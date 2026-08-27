@@ -1,6 +1,14 @@
 services:
   healthlink:
     # O proxy existente do servidor encaminha o domínio para esta porta.
-    # Assim o HealthLink não disputa 80/443 com as outras aplicações.
+    # O tráfego entre o proxy e o container também permanece em HTTPS.
+    environment:
+      HTTPS: "true"
+      HTTPS_KEY_PATH: /app/production-certs/${HEALTHLINK_TLS_KEY_FILE:-privkey.pem}
+      HTTPS_CERT_PATH: /app/production-certs/${HEALTHLINK_TLS_CERT_FILE:-fullchain.pem}
     ports: !override
       - "127.0.0.1:3003:3002"
+    volumes:
+      - ${HEALTHLINK_TLS_DIR:-./.certs}:/app/production-certs:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.env.NODE_TLS_REJECT_UNAUTHORIZED='0'; fetch('https://127.0.0.1:3002/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]

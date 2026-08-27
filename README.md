@@ -67,9 +67,9 @@ docker compose -f docker-compose.yml -f docker-compose.local-https.yml up -d --b
 Invoke-WebRequest https://localhost:3002/health -SkipCertificateCheck
 ```
 
-Para desenvolvimento local com HTTPS, use o segundo comando: o override monta `.certs/` no container e entrega frontend, API e health check em HTTPS. O Compose base permanece HTTP interno, que é o modo correto quando um proxy reverso existente termina o HTTPS no ambiente de produção. PostgreSQL e Redis permanecem internos ao Compose. Consulte [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) antes de usar em produção.
+Para desenvolvimento local com HTTPS, use o segundo comando: o override monta `.certs/` no container e entrega frontend, API e health check em HTTPS. Em produção, use também `docker-compose.server.yml`, que monta os certificados configurados no `.env` e mantém HTTPS entre o proxy reverso e o container. PostgreSQL e Redis permanecem internos ao Compose. Consulte [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) antes de usar em produção.
 
-Para o procedimento completo de implantação, HTTPS, backup, atualização e instalação do agente nas unidades móveis, consulte o [Manual de implantação em produção](docs/MANUAL-IMPLANTACAO-PRODUCAO.md).
+Para o procedimento completo de implantação, HTTPS ponta a ponta, backup, atualização e instalação do agente nas unidades móveis, consulte o [Manual de implantação em produção](docs/MANUAL-IMPLANTACAO-PRODUCAO.md).
 
 Para subir somente as dependências durante o desenvolvimento com API/frontend fora do Docker:
 

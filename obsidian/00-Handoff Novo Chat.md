@@ -121,7 +121,9 @@ Atualização 2026-08-25: iniciado o segundo lote visual no Centro Operacional. 
 
 Atualização 2026-08-25: o Centro Operacional recebeu um passe minimalista. Cards de indicadores perderam decoração e sombras pesadas, filtros usam divisores sutis e mapa/ranking passaram a ter mais espaço visual e menor ruído de borda.
 
-Atualização 2026-08-21: o HTTPS direto do Docker foi isolado em `docker-compose.local-https.yml`. O Compose base permanece HTTP interno para não quebrar produção quando o proxy reverso existente termina o TLS e encaminha para o container.
+Atualização 2026-08-21: o HTTPS direto do Docker foi isolado em `docker-compose.local-https.yml`.
+
+Atualização 2026-08-27: o perfil Docker de servidor passou a usar HTTPS ponta a ponta: o proxy reverso encaminha para `https://127.0.0.1:3003` e o Fastify recebe `HTTPS=true` dentro do container. Os certificados são montados somente leitura por `HEALTHLINK_TLS_DIR`, `HEALTHLINK_TLS_KEY_FILE` e `HEALTHLINK_TLS_CERT_FILE`; nenhum certificado ou segredo é versionado.
 
 Correção 2026-08-21: o build Docker não depende mais da existência dos certificados locais; o Vite ativa HTTPS somente quando `.certs/localhost*.pem` está presente.
 
