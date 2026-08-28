@@ -190,3 +190,6 @@ Atualização 2026-08-25: o mapa estadual passou a ocupar a viewport em larguras
 Atualização 2026-08-25: adicionada sinalização visual de incidentes no pin da unidade no mapa estadual. A severidade mais alta entre os alertas ativos define pin âmbar ou vermelho, com animação de pulso e rótulo acessível; alertas resolvidos são ignorados. A regra foi coberta por teste unitário e validada com typecheck, build web e rebuild Docker.
 
 Atualização 2026-08-28: concluída a hotfix do agente Linux após o `agent.json` ser atualizado. O agente agora usa a versão persistida no startup; o catálogo aceita bundles Node `.cjs` e `.js`, mantendo `.sh`/`.ps1` exclusivos do provisionamento.
+Atualização 2026-08-28: corrigido o aviso do Chrome DevTools sobre campos de formulário sem `id`/`name`. Os campos reutilizáveis de data e combobox, além das buscas de unidades e usuários, agora possuem `name`; a regressão foi coberta por `apps/web/src/form-field-identifiers.test.ts`.
+
+Atualização 2026-08-28: corrigido o loop de reinício do agente Linux após atualização automática. A versão baixada agora é persistida no `agent.json`, evitando que o serviço reinstale a mesma versão em cada inicialização. Suíte completa, typecheck, build do agente e build web aprovados.

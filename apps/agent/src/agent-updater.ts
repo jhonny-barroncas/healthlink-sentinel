@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto';
-import { chmod, copyFile, rename, unlink, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 
 type UpdateConfig = {
   apiUrl: string;
   platform: 'windows' | 'linux';
   agentVersion: string;
   agentPath: string;
+  configPath?: string;
   timeoutMs: number;
   agentId?: string;
 };
@@ -44,6 +45,12 @@ export async function checkForAgentUpdate(config: UpdateConfig, auth: Authentica
   if (config.platform === 'linux') await chmod(temporary, 0o755);
   await copyFile(config.agentPath, previousAgentPath(config.agentPath));
   await rename(temporary, config.agentPath);
+  if (config.configPath) {
+    const installedConfig = JSON.parse(await readFile(config.configPath, 'utf8')) as Record<string, unknown>;
+    const temporaryConfig = `${config.configPath}.update-${process.pid}`;
+    await writeFile(temporaryConfig, `${JSON.stringify({ ...installedConfig, version: release.version }, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
+    await rename(temporaryConfig, config.configPath);
+  }
   console.log(`[starlink-agent] agente atualizado para ${release.version}; reinicie o serviço para carregar o binário novo.`);
   return true;
 }
