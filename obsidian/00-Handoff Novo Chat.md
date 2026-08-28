@@ -277,3 +277,8 @@ Atualização visual 2026-08-25: os marcadores georreferenciados do mapa estadua
 - PDF executivo do briefing visual: `output/pdf/HealthLink Sentinel - Briefing Visual do Sistema.pdf` (gerado e conferido em 2026-08-11).
 
 - Cadastro de equipamentos: campos opcionais aceitam vazio, serial duplicado recebe mensagem orientativa e falhas aparecem em toast. Consulte [[03-Execucao/Correcao Cadastro de Equipamentos - Campos Opcionais]].
+
+Hotfix operacional 2026-08-28: o startup do agente passou a respeitar a versão persistida após uma atualização, corrigindo o loop observado no Raspberry Pi. O catálogo de releases aceita bundles Node `.cjs` e `.js`; instaladores `.sh`/`.ps1` permanecem gerados separadamente por enrollment.
+Correção de acessibilidade 2026-08-28: os campos reutilizáveis de data/combobox e a busca de unidades/usuários passaram a expor `name`, eliminando o aviso do Chrome DevTools sobre campos de formulário sem identificador. A suíte, o typecheck e o build web foram validados na branch `codex/avaliar-correcao-mapa`.
+
+Correção operacional 2026-08-28: o agente Linux atualizava o bundle para `1.0.1`, mas mantinha `version: 1.0.0` no `agent.json`, causando reinício contínuo com código 75. O updater agora persiste a versão instalada atomicamente no arquivo de configuração; o caso foi coberto por teste.

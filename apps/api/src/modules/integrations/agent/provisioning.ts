@@ -80,5 +80,5 @@ export function collectionAgentInstallerFileName(unitCode: string, platform: Age
 }
 
 export function isDeployableAgentArtifact(fileName: string): boolean {
-  return /^[a-z0-9][a-z0-9._-]*\.cjs$/i.test(fileName);
+  return /^[a-z0-9][a-z0-9._-]*\.(?:cjs|js)$/i.test(fileName);
 }

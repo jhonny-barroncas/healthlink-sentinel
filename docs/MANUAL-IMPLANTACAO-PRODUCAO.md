@@ -273,7 +273,7 @@ Na aba **Zabbix sincronização / Versões do agente**:
 
 1. selecione Windows ou Linux;
 2. informe a versão semântica, por exemplo `1.1.0`;
-3. envie o bundle executável `.cjs`;
+3. envie o bundle executável Node `.cjs` ou `.js`;
 4. publique.
 
 Não envie o instalador `.ps1` ou `.sh` nessa área. O instalador é gerado por servidor e contém o enrollment específico daquela unidade.
@@ -336,7 +336,7 @@ Não aplique migrations manualmente enquanto o serviço `migrate` estiver execut
 ### Atualização não ocorreu
 
 - confirme que a nova versão é maior que a instalada;
-- confirme que o arquivo publicado é `.cjs`;
+- confirme que o arquivo publicado é um bundle Node `.cjs` ou `.js`;
 - confira o SHA-256 no catálogo;
 - verifique espaço em disco e permissões do diretório do agente;
 - valide se o serviço pode reiniciar o processo.

@@ -15,7 +15,9 @@ describe('agent updater', () => {
   it('downloads only the restricted platform release and atomically replaces the agent', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'healthlink-updater-test-'));
     const agentPath = join(directory, 'healthlink-agent.cjs');
+    const configPath = join(directory, 'agent.json');
     await writeFile(agentPath, 'old-version');
+    await writeFile(configPath, JSON.stringify({ version: '1.0.0', other: 'preserved' }));
     const artifact = Buffer.from('new-version');
     const checksum = createHash('sha256').update(artifact).digest('hex');
     const requested: string[] = [];
@@ -27,11 +29,12 @@ describe('agent updater', () => {
       },
     };
 
-    const updated = await checkForAgentUpdate({ platform: 'linux', agentVersion: '1.0.0', agentPath, apiUrl: 'https://healthlink.example', timeoutMs: 3000, agentId: 'agent-id' }, client);
+    const updated = await checkForAgentUpdate({ platform: 'linux', agentVersion: '1.0.0', agentPath, configPath, apiUrl: 'https://healthlink.example', timeoutMs: 3000, agentId: 'agent-id' }, client);
 
     expect(updated).toBe(true);
     expect(await readFile(agentPath, 'utf8')).toBe('new-version');
     expect(await readFile(previousAgentPath(agentPath), 'utf8')).toBe('old-version');
+    expect(JSON.parse(await readFile(configPath, 'utf8'))).toEqual({ version: '1.1.0', other: 'preserved' });
     expect(requested).toEqual([
       'https://healthlink.example/v1/collection-agents/releases',
       'https://healthlink.example/v1/collection-agents/releases/release-id/download',

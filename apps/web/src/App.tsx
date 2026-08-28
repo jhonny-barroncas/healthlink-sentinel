@@ -1346,7 +1346,7 @@ function AgentVersionsPanel({ token, onToast }: { token: string; onToast: (toast
   useEffect(() => { void load(); }, [token]);
   async function publish() {
     if (!file) return onToast({ type: 'warning', title: 'Arquivo obrigatório', detail: `Selecione o instalador ${platform === 'windows' ? 'Windows' : 'Linux'} do agente.` });
-    if (!canPublishAgentVersion(file.name, platform)) return onToast({ type: 'warning', title: 'Pacote inválido', detail: 'Publique o bundle executável .cjs do agente, não o instalador .ps1/.sh.' });
+    if (!canPublishAgentVersion(file.name, platform)) return onToast({ type: 'warning', title: 'Pacote inválido', detail: 'Publique um bundle executável .cjs ou .js do agente, não o instalador .ps1/.sh.' });
     setBusy(true);
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
@@ -1362,7 +1362,7 @@ function AgentVersionsPanel({ token, onToast }: { token: string; onToast: (toast
         <div className="agent-versions-info">
           <p className="eyebrow">REPOSITÓRIO DO AGENTE</p>
           <h3>Versões Windows e Linux</h3>
-          <small>Publique um bundle <code>.cjs</code>; a API calcula a versão automaticamente, embute a numeração e valida o checksum SHA-256.</small>
+          <small>Publique um bundle Node <code>.cjs</code> ou <code>.js</code>; a API calcula a versão automaticamente, embute a numeração e valida o checksum SHA-256.</small>
         </div>
         <div className="agent-versions-badge">
           <span className="badge-count-icon"><PackageIcon /></span>
@@ -1377,7 +1377,7 @@ function AgentVersionsPanel({ token, onToast }: { token: string; onToast: (toast
         </div>
 
         <div className="agent-form-field file-field">
-          <label className="field-label">Bundle <code>.cjs</code> do Agente</label>
+          <label className="field-label">Bundle Node <code>.cjs</code> ou <code>.js</code> do Agente</label>
           <div
             className={`agent-file-picker${dragActive ? ' dragging' : ''}`}
             onDragEnter={(event) => { event.preventDefault(); dragCounter.current += 1; setDragActive(true); }}
@@ -1388,12 +1388,12 @@ function AgentVersionsPanel({ token, onToast }: { token: string; onToast: (toast
             <input
               type="file"
               id="agent-bundle-file"
-              accept=".cjs,application/javascript"
+              accept=".cjs,.js,application/javascript"
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             />
             <label htmlFor="agent-bundle-file" className="agent-file-label">
               <span className="file-icon"><FolderIcon /></span>
-              <span className="file-name-text">{file ? file.name : dragActive ? 'Solte o arquivo aqui…' : 'Selecionar bundle .cjs…'}</span>
+              <span className="file-name-text">{file ? file.name : dragActive ? 'Solte o arquivo aqui…' : 'Selecionar bundle .cjs ou .js…'}</span>
               <span className="file-browse-btn"><SearchIcon /> Procurar</span>
             </label>
           </div>

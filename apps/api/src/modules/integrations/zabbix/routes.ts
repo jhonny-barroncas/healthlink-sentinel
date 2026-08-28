@@ -449,7 +449,7 @@ export const zabbixRoutes: FastifyPluginAsync = async (app) => {
       fileName: z.string().min(1).max(200),
       artifactBase64: z.string().min(1).max(25_000_000),
     }).parse(request.body);
-    if (!isDeployableAgentArtifact(input.fileName)) throw Object.assign(new Error('Publique o bundle executável .cjs do agente; o instalador .ps1/.sh é gerado automaticamente por servidor.'), { statusCode: 422 });
+    if (!isDeployableAgentArtifact(input.fileName)) throw Object.assign(new Error('Publique um bundle executável .cjs ou .js do agente; o instalador .ps1/.sh é gerado automaticamente por servidor.'), { statusCode: 422 });
     const uploadedArtifact = Buffer.from(input.artifactBase64, 'base64');
     if (!uploadedArtifact.length || uploadedArtifact.length > 20 * 1024 * 1024) throw Object.assign(new Error('O arquivo precisa ter entre 1 byte e 20 MB.'), { statusCode: 422 });
     return withTenant(request.auth.tenantId, async (db) => {
