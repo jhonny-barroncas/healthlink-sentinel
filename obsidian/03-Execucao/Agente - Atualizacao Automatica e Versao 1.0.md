@@ -12,7 +12,7 @@ O agente de coleta possui uma linha de versão independente por plataforma:
 - Windows: `1.0.0`;
 - Linux: `1.0.0`.
 
-As versões são publicadas na aba **Integração Zabbix / Versões do agente**. O catálogo guarda o arquivo, plataforma, nome, tamanho e SHA-256. O download exige autenticação e o agente só aceita uma versão mais nova da mesma plataforma.
+As versões são publicadas na aba **Integração Zabbix / Versões do agente**. O catálogo guarda o bundle executável, plataforma, nome, tamanho e SHA-256. O download exige autenticação e o agente só aceita uma versão mais nova da mesma plataforma. Bundles `.cjs` e `.js` são aceitos; instaladores `.ps1` e `.sh` são envelopes gerados pelo backend e não entram como releases consumíveis pelo motor.
 
 ## Fluxo de atualização
 
@@ -38,7 +38,7 @@ O detalhe da unidade oferece **Gerar agente** diretamente em cada equipamento de
 - O agente envia heartbeat mesmo quando não houver Starlink; métricas não suportadas por MikroTik/link permanecem sem preenchimento até existir adaptador real.
 - O agente consulta releases da própria API, valida SHA-256, substitui o bundle atomicamente e reinicia o processo para carregar a nova versão.
 
-O pacote embutido inicial é `dist/agent/healthlink-agent-1.0.0.cjs`, sincronizado para os catálogos Windows/Linux na inicialização da API sem substituir uma publicação administrativa real.
+O pacote embutido vigente é `dist/agent/healthlink-agent-1.0.2.cjs`, sincronizado para os catálogos Windows/Linux na inicialização da API sem substituir uma publicação administrativa real. O build Docker gera esse bundle automaticamente após o checkout, e o runtime remove o `.previous` depois do primeiro ciclo saudável.
 
 ## Tarefa para amanhã
 

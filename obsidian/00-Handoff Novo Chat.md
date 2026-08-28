@@ -282,3 +282,4 @@ Hotfix operacional 2026-08-28: o startup do agente passou a respeitar a versão 
 Correção de acessibilidade 2026-08-28: os campos reutilizáveis de data/combobox e a busca de unidades/usuários passaram a expor `name`, eliminando o aviso do Chrome DevTools sobre campos de formulário sem identificador. A suíte, o typecheck e o build web foram validados na branch `codex/avaliar-correcao-mapa`.
 
 Correção operacional 2026-08-28: o agente Linux atualizava o bundle para `1.0.1`, mas mantinha `version: 1.0.0` no `agent.json`, causando reinício contínuo com código 75. O updater agora persiste a versão instalada atomicamente no arquivo de configuração; o caso foi coberto por teste.
+Hotfix de distribuição 2026-08-28: a versão embutida padrão do agente foi elevada para `1.0.2` no build e na sincronização built-in da API. Assim, o Docker que for puxado pela `main` gera e publica automaticamente o bundle corrigido para atualização dos agentes instalados.

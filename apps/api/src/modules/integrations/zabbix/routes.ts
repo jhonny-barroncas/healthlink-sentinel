@@ -436,7 +436,7 @@ export const zabbixRoutes: FastifyPluginAsync = async (app) => {
     return withTenant(request.auth.tenantId, async (db) => {
       const result = await db.query(`
         SELECT id, version, platform, file_name, file_size, checksum_sha256, active, created_at
-        FROM agent_versions WHERE tenant_id = $1 ORDER BY platform, created_at DESC
+        FROM agent_versions WHERE tenant_id = $1 AND file_name ~* '\\.(cjs|js)$' ORDER BY platform, created_at DESC
       `, [request.auth.tenantId]);
       return result.rows;
     });

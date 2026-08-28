@@ -193,3 +193,4 @@ Atualização 2026-08-28: concluída a hotfix do agente Linux após o `agent.jso
 Atualização 2026-08-28: corrigido o aviso do Chrome DevTools sobre campos de formulário sem `id`/`name`. Os campos reutilizáveis de data e combobox, além das buscas de unidades e usuários, agora possuem `name`; a regressão foi coberta por `apps/web/src/form-field-identifiers.test.ts`.
 
 Atualização 2026-08-28: corrigido o loop de reinício do agente Linux após atualização automática. A versão baixada agora é persistida no `agent.json`, evitando que o serviço reinstale a mesma versão em cada inicialização. Suíte completa, typecheck, build do agente e build web aprovados.
+Atualização 2026-08-28: a distribuição built-in passou a gerar/sincronizar o agente `1.0.2` automaticamente, permitindo que a produção atualizada por `git pull` ofereça a hotfix aos agentes existentes sem depender de um arquivo fora do repositório.
