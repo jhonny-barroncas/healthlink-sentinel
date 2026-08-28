@@ -117,7 +117,7 @@ export async function main(argv = process.argv): Promise<void> {
     return;
   }
   const config = cli.configPath
-    ? agentConfigFromInstalled(await loadInstalledAgentConfig(cli.configPath), bundledAgentVersion())
+    ? agentConfigFromInstalled(await loadInstalledAgentConfig(cli.configPath))
     : loadConfig();
   activeAgentPath = config.agentPath;
   await runAgent(config, cli.once);

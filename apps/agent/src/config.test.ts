@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { agentConfigFromInstalled } from './config.js';
 
 describe('installed agent runtime config', () => {
-  it('uses the bundled version and maps the assigned Starlink without asking for environment variables', () => {
+  it('uses the persisted installed version and maps the assigned Starlink without asking for environment variables', () => {
     const config = agentConfigFromInstalled({
       apiUrl: 'https://healthlink.example',
       credential: 'hla_scoped',
@@ -19,9 +19,9 @@ describe('installed agent runtime config', () => {
       configPath: 'C:\\agent\\agent.json',
       pollIntervalMs: 15000,
       timeoutMs: 3000,
-    }, '1.2.0');
+    });
 
-    expect(config.agentVersion).toBe('1.2.0');
+    expect(config.agentVersion).toBe('1.0.0');
     expect(config.apiToken).toBe('hla_scoped');
     expect(config.equipmentId).toBe('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee');
     expect(config.starlinkHost).toBe('192.168.100.1');
