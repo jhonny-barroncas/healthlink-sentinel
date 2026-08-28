@@ -13,7 +13,7 @@ import { monitoringRoutes } from './modules/monitoring/routes.js';
 import { zabbixRoutes } from './modules/integrations/zabbix/routes.js';
 import { starlinkRoutes } from './modules/integrations/starlink/routes.js';
 import { collectionAgentRoutes } from './modules/integrations/agent/routes.js';
-import { synchronizeBuiltInAgentRelease } from './modules/integrations/agent/built-in-release.js';
+import { builtInVersion, synchronizeBuiltInAgentRelease } from './modules/integrations/agent/built-in-release.js';
 import { userRoutes } from './modules/users/routes.js';
 import { env } from './platform/env.js';
 import { registerWebAssets } from './web-assets.js';
@@ -44,6 +44,6 @@ if (existsSync(webRoot)) {
 }
 
 const builtInAgent = await synchronizeBuiltInAgentRelease();
-app.log.info({ version: '1.0.0', tenants: builtInAgent.tenants, checksum: builtInAgent.checksum }, 'Built-in collection agent release synchronized');
+app.log.info({ version: builtInVersion, tenants: builtInAgent.tenants, checksum: builtInAgent.checksum }, 'Built-in collection agent release synchronized');
 
 await app.listen({ port: env.PORT, host: '0.0.0.0' });

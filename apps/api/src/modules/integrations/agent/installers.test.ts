@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { renderLinuxInstaller, renderWindowsInstaller } from './installers.js';
 
-const artifact = Buffer.from('collector-real-1.0.0');
+const artifact = Buffer.from('collector-real-1.0.0\n// HealthLink Sentinel Agent v1.0.0\n');
 const options = {
   apiUrl: 'https://healthlink.example:5174',
   enrollmentToken: 'hle_token-temporario',
@@ -33,6 +33,7 @@ describe('single-file agent installers', () => {
 
   it('renders a Linux bootstrap with embedded artifact, enrollment and supervised restart', () => {
     const script = renderLinuxInstaller(options);
+    expect(script).not.toContain('\r');
     expect(script).toContain(artifact.toString('base64'));
     expect(script).toContain(Buffer.from(options.enrollmentToken).toString('base64'));
     expect(script).toContain('systemctl enable --now healthlink-agent.service');
@@ -40,5 +41,10 @@ describe('single-file agent installers', () => {
     expect(script).toContain('printenv HEALTHLINK_INSTALLER_TEST_MODE');
     expect(script).not.toContain('[ "$HEALTHLINK_INSTALLER_TEST_MODE" = "1" ]');
     expect(script).not.toContain('read -p');
+  });
+
+  it('rejects an artifact whose embedded version does not match the installer version', () => {
+    expect(() => renderLinuxInstaller({ ...options, version: '1.0.1' })).toThrow('versão embutida');
+    expect(() => renderWindowsInstaller({ ...options, version: '1.0.1' })).toThrow('versão embutida');
   });
 });

@@ -1,3 +1,5 @@
+import { extractEmbeddedAgentVersion } from './versioning.js';
+
 export type AgentInstallerOptions = {
   apiUrl: string;
   enrollmentToken: string;
@@ -20,6 +22,7 @@ function validateOptions(options: AgentInstallerOptions): void {
   if (!/^[a-f0-9]{64}$/i.test(options.artifactChecksum)) throw new Error('Checksum do artefato inválido.');
   if (!/^\d+\.\d+\.\d+$/.test(options.version)) throw new Error('Versão do agente inválida.');
   if (!options.artifact.length) throw new Error('Artefato do agente vazio.');
+  if (extractEmbeddedAgentVersion(options.artifact) !== options.version) throw new Error('A versão embutida do artefato não corresponde à versão do instalador.');
 }
 
 export function renderWindowsInstaller(options: AgentInstallerOptions): string {

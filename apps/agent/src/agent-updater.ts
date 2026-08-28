@@ -15,6 +15,10 @@ type AuthenticatedFetcher = { fetch(input: string, init?: RequestInit): Promise<
 
 export type AgentRelease = { id: string; version: string; platform: 'windows' | 'linux'; file_name: string; checksum_sha256: string; active: boolean };
 
+function isExecutableBundle(fileName: string): boolean {
+  return /^[a-z0-9][a-z0-9._-]*\.(?:cjs|js)$/i.test(fileName);
+}
+
 export function previousAgentPath(agentPath: string): string {
   return `${agentPath}.previous`;
 }
@@ -33,7 +37,9 @@ export async function checkForAgentUpdate(config: UpdateConfig, auth: Authentica
   const response = await auth.fetch(`${config.apiUrl}${releaseBase}`, { signal: AbortSignal.timeout(config.timeoutMs) });
   if (!response.ok) throw new Error(`Não foi possível consultar versões do agente (HTTP ${response.status}).`);
   const releases = await response.json() as AgentRelease[];
-  const release = releases.filter((item) => item.active && item.platform === config.platform && isNewerVersion(config.agentVersion, item.version)).sort((a, b) => b.version.localeCompare(a.version, undefined, { numeric: true }))[0];
+  const release = releases
+    .filter((item) => item.active && item.platform === config.platform && isExecutableBundle(item.file_name) && isNewerVersion(config.agentVersion, item.version))
+    .sort((a, b) => b.version.localeCompare(a.version, undefined, { numeric: true }))[0];
   if (!release) return false;
   const artifactResponse = await auth.fetch(`${config.apiUrl}${releaseBase}/${release.id}/download`, { signal: AbortSignal.timeout(config.timeoutMs) });
   if (!artifactResponse.ok) throw new Error(`Não foi possível baixar a versão ${release.version} (HTTP ${artifactResponse.status}).`);
