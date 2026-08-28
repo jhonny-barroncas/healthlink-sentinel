@@ -13,6 +13,7 @@ import { localAgentSourcePayload } from './starlink-source.js';
 import { canPublishAgentVersion, type AgentPlatform, type AgentVersionRecord } from './agent-version.js';
 import { agentInstallerFileName, extractAgentInstallerFileName, getAgentProvisioningRequirements } from './agent-provisioning.js';
 import { friendlyApiMessage } from './error-messages.js';
+import { mapRasterFallbackStyle, mapRasterLightFallbackStyle } from './map-styles.js';
 import { filterIncidentReports, summarizeIncidentReports, type IncidentReportFilters } from './incident-reports.js';
 import { EyeIcon, EyeOffIcon, UserIcon, ChevronIcon, EditIcon, LogoutIcon, CloseIcon, BlockIcon, UnblockIcon, RejectIcon, CheckIcon, EyeCheckIcon, ResolveIcon, NavDashboardIcon, NavTruckIcon, NavBellIcon, NavActivityIcon, NavUsersIcon, NavReportIcon, SyncIcon, SunIcon, SearchIcon, HomeIcon, BreadcrumbChevronIcon, NavGeneralIcon, NavLinkIcon, NavVpnIcon, NavServerIcon, ClipboardIcon, MoonIcon, WarningIcon, ErrorIcon, InfoIcon, PingIcon, TracertIcon, TrashIcon, PlusIcon, RefreshIcon, ClearFilterIcon, AgentIcon, CalendarIcon, ChevronLeftIcon, ChevronRightIcon, PackageIcon, FolderIcon, UploadIcon } from './icons.js';
 
@@ -410,34 +411,6 @@ const stateNameByCode: Record<string, string> = { AC: 'Acre', AL: 'Alagoas', AP:
 const stateMapCenter: Record<string, [number, number]> = {
   AC: [-70.0, -9.0], AL: [-36.6, -9.6], AP: [-51.8, 1.4], AM: [-63.0, -4.2], BA: [-41.7, -12.5], CE: [-39.5, -5.2], DF: [-47.9, -15.8], ES: [-40.5, -19.6], GO: [-49.6, -16.0], MA: [-45.3, -5.0], MT: [-55.5, -12.8], MS: [-54.7, -20.5], MG: [-44.5, -18.5], PA: [-52.5, -4.5], PB: [-36.7, -7.1], PR: [-51.5, -24.6], PE: [-37.9, -8.4], PI: [-42.8, -7.5], RJ: [-43.2, -22.2], RN: [-36.6, -5.8], RS: [-53.2, -30.0], RO: [-63.0, -10.8], RR: [-61.3, 2.0], SC: [-50.2, -27.3], SP: [-48.7, -22.3], SE: [-37.4, -10.6], TO: [-48.3, -10.2],
 };
-const mapRasterFallbackStyle = {
-  version: 8 as const,
-  sources: {
-    cartoDark: {
-      type: 'raster' as const,
-      // A raster source must use one provider/style. Mixing OSM and CARTO
-      // here makes adjacent tiles alternate styles and creates vertical
-      // light/dark bands in the map.
-      tiles: ['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'],
-      tileSize: 256,
-      attribution: '© OpenStreetMap contributors © CARTO',
-    },
-  },
-  layers: [{ id: 'carto-dark-tiles', type: 'raster' as const, source: 'cartoDark' }],
-};
-const mapRasterLightFallbackStyle = {
-  version: 8 as const,
-  sources: {
-    cartoLight: {
-      type: 'raster' as const,
-      tiles: ['https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'],
-      tileSize: 256,
-      attribution: '© OpenStreetMap contributors © CARTO',
-    },
-  },
-  layers: [{ id: 'carto-light-tiles', type: 'raster' as const, source: 'cartoLight' }],
-};
-
 function getStateFill(uf: string, units: Unit[]) {
   const stateUnits = units.filter((unit) => unit.state_code.toUpperCase() === uf.toUpperCase());
   if (!stateUnits.length) return mapStatusColor.unknown;
