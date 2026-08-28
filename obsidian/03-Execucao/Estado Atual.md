@@ -44,6 +44,8 @@ phase: foundation
 
 # Estado Atual
 
+> Atualização 2026-08-28: a exclusão de unidades fixas e móveis passou a ser permanente e transacional. O detalhe da unidade e o menu contextual dos cards exibem “Excluir unidade” com confirmação; a API remove dados operacionais dependentes, incluindo equipamentos, links, agentes, vínculos, telemetrias, alertas e eventos relacionados.
+
 > Atualização 2026-08-24: a barra lateral desktop passou a ficar compacta por padrão, exibindo apenas ícones, e expande como sobreposição ao receber hover ou foco de teclado. A gestão de usuários também passou a empilhar formulário e lista em larguras de tablet e reorganizar filtros/ações em telas móveis.
 
 > Atualização 2026-08-24: unidades agora possuem tipo estruturado (`mobile` ou `fixed`) pela migration `012_unit_types.sql`. A navegação separa **Unidades** e **Unidades móveis**; o perfil `mobile_unit_supervisor` recebe somente dados móveis também no backend, enquanto infraestrutura/administradores mantêm visão das duas categorias.

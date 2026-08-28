@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { withTenant } from '../../platform/database.js';
 import { canOnlySeeMobileUnits, hasPermission, permission } from '../../platform/authorization.js';
-import { createHealthUnit, deactivateHealthUnit, getHealthUnit, listHealthUnits, updateHealthUnit, writeUnitAudit, type HealthUnitInput } from './repository.js';
+import { createHealthUnit, deleteHealthUnit, getHealthUnit, listHealthUnits, updateHealthUnit, writeUnitAudit, type HealthUnitInput } from './repository.js';
 
 const unitSchema = z.object({
   code: z.string().trim().min(1).max(50),
@@ -72,16 +72,17 @@ export const unitRoutes: FastifyPluginAsync = async (app) => {
   app.delete('/v1/units/:id', { preHandler: [app.authenticate] }, async (request) => {
     requirePermission(request, permission.unitsManage);
     const params = z.object({ id: z.string().uuid() }).parse(request.params);
-    const deactivated = await withTenant(request.auth.tenantId, async (client) => {
-      const changed = await deactivateHealthUnit(client, request.auth.tenantId, params.id);
-      if (changed) await writeUnitAudit(client, request.auth.tenantId, request.auth.userId, 'health_unit.deactivated', params.id);
-      return changed;
+    const deleted = await withTenant(request.auth.tenantId, async (client) => {
+      const exists = await getHealthUnit(client, request.auth.tenantId, params.id);
+      if (!exists) return false;
+      await writeUnitAudit(client, request.auth.tenantId, request.auth.userId, 'health_unit.deleted', params.id);
+      return deleteHealthUnit(client, request.auth.tenantId, params.id);
     });
-    if (!deactivated) {
-      const error = new Error('Unidade não encontrada ou já desativada.') as Error & { statusCode: number };
+    if (!deleted) {
+      const error = new Error('Unidade não encontrada.') as Error & { statusCode: number };
       error.statusCode = 404;
       throw error;
     }
-    return { success: true, deactivated: true };
+    return { success: true, deleted: true };
   });
 };
