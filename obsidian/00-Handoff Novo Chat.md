@@ -80,6 +80,7 @@ Atualização 2026-08-24: a navegação Relatórios agora abre o relatório oper
 Atualização 2026-08-28: unidades fixas e móveis agora podem ser excluídas pelos dois pontos da interface — botão no cabeçalho do detalhe e ação no menu contextual do card. A confirmação chama `DELETE /v1/units/:id`, que apaga transacionalmente os dados operacionais vinculados e preserva somente o registro de auditoria da exclusão.
 
 Atualização 2026-08-27: corrigido o fallback raster do mapa estadual para usar tiles públicos do OpenStreetMap. O fallback anterior do CARTO passou a exigir API key e exibia `API KEY REQUIRED`; a correção foi feita na branch `codex/corrigir-mapa-cartografico` com teste de regressão.
+
 Correção 2026-08-24: clicar em uma opção da barra lateral não mantém mais o menu expandido depois que o ponteiro sai. Interações por ponteiro removem o foco residual do botão; a navegação por teclado continua usando `focus-within`, sem depender de `:has()` nas regras essenciais.
 
 Atualização 2026-08-24: ao receber `401`, a tela de sessão expirada passa a funcionar como uma camada de saída acima dos demais popovers. Qualquer toque/clique, além de Enter, Espaço ou Esc capturados globalmente, remove a sessão local e retorna ao login.

@@ -42,7 +42,7 @@ O mapa geográfico detalhado agora permite alternar entre `Dark` e `Claro` no pr
 - `react-map-gl/maplibre`
 - estilo: `https://tiles.openfreemap.org/styles/dark`
 - dados cartográficos: OpenFreeMap / OpenStreetMap, com atribuição exibida pelo mapa
-- fallback automático: tiles raster dark do CARTO quando o estilo vetorial não conseguir carregar na rede local
+- fallback automático: tiles raster do OpenStreetMap quando o estilo vetorial não conseguir carregar na rede local; não depende de chave CARTO
 - fallback de mapa real: após 2,5 s sem carregamento vetorial, o painel troca para tiles raster do OpenStreetMap/CARTO; não usar o vetor esquemático como substituto visual do mapa real
 
 ## Alterações técnicas
@@ -83,7 +83,7 @@ O mapa estadual calcula os limites das unidades georreferenciadas e aplica `fitB
 
 ## Nota de estabilidade cartográfica
 
-O fallback raster usa somente o estilo dark do CARTO. Misturar URLs de provedores diferentes na mesma fonte raster faz os tiles vizinhos alternarem de estilo e cria faixas claras/escuras no mapa.
+O fallback raster usa somente o OpenStreetMap. Misturar URLs de provedores diferentes na mesma fonte raster faz os tiles vizinhos alternarem de estilo e cria faixas claras/escuras no mapa.
 
 ## Centralização ao selecionar unidade
 
