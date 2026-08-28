@@ -277,3 +277,5 @@ Atualização visual 2026-08-25: os marcadores georreferenciados do mapa estadua
 - PDF executivo do briefing visual: `output/pdf/HealthLink Sentinel - Briefing Visual do Sistema.pdf` (gerado e conferido em 2026-08-11).
 
 - Cadastro de equipamentos: campos opcionais aceitam vazio, serial duplicado recebe mensagem orientativa e falhas aparecem em toast. Consulte [[03-Execucao/Correcao Cadastro de Equipamentos - Campos Opcionais]].
+
+Hotfix operacional 2026-08-28: o startup do agente passou a respeitar a versão persistida após uma atualização, corrigindo o loop observado no Raspberry Pi. O catálogo de releases aceita bundles Node `.cjs` e `.js`; instaladores `.sh`/`.ps1` permanecem gerados separadamente por enrollment.

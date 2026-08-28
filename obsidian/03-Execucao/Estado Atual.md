@@ -188,3 +188,5 @@ Atualização 2026-08-25: corrigido o modal do mapa estadual que ficava deslocad
 Atualização 2026-08-25: o mapa estadual passou a ocupar a viewport em larguras CSS muito amplas, evitando que o zoom reduzido do navegador deixe o card visualmente pequeno. O comportamento padrão em zoom normal foi preservado; typecheck, build web e rebuild Docker passaram novamente.
 
 Atualização 2026-08-25: adicionada sinalização visual de incidentes no pin da unidade no mapa estadual. A severidade mais alta entre os alertas ativos define pin âmbar ou vermelho, com animação de pulso e rótulo acessível; alertas resolvidos são ignorados. A regra foi coberta por teste unitário e validada com typecheck, build web e rebuild Docker.
+
+Atualização 2026-08-28: concluída a hotfix do agente Linux após o `agent.json` ser atualizado. O agente agora usa a versão persistida no startup; o catálogo aceita bundles Node `.cjs` e `.js`, mantendo `.sh`/`.ps1` exclusivos do provisionamento.

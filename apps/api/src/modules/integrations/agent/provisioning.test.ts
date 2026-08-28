@@ -83,6 +83,7 @@ describe('agent provisioning rules', () => {
 
   it('accepts only a bundled collector artifact for provisioning', () => {
     expect(isDeployableAgentArtifact('healthlink-agent-1.0.0-linux.cjs')).toBe(true);
+    expect(isDeployableAgentArtifact('healthlink-agent-1.0.0-linux.js')).toBe(true);
     expect(isDeployableAgentArtifact('healthlink-agent-1.0.0.sh')).toBe(false);
     expect(isDeployableAgentArtifact('healthlink-agent-1.0.0.ps1')).toBe(false);
   });
