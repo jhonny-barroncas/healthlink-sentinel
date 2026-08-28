@@ -72,6 +72,24 @@ export async function deactivateHealthUnit(client: PoolClient, tenantId: string,
   return (result.rowCount ?? 0) > 0;
 }
 
+export async function deleteHealthUnit(client: PoolClient, tenantId: string, id: string): Promise<boolean> {
+  await client.query(`
+    DELETE FROM monitoring_events
+    WHERE tenant_id = $2
+      AND equipment_id IN (SELECT id FROM equipment WHERE unit_id = $1 AND tenant_id = $2)
+  `, [id, tenantId]);
+  await client.query(`
+    DELETE FROM alerts
+    WHERE tenant_id = $2
+      AND (unit_id = $1 OR equipment_id IN (SELECT id FROM equipment WHERE unit_id = $1 AND tenant_id = $2))
+  `, [id, tenantId]);
+  const result = await client.query<{ id: string }>(
+    'DELETE FROM health_units WHERE id = $1 AND tenant_id = $2 RETURNING id',
+    [id, tenantId],
+  );
+  return result.rows.length > 0;
+}
+
 export async function writeUnitAudit(client: PoolClient, tenantId: string, actorUserId: string, action: string, unitId?: string): Promise<void> {
   await client.query(`
     INSERT INTO audit_logs (tenant_id, actor_user_id, action, entity_type, entity_id)

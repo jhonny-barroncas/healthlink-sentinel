@@ -112,6 +112,17 @@
   color: #fff;
 }
 
+.unit-context-menu .context-delete-action {
+  border-color: rgba(255, 89, 100, 0.3);
+  color: #ff9da5;
+}
+
+.unit-context-menu .context-delete-action:hover {
+  border-color: var(--red);
+  background: rgba(255, 89, 100, 0.12);
+  color: #ffd8db;
+}
+
 .unit-context-menu .context-cancel {
   margin-top: 4px;
   border-top: 1px solid #1c3448;
