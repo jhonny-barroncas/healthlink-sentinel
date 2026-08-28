@@ -17,5 +17,5 @@ export function agentPlatformLabel(platform: AgentPlatform): string {
 
 export function canPublishAgentVersion(fileName: string, platform: AgentPlatform): boolean {
   void platform;
-  return /^[a-z0-9][a-z0-9._-]*\.cjs$/i.test(fileName);
+  return /^[a-z0-9][a-z0-9._-]*\.(?:cjs|js)$/i.test(fileName);
 }
