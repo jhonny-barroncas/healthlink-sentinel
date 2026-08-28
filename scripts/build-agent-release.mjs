@@ -4,7 +4,7 @@ import { build } from 'esbuild';
 
 const projectRoot = resolve(import.meta.dirname, '..');
 const protoRoot = resolve(projectRoot, 'apps/agent/proto');
-const version = process.env.HEALTHLINK_AGENT_BUILD_VERSION?.trim() || '1.0.0';
+const version = process.env.HEALTHLINK_AGENT_BUILD_VERSION?.trim() || '1.0.2';
 const output = resolve(projectRoot, `dist/agent/healthlink-agent-${version}.cjs`);
 
 async function collectProtoAssets(directory) {

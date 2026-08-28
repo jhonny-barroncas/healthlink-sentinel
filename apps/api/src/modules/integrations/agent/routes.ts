@@ -274,7 +274,7 @@ export const collectionAgentRoutes: FastifyPluginAsync = async (app) => {
       const result = await db.query(`
         SELECT id, version, platform, file_name, file_size, checksum_sha256, active, created_at
         FROM agent_versions
-        WHERE tenant_id = $1 AND platform = $2 AND active = true
+        WHERE tenant_id = $1 AND platform = $2 AND active = true AND file_name ~* '\\.(cjs|js)$'
         ORDER BY string_to_array(version, '.')::int[] DESC, created_at DESC
       `, [auth.tenantId, auth.platform]);
       return result.rows;
@@ -349,14 +349,14 @@ export const collectionAgentRoutes: FastifyPluginAsync = async (app) => {
       }>(`
         SELECT version, file_name, artifact, checksum_sha256
         FROM agent_versions
-        WHERE tenant_id = $1 AND platform = $2 AND active = true
+        WHERE tenant_id = $1 AND platform = $2 AND active = true AND file_name ~* '\\.(cjs|js)$'
         ORDER BY string_to_array(version, '.')::int[] DESC, created_at DESC
         LIMIT 1
       `, [request.auth.tenantId, input.platform]);
       const release = releaseResult.rows[0];
       if (!release) throw httpError(`Nenhuma versão ativa do agente ${input.platform} foi publicada.`, 422);
       if (!isDeployableAgentArtifact(release.file_name)) {
-        throw httpError(`A versão ${release.version} do agente ${input.platform} ainda não possui um pacote executável completo. Publique o arquivo .cjs na aba Zabbix sincronização.`, 422);
+        throw httpError(`A versão ${release.version} do agente ${input.platform} ainda não possui um pacote executável completo. Publique um bundle .cjs ou .js na aba Zabbix sincronização.`, 422);
       }
 
       const agentId = randomUUID();
