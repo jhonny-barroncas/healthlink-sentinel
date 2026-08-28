@@ -77,6 +77,8 @@ Atualização 2026-08-24: a navegação Relatórios agora abre o relatório oper
 
 # Handoff de contexto — HealthLink Sentinel
 
+Atualização 2026-08-28: o agente local Starlink passou a enviar incidentes individuais derivados dos alertas ativos da antena. A API reconcilia esses incidentes por equipamento, abre/recupera registros em `alerts`, registra `alert_events` e `monitoring_events` e evita duplicidade entre coletas. O bundle do agente foi promovido para `1.0.3`. Consulte [[03-Execucao/Modulo Starlink - Estrategia Hibrida]].
+
 Atualização 2026-08-28: unidades fixas e móveis agora podem ser excluídas pelos dois pontos da interface — botão no cabeçalho do detalhe e ação no menu contextual do card. A confirmação chama `DELETE /v1/units/:id`, que apaga transacionalmente os dados operacionais vinculados e preserva somente o registro de auditoria da exclusão.
 
 Atualização 2026-08-27: corrigido o fallback raster do mapa estadual para usar tiles públicos do OpenStreetMap. O fallback anterior do CARTO passou a exigir API key e exibia `API KEY REQUIRED`; a correção foi feita na branch `codex/corrigir-mapa-cartografico` com teste de regressão.

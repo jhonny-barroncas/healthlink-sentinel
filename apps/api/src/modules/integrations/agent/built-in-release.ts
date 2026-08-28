@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-export const builtInVersion = '1.0.2';
-const placeholderNames = ['healthlink-agent-1.0.2.sh', 'healthlink-agent-1.0.2.ps1'];
+export const builtInVersion = '1.0.3';
+const placeholderNames = ['healthlink-agent-1.0.3.sh', 'healthlink-agent-1.0.3.ps1'];
 
 export function shouldReplaceBuiltInRelease(release: { version: string; fileName: string }): boolean {
   return release.version === builtInVersion && placeholderNames.includes(release.fileName);
