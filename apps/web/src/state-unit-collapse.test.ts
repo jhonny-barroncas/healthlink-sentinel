@@ -25,4 +25,11 @@ describe('state map unit cards', () => {
     expect(source).toContain("if (next.has(unitId)) { next.delete(unitId); if (unitContext?.unit.unit_id === unitId) setUnitContext(null); }");
     expect(source).toContain("onClose={() => { setSelectedUnit(null); setSelectedLink(null); setUnitContext(null); setExpandedUnitIds(new Set()); }}");
   });
+
+  it('exposes permanent unit deletion in the detail header and card context menu', () => {
+    expect(source).toContain("menuAction('delete')");
+    expect(source).toContain('Excluir unidade');
+    expect(source).toContain('function confirmDeleteUnit');
+    expect(source).toContain("api(`/v1/units/${deleteTarget.unit_id}`, token, { method: 'DELETE' })");
+  });
 });
