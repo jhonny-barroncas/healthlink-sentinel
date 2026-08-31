@@ -285,3 +285,5 @@ Correção de acessibilidade 2026-08-28: os campos reutilizáveis de data/combob
 
 Correção operacional 2026-08-28: o agente Linux atualizava o bundle para `1.0.1`, mas mantinha `version: 1.0.0` no `agent.json`, causando reinício contínuo com código 75. O updater agora persiste a versão instalada atomicamente no arquivo de configuração; o caso foi coberto por teste.
 Hotfix de distribuição 2026-08-28: a versão embutida padrão do agente foi elevada para `1.0.2` no build e na sincronização built-in da API. Assim, o Docker que for puxado pela `main` gera e publica automaticamente o bundle corrigido para atualização dos agentes instalados.
+
+Correção operacional 2026-08-31: o scheduler Zabbix deixou de chamar a própria API por HTTP em `127.0.0.1`. As sincronizações completa e de telemetria agora usam `app.inject`, funcionando também quando o container de produção atende HTTPS internamente. Ajustes locais de Docker permanecem fora do commit.
