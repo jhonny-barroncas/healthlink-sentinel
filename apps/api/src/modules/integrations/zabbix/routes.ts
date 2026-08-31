@@ -7,6 +7,7 @@ import { database, withTenant } from '../../../platform/database.js';
 import { isDeployableAgentArtifact } from '../agent/provisioning.js';
 import { embedAgentVersion, extractEmbeddedAgentVersion, nextAgentVersion } from '../agent/versioning.js';
 import { ZabbixClient, ZabbixHttpTransport } from './client.js';
+import { invokeInternalPost } from './internal-request.js';
 import { selectLinkMetricCandidates, type LinkMetric, type ZabbixItem } from './telemetry.js';
 
 function requireIntegrationAccess(request: { auth: { roles: string[] } }): void {
@@ -569,7 +570,7 @@ export const zabbixRoutes: FastifyPluginAsync = async (app) => {
         const tenants = await listSchedulerTenants();
         for (const tenant of tenants.rows) {
           const token = await app.jwt.sign({ sub: tenant.user_id, tenantId: tenant.tenant_id, roles: ['global_administrator'] }, { expiresIn: Math.ceil(env.ZABBIX_SYNC_INTERVAL_MS / 1000) + 30 });
-          const response = await fetch(`http://127.0.0.1:${env.PORT}/v1/integrations/zabbix/sync`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: '{}' });
+          const response = await invokeInternalPost(app, '/v1/integrations/zabbix/sync', token);
           if (!response.ok) app.log.warn({ tenantId: tenant.tenant_id, status: response.status }, 'Zabbix scheduled sync failed');
         }
       } catch (error) {
@@ -585,7 +586,7 @@ export const zabbixRoutes: FastifyPluginAsync = async (app) => {
         const tenants = await listSchedulerTenants();
         for (const tenant of tenants.rows) {
           const token = await app.jwt.sign({ sub: tenant.user_id, tenantId: tenant.tenant_id, roles: ['global_administrator'] }, { expiresIn: Math.ceil(env.ZABBIX_TELEMETRY_INTERVAL_MS / 1000) + 30 });
-          const response = await fetch(`http://127.0.0.1:${env.PORT}/v1/integrations/zabbix/telemetry-sync`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: '{}' });
+          const response = await invokeInternalPost(app, '/v1/integrations/zabbix/telemetry-sync', token);
           if (!response.ok) app.log.debug({ tenantId: tenant.tenant_id, status: response.status }, 'Zabbix telemetry sync unavailable');
         }
       } catch (error) {

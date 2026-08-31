@@ -28,3 +28,7 @@ O método `problem.get` não aceita `selectHosts` nesta versão. A implementaç�
 ## Próximo passo
 
 Testar o endpoint com o JWT do HealthLink e, em seguida, criar a rotina agendada de sincronização (worker/cron), antes de iniciar as telas frontend.
+
+## Correção 2026-08-31
+
+O scheduler interno passou a usar `app.inject` para executar as rotas persistentes de sincronização e telemetria. Isso elimina a dependência do protocolo e da porta publicados pelo container e corrige a falha no servidor, onde a API interna usa HTTPS. O comportamento foi coberto em `apps/api/src/modules/integrations/zabbix/internal-request.test.ts`.

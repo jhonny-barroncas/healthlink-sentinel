@@ -7,6 +7,8 @@ export type TelemetryBatch = {
   batchId: string;
   observedAt: string;
   payload: Record<string, number>;
+  incidents: Array<{ key: string; title: string; severity: number }>;
+  incidentsAvailable: boolean;
 };
 
 function finite(value: unknown): value is number {
@@ -21,6 +23,17 @@ function countAlerts(alerts: Record<string, unknown> | undefined): number | unde
   if (!alerts) return undefined;
   const values = Object.values(alerts).filter((value) => typeof value === 'boolean');
   return values.length ? values.filter(Boolean).length : undefined;
+}
+
+function normalizeIncidents(alerts: Record<string, unknown> | undefined): Array<{ key: string; title: string; severity: number }> {
+  if (!alerts) return [];
+  return Object.entries(alerts)
+    .filter(([, value]) => value === true)
+    .map(([key]) => ({
+      key,
+      title: key.replace(/[_-]+/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()),
+      severity: /critical|thermal|motor|obstruction|no[_-]?internet|offline/i.test(key) ? 4 : 3,
+    }));
 }
 
 export async function collectStarlink(config: AgentConfig): Promise<TelemetryBatch> {
@@ -56,7 +69,8 @@ export async function collectStarlink(config: AgentConfig): Promise<TelemetryBat
       console.warn('[starlink-agent] antena não retornou localização.');
     }
     if (!Object.keys(payload).length) throw new Error('A Starlink respondeu sem métricas numéricas reconhecidas.');
-    return { equipmentId: config.equipmentId, source: 'local_agent', batchId: crypto.randomUUID(), observedAt: new Date().toISOString(), payload };
+    const incidentsAvailable = Boolean(status.alerts && typeof status.alerts === 'object');
+    return { equipmentId: config.equipmentId, source: 'local_agent', batchId: crypto.randomUUID(), observedAt: new Date().toISOString(), payload, incidents: normalizeIncidents(status.alerts as unknown as Record<string, unknown> | undefined), incidentsAvailable };
   } finally {
     dish.close();
   }
