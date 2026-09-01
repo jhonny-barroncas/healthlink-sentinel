@@ -66,65 +66,47 @@
   .form-modal-backdrop .location-fields { grid-template-columns: 1fr !important; }
 }
 
+/* Menu de contexto da unidade — mesmo comportamento/estilo dos dropdowns */
 .unit-context-menu {
   position: fixed;
   z-index: 1300;
   width: 220px;
-  display: grid;
-  gap: 4px;
-  padding: 12px;
-  border: 1px solid rgba(53, 211, 208, 0.42);
-  border-radius: 8px;
-  background: rgba(8, 20, 33, 0.96);
-  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.46), 0 0 24px rgba(53, 211, 208, 0.08);
-  backdrop-filter: blur(14px);
-}
-
-.unit-context-menu p {
-  margin: 0;
-  color: #6f91a7;
-  font: 12px Arial, Helvetica, 'Segoe UI', sans-serif;
-  letter-spacing: .08em;
-}
-
-.unit-context-menu strong {
-  margin-bottom: 6px;
-  color: #e2edf5;
-  font-size: 12px;
-}
-
-.unit-context-menu button {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 10px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: #b9cedc;
-  text-align: left;
-  font: 12px Arial, Helvetica, 'Segoe UI', sans-serif;
-  cursor: pointer;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid rgba(126, 186, 208, .28);
+  border-radius: var(--radius-md);
+  background: #0b1c2c;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .05);
+  transform-origin: top left;
+  animation: user-menu-in .24s var(--ease-standard) both;
 }
 
-.unit-context-menu button:hover {
-  border-color: rgba(53, 211, 208, 0.3);
-  background: rgba(53, 211, 208, 0.1);
-  color: #fff;
+.unit-context-menu-head {
+  display: grid;
+  gap: 3px;
+  padding: 9px 12px 8px;
+  min-width: 0;
 }
 
-.unit-context-menu .context-delete-action {
-  border-color: rgba(255, 89, 100, 0.3);
-  color: #ff9da5;
+.unit-context-menu-head span {
+  color: #6f889c;
+  font: 600 10px var(--font-sans);
+  letter-spacing: .08em;
+  text-transform: uppercase;
 }
 
-.unit-context-menu .context-delete-action:hover {
-  border-color: var(--red);
-  background: rgba(255, 89, 100, 0.12);
-  color: #ffd8db;
+.unit-context-menu-head strong {
+  color: #e8f2fb;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.unit-context-menu .context-cancel {
-  margin-top: 4px;
-  border-top: 1px solid #1c3448;
-  color: #71889b;
+.unit-context-menu .dropdown-item svg { width: 14px; height: 14px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .unit-context-menu { animation: none; }
 }
