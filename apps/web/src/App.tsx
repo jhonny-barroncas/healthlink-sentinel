@@ -1646,10 +1646,6 @@ function AgentVersionsPanel({ token, onToast, actions }: { token: string; onToas
         </div>
         <div className="agent-versions-header-side">
           {actions}
-          <div className="agent-versions-badge">
-            <span className="badge-count-icon"><PackageIcon /></span>
-            <span>{loaded ? `${versions.length} pacote(s)` : '…'}</span>
-          </div>
         </div>
       </div>
 
