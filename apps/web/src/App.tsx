@@ -1346,7 +1346,7 @@ function ZabbixIntegration({ candidates, units, loading, onRefresh, onStatusRefr
       <AgentVersionsPanel token={token} onToast={onToast} actions={syncActions} />
       </div>}
       {tab === 'bridge' && <div className="integration-grid">
-        <article className="host-panel"><div className="panel-title"><div><p className="eyebrow">INVENTÁRIO DO ZABBIX</p><h3>Selecione um host</h3></div><strong>{filteredHosts.length}</strong></div><div className="search-input-wrap"><SearchIcon /><input className="search-input" value={hostSearch} onChange={(e) => setHostSearch(e.target.value)} placeholder="Buscar por nome ou ID…" /></div><div className="host-list">{filteredHosts.map((host) => { const hasCoordinates = Number.isFinite(Number(host.inventory?.location_lat)) && Number.isFinite(Number(host.inventory?.location_lon)); return <button key={host.hostid} className={`host-row ${linkedEquipment.has(host.hostid) ? 'linked' : 'pending'} ${selectedHost === host.hostid ? 'selected' : ''}`} onClick={() => setSelectedHost(host.hostid)}><span className={`host-status ${Number(host.status) === 0 ? 'online' : 'offline'}`} /><div><strong>{host.name || host.host}</strong><small>{host.host} · ID {host.hostid}{host.interfaces?.[0]?.ip ? ` · ${host.interfaces[0].ip}` : ''}{hasCoordinates ? ' · localização no inventário' : ''}</small></div><span className={`status ${linkedEquipment.has(host.hostid) ? 'online' : 'degraded'}`}>{linkedEquipment.has(host.hostid) ? 'Vinculado' : 'Pendente'}</span></button>; })}</div></article>
+        <article className="host-panel"><div className="panel-title"><div><p className="eyebrow">INVENTÁRIO DO ZABBIX</p><h3>Selecione um host</h3></div><strong>{filteredHosts.length}</strong></div><div className="search-input-wrap"><SearchIcon /><input className="search-input" value={hostSearch} onChange={(e) => setHostSearch(e.target.value)} placeholder="Buscar por nome ou ID…" /></div><div className="host-list">{filteredHosts.map((host) => { const hasCoordinates = Number.isFinite(Number(host.inventory?.location_lat)) && Number.isFinite(Number(host.inventory?.location_lon)); return <button key={host.hostid} className={`host-row ${linkedEquipment.has(host.hostid) ? 'linked' : 'pending'} ${selectedHost === host.hostid ? 'selected' : ''}`} onClick={() => setSelectedHost(host.hostid)}><div><strong>{host.name || host.host}</strong><small>{host.host} · ID {host.hostid}{host.interfaces?.[0]?.ip ? ` · ${host.interfaces[0].ip}` : ''}{hasCoordinates ? ' · localização no inventário' : ''}</small></div><span className={`status ${linkedEquipment.has(host.hostid) ? 'online' : 'degraded'}`}>{linkedEquipment.has(host.hostid) ? 'Vinculado' : 'Pendente'}</span></button>; })}</div></article>
         <article className="link-panel">
           <div className="panel-title"><div><p className="eyebrow">DESTINO DO VÍNCULO</p><h3>Equipamento do HealthLink</h3></div>{syncActions}</div>
           <p className="muted">O host é associado ao equipamento; a unidade é herdada automaticamente.</p>
@@ -1698,9 +1698,8 @@ function AgentVersionsPanel({ token, onToast, actions }: { token: string; onToas
             </div>
           ) : (
             versions.map((item) => (
-              <div className="agent-version-card" key={item.id}>
+              <div className={`agent-version-card ${item.active ? 'is-active' : 'is-inactive'}`} key={item.id}>
                 <div className="agent-version-main">
-                  <span className={`legend-dot ${item.active ? 'online' : 'unknown'}`} />
                   <div className="agent-version-title-group">
                     <strong>{item.platform === 'windows' ? 'Windows' : 'Linux'}</strong>
                     <span className="version-tag">v{item.version}</span>
