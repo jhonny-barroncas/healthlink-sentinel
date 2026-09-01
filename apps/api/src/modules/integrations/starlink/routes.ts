@@ -3,9 +3,10 @@ import { z } from 'zod';
 import { withTenant } from '../../../platform/database.js';
 import { hasPermission, permission } from '../../../platform/authorization.js';
 import { deriveStarlinkStatus, normalizeStarlinkPayload, type StarlinkSource } from './telemetry.js';
+import { persistStarlinkIncidents, type StarlinkIncident } from './incidents.js';
 
 const sourceSchema = z.object({ sourceKind: z.enum(['official_api', 'local_agent', 'zabbix']), endpoint: z.string().url().optional().nullable(), enabled: z.boolean().default(true), metadata: z.record(z.string(), z.unknown()).default({}) });
-const ingestSchema = z.object({ equipmentId: z.string().uuid(), source: z.enum(['official_api', 'local_agent', 'zabbix']), observedAt: z.string().datetime().optional(), batchId: z.string().uuid().optional(), payload: z.record(z.string(), z.unknown()) });
+const ingestSchema = z.object({ equipmentId: z.string().uuid(), source: z.enum(['official_api', 'local_agent', 'zabbix']), observedAt: z.string().datetime().optional(), batchId: z.string().uuid().optional(), payload: z.record(z.string(), z.unknown()), incidents: z.array(z.object({ key: z.string().min(1), title: z.string().min(1), severity: z.number().int().min(0).max(5) })).default([]), incidentsAvailable: z.boolean().optional() });
 
 function requireAccess(request: { auth: { roles: string[] } }) {
   if (!hasPermission(request.auth.roles, permission.integrationsManage)) throw Object.assign(new Error('Permissão insuficiente.'), { statusCode: 403 });
@@ -117,7 +118,7 @@ export const starlinkRoutes: FastifyPluginAsync = async (app) => {
     const input = ingestSchema.parse(request.body);
     const observedAt = input.observedAt ?? new Date().toISOString();
     const samples = normalizeStarlinkPayload(input.payload, observedAt);
-    if (!samples.length) return reply.code(422).send({ error: 'Nenhuma métrica Starlink reconhecida; dados ausentes permanecem N/D.' });
+    if (!samples.length && !input.incidents.length) return reply.code(422).send({ error: 'Nenhuma métrica ou incidente Starlink reconhecido; dados ausentes permanecem N/D.' });
     return withTenant(request.auth.tenantId, async (db) => {
       const ownership = await db.query<{ unit_id: string }>(`SELECT e.unit_id FROM equipment e JOIN equipment_types et ON et.id = e.equipment_type_id WHERE e.id = $1 AND e.tenant_id = $2 AND e.active = true AND et.code = 'starlink'`, [input.equipmentId, request.auth.tenantId]);
       if (!ownership.rows[0]) throw Object.assign(new Error('Equipamento Starlink não encontrado neste tenant.'), { statusCode: 404 });
@@ -137,8 +138,11 @@ export const starlinkRoutes: FastifyPluginAsync = async (app) => {
         await db.query(`UPDATE health_units SET latitude = $1, longitude = $2, updated_at = now() WHERE id = $3 AND tenant_id = $4 AND latitude IS NULL AND longitude IS NULL`, [latitude, longitude, ownership.rows[0].unit_id, request.auth.tenantId]);
       }
       const status = deriveStarlinkStatus(samples);
+      const incidentChanges = input.incidentsAvailable === false
+        ? { opened: [], recovered: [], unchanged: [] }
+        : await persistStarlinkIncidents(db, request.auth.tenantId, ownership.rows[0].unit_id, input.equipmentId, observedAt, input.incidents as StarlinkIncident[], `starlink_${input.source}`);
       await db.query(`INSERT INTO equipment_status_snapshots (equipment_id, tenant_id, operational_status, observed_at, source_payload) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (equipment_id) DO UPDATE SET operational_status = EXCLUDED.operational_status, observed_at = EXCLUDED.observed_at, source_payload = EXCLUDED.source_payload`, [input.equipmentId, request.auth.tenantId, status, observedAt, { source: `starlink_${input.source}`, sampleCount: samples.length }]);
-      return { equipmentId: input.equipmentId, source: input.source satisfies StarlinkSource, samplesPersisted, operationalStatus: status, observedAt, batchId: input.batchId ?? null };
+      return { equipmentId: input.equipmentId, source: input.source satisfies StarlinkSource, samplesPersisted, incidentsOpened: incidentChanges.opened.length, incidentsRecovered: incidentChanges.recovered.length, operationalStatus: status, observedAt, batchId: input.batchId ?? null };
     });
   });
 };

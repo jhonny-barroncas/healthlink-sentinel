@@ -77,6 +77,8 @@ Atualização 2026-08-24: a navegação Relatórios agora abre o relatório oper
 
 # Handoff de contexto — HealthLink Sentinel
 
+Atualização 2026-08-28: o agente local Starlink passou a enviar incidentes individuais derivados dos alertas ativos da antena. A API reconcilia esses incidentes por equipamento, abre/recupera registros em `alerts`, registra `alert_events` e `monitoring_events` e evita duplicidade entre coletas. O bundle do agente foi promovido para `1.0.3`. Consulte [[03-Execucao/Modulo Starlink - Estrategia Hibrida]].
+
 Atualização 2026-08-28: unidades fixas e móveis agora podem ser excluídas pelos dois pontos da interface — botão no cabeçalho do detalhe e ação no menu contextual do card. A confirmação chama `DELETE /v1/units/:id`, que apaga transacionalmente os dados operacionais vinculados e preserva somente o registro de auditoria da exclusão.
 
 Atualização 2026-08-27: corrigido o fallback raster do mapa estadual para usar tiles públicos do OpenStreetMap. O fallback anterior do CARTO passou a exigir API key e exibia `API KEY REQUIRED`; a correção foi feita na branch `codex/corrigir-mapa-cartografico` com teste de regressão.
@@ -283,3 +285,5 @@ Correção de acessibilidade 2026-08-28: os campos reutilizáveis de data/combob
 
 Correção operacional 2026-08-28: o agente Linux atualizava o bundle para `1.0.1`, mas mantinha `version: 1.0.0` no `agent.json`, causando reinício contínuo com código 75. O updater agora persiste a versão instalada atomicamente no arquivo de configuração; o caso foi coberto por teste.
 Hotfix de distribuição 2026-08-28: a versão embutida padrão do agente foi elevada para `1.0.2` no build e na sincronização built-in da API. Assim, o Docker que for puxado pela `main` gera e publica automaticamente o bundle corrigido para atualização dos agentes instalados.
+
+Correção operacional 2026-08-31: o scheduler Zabbix deixou de chamar a própria API por HTTP em `127.0.0.1`. As sincronizações completa e de telemetria agora usam `app.inject`, funcionando também quando o container de produção atende HTTPS internamente. Ajustes locais de Docker permanecem fora do commit.

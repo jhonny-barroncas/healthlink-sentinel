@@ -5,6 +5,7 @@ import { hasPermission, permission } from '../../../platform/authorization.js';
 import { withTenant } from '../../../platform/database.js';
 import { env } from '../../../platform/env.js';
 import { deriveStarlinkStatus, normalizeStarlinkPayload } from '../starlink/telemetry.js';
+import { persistStarlinkIncidents, type StarlinkIncident } from '../starlink/incidents.js';
 import { renderLinuxInstaller, renderWindowsInstaller } from './installers.js';
 import { validateEnrollment } from './lifecycle.js';
 import {
@@ -41,6 +42,8 @@ const telemetrySchema = z.object({
   observedAt: z.string().datetime().optional(),
   batchId: z.string().uuid(),
   payload: z.record(z.string(), z.unknown()),
+  incidents: z.array(z.object({ key: z.string().min(1), title: z.string().min(1), severity: z.number().int().min(0).max(5) })).default([]),
+  incidentsAvailable: z.boolean().default(false),
 });
 const installerSchema = z.object({
   serverEquipmentId: z.string().uuid(),
@@ -220,7 +223,7 @@ export const collectionAgentRoutes: FastifyPluginAsync = async (app) => {
     const input = telemetrySchema.parse(request.body);
     const observedAt = input.observedAt ?? new Date().toISOString();
     const samples = normalizeStarlinkPayload(input.payload, observedAt);
-    if (!samples.length) return reply.code(422).send({ error: 'Nenhuma métrica Starlink reconhecida; dados ausentes permanecem N/D.' });
+    if (!samples.length && !input.incidents.length) return reply.code(422).send({ error: 'Nenhuma métrica ou incidente Starlink reconhecido; dados ausentes permanecem N/D.' });
     return withTenant(auth.tenantId, async (db) => {
       const assignment = await db.query<{ unit_id: string }>(`
         SELECT e.unit_id
@@ -254,6 +257,9 @@ export const collectionAgentRoutes: FastifyPluginAsync = async (app) => {
         `, [latitude, longitude, auth.unitId, auth.tenantId]);
       }
       const status = deriveStarlinkStatus(samples);
+      const incidentChanges = input.incidentsAvailable
+        ? await persistStarlinkIncidents(db, auth.tenantId, auth.unitId, input.equipmentId, observedAt, input.incidents as StarlinkIncident[], 'starlink_local_agent')
+        : { opened: [], recovered: [], unchanged: [] };
       await db.query(`
         INSERT INTO equipment_status_snapshots (equipment_id, tenant_id, operational_status, observed_at, source_payload)
         VALUES ($1,$2,$3,$4,$5)
@@ -264,7 +270,7 @@ export const collectionAgentRoutes: FastifyPluginAsync = async (app) => {
         UPDATE collection_agents SET last_heartbeat_at = now(), last_collection_at = $1, updated_at = now()
         WHERE id = $2 AND tenant_id = $3
       `, [observedAt, auth.agentId, auth.tenantId]);
-      return { duplicate: false, batchId: input.batchId, equipmentId: input.equipmentId, samplesPersisted: samples.length, operationalStatus: status, observedAt };
+      return { duplicate: false, batchId: input.batchId, equipmentId: input.equipmentId, samplesPersisted: samples.length, incidentsOpened: incidentChanges.opened.length, incidentsRecovered: incidentChanges.recovered.length, operationalStatus: status, observedAt };
     });
   });
 
