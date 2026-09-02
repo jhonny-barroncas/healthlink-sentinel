@@ -27,6 +27,13 @@ describe('collapsible desktop sidebar', () => {
     expect(styles).toMatch(/\.nav-subitem\.active::before\s*\{[^}]*background:\s*var\(--cyan\);[^}]*box-shadow:[^}]*rgba\(53,\s*211,\s*208,[^)]+\);/s);
   });
 
+  it('marks the Zabbix sidebar destination active so it uses the shared glider', () => {
+    expect(appSource).toContain('<SyncStatusButton active={view === \'zabbix\'}');
+    expect(appSource).toMatch(/function SyncStatusButton\(\{ active, status, onClick \}:[^}]+active: boolean;/s);
+    expect(appSource).toContain("className={`sidebar-sync-button ${active ? 'active' : ''} integration-${health}`}");
+    expect(styles).toMatch(/\.sidebar-sync-button\.active::before\s*\{[^}]*background:\s*var\(--cyan\);[^}]*box-shadow:[^}]*rgba\(53,\s*211,\s*208,[^)]+\);/s);
+  });
+
   it('keeps every shared navigation icon exported and imported', () => {
     expect(iconSource).toContain('export function NavDashboardIcon()');
     expect(appSource).toMatch(/import \{[^}]*NavDashboardIcon[^}]*\} from '\.\/icons\.js';/s);

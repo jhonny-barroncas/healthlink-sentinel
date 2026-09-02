@@ -572,7 +572,10 @@ span.breadcrumb-item.current { padding: 2px 4px; }.operator { display: flex; ali
 /* Integração Zabbix: status clicável na lateral e visão unificada da ponte de hosts. */
 .sidebar > .sidebar-footer { display: none; }
 .sidebar nav > .nav-item:has(.nav-health-dot) { display: none; }
-.sidebar-sync-button { display: block; width: 100%; margin-top: auto; padding: 15px 12px; border: 1px solid rgba(53,211,208,.28); border-radius: 9px; background: var(--app-bg); color: #9aabba; text-align: left; transition: border-color .18s ease, background .18s ease, transform .18s ease; }
+.sidebar-sync-button { position: relative; display: block; width: 100%; margin-top: auto; padding: 15px 12px; overflow: hidden; border: 1px solid rgba(53,211,208,.28); border-radius: 9px; background: var(--app-bg); color: #9aabba; text-align: left; isolation: isolate; transition: border-color .18s ease, background .18s ease, transform .18s ease; }
+.sidebar-sync-button::before { content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; border-radius: var(--radius-full); background: var(--cyan); box-shadow: 0 0 7px rgba(53, 211, 208, .9), 0 0 18px rgba(53, 211, 208, .42); opacity: 0; transform: scaleY(.45); transition: opacity var(--motion-fast) var(--ease-standard), transform var(--motion-base) var(--ease-standard); }
+.sidebar-sync-button.active { background: linear-gradient(90deg, rgba(53,211,208,.13), transparent); }
+.sidebar-sync-button.active::before { background: var(--cyan); box-shadow: 0 0 7px rgba(53, 211, 208, .9), 0 0 18px rgba(53, 211, 208, .42); opacity: 1; transform: scaleY(1); }
 .sidebar-sync-button:hover { border-color: rgba(53,211,208,.72); background: rgba(15,39,51,.9); transform: translateY(-2px); }
 .sidebar-status-main { display: flex; align-items: center; gap: 7px; color: #dce8f4; font-size: 12px; }
 .sidebar-status-main .pulse { flex: 0 0 auto; margin-right: 2px; }

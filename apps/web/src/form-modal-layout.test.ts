@@ -5,6 +5,10 @@ const modalStyles = readFileSync(new URL('./form-modal.css', import.meta.url), '
 const appSource = readFileSync(new URL('./App.tsx', import.meta.url), 'utf8');
 
 describe('form modal layout', () => {
+  it('keeps every CSS block closed so the production minifier can parse the modal stylesheet', () => {
+    expect(modalStyles.match(/\{/g)?.length ?? 0).toBe(modalStyles.match(/\}/g)?.length ?? 0);
+  });
+
   it('keeps the desktop equipment card fully visible without vertical scrolling', () => {
     expect(modalStyles).toContain('.form-card[aria-label^="Novo equipamento"]');
     expect(modalStyles).toMatch(/\.form-card\[aria-label\^="Novo equipamento"\]\s*\{[^}]*max-height:\s*none;[^}]*overflow:\s*visible;/s);

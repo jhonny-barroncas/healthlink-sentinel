@@ -5,6 +5,14 @@ updated: 2026-08-11
 status: active
 ---
 
+## Atualização 2026-09-02 — indicador ciano da navegação lateral
+
+- A navegação lateral recebeu o padrão visual de glider da referência fornecida, adaptado à identidade do HealthLink com ciano no lugar do amarelo.
+- Itens principais, subitens e o acesso à Integração Zabbix exibem uma barra luminosa e gradiente discreto quando ativos.
+- Foram preservados o recolhimento por hover/foco, RBAC, badges, estados operacionais e todos os manipuladores de navegação existentes.
+- A regressão foi ampliada em `apps/web/src/sidebar-collapse.test.ts`.
+- A validação também revelou e corrigiu uma chave ausente no bloco de redução de movimento de `form-modal.css`, eliminando o aviso de sintaxe emitido pelo build.
+
 ## Atualização 2026-09-02 — incidentes de indisponibilidade do agente
 
 - Corrigida a lacuna de persistência: a API agora possui watchdog de heartbeat dos agentes a cada 15 segundos (`AGENT_HEARTBEAT_WATCHDOG_INTERVAL_MS`).

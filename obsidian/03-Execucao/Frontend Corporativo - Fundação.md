@@ -53,6 +53,15 @@ O frontend escuta em todas as interfaces. Abrir `http://localhost:5173` localmen
 - As regras essenciais da lateral não dependem de `:has()`, reduzindo o risco de incompatibilidade no navegador de produção.
 - A regressão é coberta por `apps/web/src/sidebar-collapse.test.ts`.
 
+## Padronização do indicador ativo — 2026-09-02
+
+- Incorporado à navegação existente o conceito de glider vertical da referência visual, sem introduzir inputs ou alterar a semântica dos botões React.
+- A seleção usa exclusivamente o ciano institucional: barra luminosa, brilho controlado e gradiente horizontal sobre a superfície dark.
+- O padrão cobre itens principais, filtros secundários do Centro Operacional e o botão de acesso à Integração Zabbix.
+- O indicador permanece legível tanto no modo compacto quanto no menu expandido por hover/foco.
+- A estrutura de navegação, permissões, badges e estados semânticos de integração foi preservada.
+- Durante a validação, foi fechado corretamente o bloco `prefers-reduced-motion` de `form-modal.css`; a integridade estrutural da folha ganhou cobertura em `form-modal-layout.test.ts`.
+
 ## Saída após sessão expirada — 2026-08-24
 
 - O aviso de sessão expirada mantém o painel bloqueado até a interação do operador.

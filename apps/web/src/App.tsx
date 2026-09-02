@@ -371,7 +371,7 @@ export function App() {
           <button title="Usuários" className={`nav-item ${view === 'users' ? 'active' : ''}`} onClick={() => { setView('users'); setSelectedUnitId(null); void loadUsers(); }}><span className="nav-icon"><NavUsersIcon /></span><span className="nav-label">Usuários</span></button>
           <button title="Relatórios" className={`nav-item ${view === 'reports' ? 'active' : ''}`} onClick={() => { setView('reports'); setSelectedUnitId(null); }}><span className="nav-icon"><NavReportIcon /></span><span className="nav-label">Relatórios</span></button>
         </nav>
-        <SyncStatusButton status={zabbixStatus} onClick={() => { setView('zabbix'); setSelectedUnitId(null); void Promise.all([loadZabbixStatus(), loadZabbixCandidates()]); }} />
+        <SyncStatusButton active={view === 'zabbix'} status={zabbixStatus} onClick={() => { setView('zabbix'); setSelectedUnitId(null); void Promise.all([loadZabbixStatus(), loadZabbixCandidates()]); }} />
         <div className={`sidebar-footer integration-${zabbixStatus?.health_status ?? 'unknown'}`}><span className="pulse" /> {zabbixStatus?.health_status === 'healthy' ? 'Zabbix sincronizado' : zabbixStatus?.health_status === 'unavailable' ? 'Zabbix indisponível' : zabbixStatus?.health_status === 'degraded' ? 'Zabbix em atenção' : 'Zabbix aguardando coleta'}<small>{zabbixStatus?.last_success_at ? `última coleta · ${new Date(zabbixStatus.last_success_at).toLocaleTimeString('pt-BR')}` : 'ciclo automático · 60s'}</small></div>
       </aside>
       <main>
@@ -1229,14 +1229,14 @@ function syncStatusLabel(status: ZabbixSyncStatus | null) {
   return health === 'healthy' ? 'Zabbix sincronizado' : health === 'unavailable' ? 'Zabbix indisponível' : health === 'degraded' ? 'Zabbix em atenção' : 'Zabbix aguardando coleta';
 }
 
-function SyncStatusButton({ status, onClick }: { status: ZabbixSyncStatus | null; onClick: () => void }) {
+function SyncStatusButton({ active, status, onClick }: { active: boolean; status: ZabbixSyncStatus | null; onClick: () => void }) {
   const [, setNow] = useState(() => Date.now());
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
   const health = status?.health_status ?? 'unknown';
   const lastAttempt = status?.last_attempt_at ? new Date(status.last_attempt_at).getTime() : 0;
   const nextSync = lastAttempt ? Math.max(0, 60_000 - (Date.now() - lastAttempt)) : 60_000;
   const seconds = Math.ceil(nextSync / 1000);
-  return <button type="button" className={`sidebar-sync-button integration-${health}`} onClick={onClick} title="Abrir status da integração e ponte de hosts">
+  return <button type="button" className={`sidebar-sync-button ${active ? 'active' : ''} integration-${health}`} onClick={onClick} title="Abrir status da integração e ponte de hosts">
     <span className="sidebar-status-main"><span className="pulse" /><strong>{syncStatusLabel(status)}</strong><span className="sidebar-status-arrow">›</span></span>
     <small>{status?.last_success_at ? `última coleta · ${new Date(status.last_success_at).toLocaleTimeString('pt-BR')}` : 'nenhuma coleta confirmada'}</small>
     <small className="sidebar-countdown">próxima sincronização · {seconds}s</small>

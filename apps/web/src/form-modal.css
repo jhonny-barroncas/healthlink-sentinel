@@ -109,6 +109,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .unit-context-menu { animation: none; }
+}
+
 .unit-context-menu .context-delete-action {
   border-color: rgba(255, 89, 100, 0.3);
   color: #ff9da5;
