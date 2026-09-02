@@ -8,14 +8,14 @@ import { validateManagedUserForm } from './user-form.js';
 import { groupTelemetryByUnit } from './state-map-telemetry.js';
 import { chooseDiagnosticTarget, type DiagnosticTargetCandidate } from './diagnostic-target.js';
 import { getUnitMapAlertState, hasUnitAssets, selectMapAsset } from './state-map-interactions.js';
-import { agentStatusLabel, type AgentRecord } from './agent-status.js';
+import { agentStatusLabel, normalizeAgentRecord, type AgentRecord } from './agent-status.js';
 import { localAgentSourcePayload } from './starlink-source.js';
 import { canPublishAgentVersion, type AgentPlatform, type AgentVersionRecord } from './agent-version.js';
 import { agentInstallerFileName, extractAgentInstallerFileName, getAgentProvisioningRequirements } from './agent-provisioning.js';
 import { friendlyApiMessage } from './error-messages.js';
 import { mapRasterFallbackStyle, mapRasterLightFallbackStyle } from './map-styles.js';
 import { filterIncidentReports, summarizeIncidentReports, type IncidentReportFilters } from './incident-reports.js';
-import { EyeIcon, EyeOffIcon, UserIcon, ChevronIcon, EditIcon, LogoutIcon, CloseIcon, BlockIcon, UnblockIcon, RejectIcon, CheckIcon, EyeCheckIcon, ResolveIcon, NavDashboardIcon, NavTruckIcon, NavBellIcon, NavActivityIcon, NavUsersIcon, NavReportIcon, SyncIcon, SunIcon, SearchIcon, HomeIcon, BreadcrumbChevronIcon, NavGeneralIcon, NavLinkIcon, NavVpnIcon, NavServerIcon, ClipboardIcon, MoonIcon, WarningIcon, ErrorIcon, InfoIcon, PingIcon, TracertIcon, TrashIcon, PlusIcon, RefreshIcon, ClearFilterIcon, AgentIcon, CalendarIcon, ChevronLeftIcon, ChevronRightIcon, PackageIcon, FolderIcon, UploadIcon } from './icons.js';
+import { EyeIcon, EyeOffIcon, UserIcon, LockIcon, MailIcon, BadgeIcon, LoginIcon, MoreVerticalIcon, ChevronIcon, EditIcon, LogoutIcon, CloseIcon, BlockIcon, UnblockIcon, RejectIcon, CheckIcon, EyeCheckIcon, ResolveIcon, NavDashboardIcon, NavTruckIcon, NavBellIcon, NavActivityIcon, NavUsersIcon, NavReportIcon, SyncIcon, SunIcon, SearchIcon, HomeIcon, BreadcrumbChevronIcon, NavGeneralIcon, NavLinkIcon, NavVpnIcon, NavServerIcon, ClipboardIcon, MoonIcon, WarningIcon, ErrorIcon, InfoIcon, PingIcon, TracertIcon, TrashIcon, PlusIcon, RefreshIcon, ClearFilterIcon, AgentIcon, CalendarIcon, ChevronLeftIcon, ChevronRightIcon, PackageIcon, FolderIcon, UploadIcon, MapIcon } from './icons.js';
 
 type LoginResponse = { accessToken: string; user: { id: string; displayName: string; email: string }; tenant: { name: string; roles?: string[] } };
 type Unit = { unit_id: string; code: string; name: string; state_code: string; city: string; unit_type: 'mobile' | 'fixed'; latitude: number | string | null; longitude: number | string | null; operational_status: 'online' | 'degraded' | 'offline' | 'unknown'; offline_equipment: number; degraded_equipment: number };
@@ -34,6 +34,27 @@ type AccessRequest = { id: string; email: string; display_name: string; requeste
 type Toast = { id: string; type: 'error' | 'warning' | 'success' | 'info'; title: string; detail?: string; sticky?: boolean; durationMs?: number };
 
 const apiBase = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+
+function initialsFromName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'U';
+  return parts.slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  global_administrator: 'Administrador global',
+  tenant_administrator: 'Administrador',
+  supervisor: 'Supervisor',
+  mobile_unit_supervisor: 'Supervisor de unidades móveis',
+  noc_operator: 'Operador NOC',
+  service_agent: 'Agente de integração',
+  viewer: 'Visualizador',
+};
+
+function roleLabel(roles: string[] | undefined): string {
+  const role = roles?.[0];
+  return (role && ROLE_LABELS[role]) || 'Usuário';
+}
 
 async function api<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, { ...init, headers: { ...(init?.body ? { 'content-type': 'application/json' } : {}), authorization: `Bearer ${token}`, ...init?.headers } });
@@ -77,7 +98,17 @@ export function App() {
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
   const [view, setView] = useState<'command' | 'mobile-units' | 'fixed-units' | 'alerts' | 'reports' | 'zabbix' | 'connections' | 'users'>('command');
   const [commandMenuOpen, setCommandMenuOpen] = useState(true);
+  const [usersCreating, setUsersCreating] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const usersEditing = editingUserId !== null;
+  const [unitCreating, setUnitCreating] = useState(false);
+  const [equipmentCreating, setEquipmentCreating] = useState(false);
+  const [editingUnitId, setEditingUnitId] = useState<string | null>(null);
+  const [editingEquipmentId, setEditingEquipmentId] = useState<string | null>(null);
   const [commandScope, setCommandScope] = useState<'all' | 'links' | 'agents' | 'servers'>('all');
+  useEffect(() => { if (view !== 'users') { setUsersCreating(false); setEditingUserId(null); } }, [view]);
+  useEffect(() => { setUnitCreating(false); setEquipmentCreating(false); setEditingUnitId(null); setEditingEquipmentId(null); }, [view]);
+  useEffect(() => { if (!selectedUnitId) { setEquipmentCreating(false); setEditingEquipmentId(null); } }, [selectedUnitId]);
   const [agents, setAgents] = useState<AgentRecord[]>([]);
   const [zabbixCandidates, setZabbixCandidates] = useState<ZabbixCandidates | null>(null);
   const [zabbixStatus, setZabbixStatus] = useState<ZabbixSyncStatus | null>(null);
@@ -105,11 +136,14 @@ export function App() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
 
+  const userMenuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!userMenuOpen) return;
-    const close = () => setUserMenuOpen(false);
+    const close = (event: MouseEvent) => { if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) setUserMenuOpen(false); };
+    const onEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setUserMenuOpen(false); };
     window.addEventListener('mousedown', close);
-    return () => window.removeEventListener('mousedown', close);
+    window.addEventListener('keydown', onEscape);
+    return () => { window.removeEventListener('mousedown', close); window.removeEventListener('keydown', onEscape); };
   }, [userMenuOpen]);
 
   function addToast(toast: Omit<Toast, 'id'>) {
@@ -169,8 +203,8 @@ export function App() {
       Promise.all([
         api<Unit[]>('/v1/monitoring/units', session.accessToken),
         api<Equipment[]>('/v1/monitoring/equipment', session.accessToken),
-        api<AgentRecord[]>('/v1/monitoring/agents', session.accessToken),
-      ]).then(([nextUnits, nextEquipment, nextAgents]) => { setUnits(nextUnits); setEquipment(nextEquipment); setAgents(nextAgents); setError(''); });
+        api<Array<Record<string, unknown>>>('/v1/monitoring/agents', session.accessToken),
+      ]).then(([nextUnits, nextEquipment, nextAgents]) => { setUnits(nextUnits); setEquipment(nextEquipment); setAgents(nextAgents.map(normalizeAgentRecord)); setError(''); });
 
     void fetchInventory().finally(() => setLoading(false));
 
@@ -324,7 +358,7 @@ export function App() {
   return (
     <div className="app-shell">
       <aside className="sidebar" style={lockedStyle} onPointerUp={(event) => { const button = (event.target as HTMLElement).closest('button'); button?.blur(); }}>
-        <div className="brand"><img className="brand-mark" src={brandIcon} alt="HealthLink Sentinel" width={38} height={38} /><div><strong>HealthLink</strong><small>SENTINEL</small></div></div>
+        <button type="button" className="brand" title="Ir para a visão geral" onClick={() => { setView('command'); setCommandScope('all'); setSelectedUnitId(null); setCommandMenuOpen(true); }}><img className="brand-mark" src={brandIcon} alt="HealthLink Sentinel" width={38} height={38} /><div><strong>HealthLink</strong><small>SENTINEL</small></div></button>
         <nav>
           <button title="Visão geral" className={`nav-item ${view === 'command' ? 'active' : ''}`} onClick={() => { setView('command'); setSelectedUnitId(null); setCommandMenuOpen((open) => !open); }}><span className="nav-icon"><NavDashboardIcon /></span><span className="nav-label">Visão geral</span><b className="nav-chevron">{commandMenuOpen && view === 'command' ? '−' : '+'}</b></button>
           {commandMenuOpen && view === 'command' && <div className="nav-submenu" aria-label="Filtros do centro operacional">
@@ -343,30 +377,46 @@ export function App() {
       <main>
         <header className="topbar">
           <div>
-            <nav className="breadcrumb" aria-label="Navegação" style={lockedStyle}>
-              <button className="breadcrumb-home" onClick={() => { setView('command'); setCommandScope('all'); setSelectedUnitId(null); }} aria-label="Ir para o início"><HomeIcon /></button>
-              <BreadcrumbChevronIcon />
-              <button className={`breadcrumb-item ${!selectedUnitId && (view !== 'command' || commandScope === 'all') ? 'current' : ''}`} onClick={() => { setSelectedUnitId(null); if (view === 'command') setCommandScope('all'); }}>{breadcrumbSectionLabel}</button>
-              {view === 'command' && commandScope !== 'all' && <><BreadcrumbChevronIcon /><span className="breadcrumb-item current">{scopeLabelFor(commandScope)}</span></>}
-              {(view === 'mobile-units' || view === 'fixed-units') && selectedUnit && <><BreadcrumbChevronIcon /><span className="breadcrumb-item current">{selectedUnit.code} · {selectedUnit.name}</span></>}
-            </nav>
             <p className="eyebrow">CENTRO DE COMANDO · {session.tenant.name}</p><h1>Consciência operacional</h1>
+            <nav className="breadcrumb" aria-label="Navegação" style={lockedStyle}>
+              <button className="breadcrumb-home" onClick={() => { setProfileModalOpen(false); setView('command'); setCommandScope('all'); setSelectedUnitId(null); }} aria-label="Ir para o início"><HomeIcon /></button>
+              <BreadcrumbChevronIcon />
+              {profileModalOpen ? <span className="breadcrumb-item current">Editar perfil</span> : <>
+              <button className={`breadcrumb-item ${!selectedUnitId && !(view === 'users' && (usersCreating || usersEditing)) && !((view === 'mobile-units' || view === 'fixed-units') && (unitCreating || editingUnitId || editingEquipmentId)) && (view !== 'command' || commandScope === 'all') ? 'current' : ''}`} onClick={() => { setSelectedUnitId(null); setUsersCreating(false); setEditingUserId(null); setUnitCreating(false); setEquipmentCreating(false); setEditingUnitId(null); setEditingEquipmentId(null); if (view === 'command') setCommandScope('all'); }}>{breadcrumbSectionLabel}</button>
+              {view === 'users' && usersCreating && <><BreadcrumbChevronIcon /><span className="breadcrumb-item current">Criar usuário</span></>}
+              {view === 'users' && usersEditing && <><BreadcrumbChevronIcon /><span className="breadcrumb-item current">Editar usuário</span></>}
+              {(view === 'mobile-units' || view === 'fixed-units') && unitCreating && <><BreadcrumbChevronIcon /><span className="breadcrumb-item current">Criar unidade</span></>}
+              {view === 'command' && commandScope !== 'all' && <><BreadcrumbChevronIcon /><span className="breadcrumb-item current">{scopeLabelFor(commandScope)}</span></>}
+              {(view === 'mobile-units' || view === 'fixed-units') && selectedUnit && <><BreadcrumbChevronIcon /><span className={`breadcrumb-item ${equipmentCreating || editingUnitId || editingEquipmentId ? '' : 'current'}`}>{selectedUnit.code} · {selectedUnit.name}</span></>}
+              {(view === 'mobile-units' || view === 'fixed-units') && selectedUnit && equipmentCreating && <><BreadcrumbChevronIcon /><span className="breadcrumb-item current">Cadastrar equipamento</span></>}
+              {(view === 'mobile-units' || view === 'fixed-units') && editingUnitId && <><BreadcrumbChevronIcon /><span className="breadcrumb-item current">Editar unidade</span></>}
+              {(view === 'mobile-units' || view === 'fixed-units') && editingEquipmentId && <><BreadcrumbChevronIcon /><span className="breadcrumb-item current">Editar equipamento</span></>}
+              </>}
+            </nav>
           </div>
           <div className="header-actions-group">
-            <div className="user-profile-pill-wrapper">
-              <button className={`user-profile-pill ${userMenuOpen ? 'active' : ''}`} onClick={() => setUserMenuOpen((prev) => !prev)} aria-expanded={userMenuOpen}>
-                <span className="user-avatar-circle"><UserIcon /></span>
-                <span className="user-profile-name">{session.user.displayName.split(' ')[0] || 'admin'}</span>
+            <div className="user-profile-pill-wrapper" ref={userMenuRef}>
+              <button className={`user-profile-pill ${userMenuOpen ? 'active' : ''}`} onClick={() => setUserMenuOpen((prev) => !prev)} aria-haspopup="menu" aria-expanded={userMenuOpen}>
+                <span className="user-avatar-circle">{initialsFromName(session.user.displayName)}</span>
+                <span className="user-profile-identity-text">
+                  <strong>{session.user.displayName.split(' ')[0] || 'admin'}</strong>
+                  <small>{roleLabel(session.tenant.roles)}</small>
+                </span>
                 <span className="user-chevron"><ChevronIcon up={userMenuOpen} /></span>
               </button>
               {userMenuOpen && (
-                <div className="user-profile-dropdown" onMouseDown={(e) => e.stopPropagation()}>
-                  <button className="dropdown-item" disabled={sessionExpired} onClick={() => { setUserMenuOpen(false); setProfileModalOpen(true); }}>
+                <div className="user-profile-dropdown" role="menu" onMouseDown={(e) => e.stopPropagation()}>
+                  <div className="user-profile-identity">
+                    <strong title={session.user.displayName}>{session.user.displayName}</strong>
+                    <small title={session.user.email}>{session.user.email}</small>
+                  </div>
+                  <div className="dropdown-divider" />
+                  <button role="menuitem" className="dropdown-item" disabled={sessionExpired} onClick={() => { setUserMenuOpen(false); setProfileModalOpen(true); }}>
                     <span className="dropdown-item-icon"><EditIcon /></span>
                     <span>Editar perfil</span>
                   </button>
                   <div className="dropdown-divider" />
-                  <button className="dropdown-item logout" onClick={() => { sessionStorage.clear(); setJustLoggedOut(true); setSession(null); }}>
+                  <button role="menuitem" className="dropdown-item logout" onClick={() => { sessionStorage.clear(); setJustLoggedOut(true); setSession(null); }}>
                     <span className="dropdown-item-icon"><LogoutIcon /></span>
                     <span>Sair</span>
                   </button>
@@ -381,13 +431,12 @@ export function App() {
             <div className="error-banner" role="alert">
               <span className="error-banner-icon"><WarningIcon /></span>
               <span className="error-banner-text">{error}</span>
-              <button className="error-banner-close" onClick={() => setError('')} title="Fechar"><CloseIcon /></button>
+              <button type="button" className="icon-button clear-filters-button error-banner-close" onClick={() => setError('')} aria-label="Fechar"><CloseIcon /></button>
             </div>
           )}
-          {view === 'alerts' ? <AlertsCenter alerts={alerts} mode={alertMode} loading={alertsLoading} onModeChange={setAlertMode} onAction={changeAlert} onRetry={() => void loadAlerts(alertMode).catch((r: Error) => setError(r.message))} /> : view === 'reports' ? <IncidentReports alerts={[...activeAlerts, ...resolvedAlerts]} units={units} onRefresh={() => { void Promise.all([loadAlerts('active'), loadResolvedAlerts()]); }} /> : view === 'users' ? <UsersPanel users={managedUsers} requests={accessRequests} loading={usersLoading} token={session.accessToken} onRefresh={loadUsers} onChange={changeUser} onToast={addToast} /> : view === 'command' ? <CommandCenter key={commandScope} units={units} equipment={equipment} agents={agents} alerts={activeAlerts} resolvedAlerts={resolvedAlerts} summary={summary} scope={commandScope} token={session.accessToken} onInventoryRefresh={refreshInventory} onError={setError} onSelectUnit={(unitId) => { setSelectedUnitId(unitId); setView('mobile-units'); }} onToast={addToast} /> : view === 'connections' ? <ConnectionStatus integrationStatus={zabbixStatus} onRefresh={loadZabbixStatus} onOpenZabbix={() => { setView('zabbix'); void loadZabbixCandidates(); }} /> : view === 'zabbix' ? <ZabbixIntegration candidates={zabbixCandidates} integrationStatus={zabbixStatus} units={units} loading={zabbixLoading} onRefresh={loadZabbixCandidates} onStatusRefresh={loadZabbixStatus} onInventoryRefresh={refreshInventory} onAlertsRefresh={refreshAlerts} onError={setError} onToast={addToast} token={session.accessToken} /> : <Fragment key={view}><InventoryActions unitType={view === 'mobile-units' ? 'mobile' : 'fixed'} token={session.accessToken} units={units} selectedUnit={selectedUnit} onRefresh={refreshInventory} onError={(message) => { setError(message); addToast({ type: 'error', title: 'Falha no cadastro', detail: message }); }} onToast={addToast} /><UnitsView units={units.filter((unit) => unit.unit_type === (view === 'mobile-units' ? 'mobile' : 'fixed'))} selectedUnit={selectedUnit} selectedEquipment={selectedEquipment} loading={loading} summary={{ online: units.filter((u) => u.unit_type === (view === 'mobile-units' ? 'mobile' : 'fixed') && u.operational_status === 'online').length, attention: units.filter((u) => u.unit_type === (view === 'mobile-units' ? 'mobile' : 'fixed') && u.operational_status === 'degraded').length, offline: units.filter((u) => u.unit_type === (view === 'mobile-units' ? 'mobile' : 'fixed') && u.operational_status === 'offline').length, unknown: units.filter((u) => u.unit_type === (view === 'mobile-units' ? 'mobile' : 'fixed') && u.operational_status === 'unknown').length }} onSelectUnit={setSelectedUnitId} onBack={() => setSelectedUnitId(null)} onInventoryRefresh={refreshInventory} token={session.accessToken} onToast={addToast} /></Fragment>}
+          {profileModalOpen ? <EditProfilePage session={session} onSaved={(newName) => { setSession({ ...session, user: { ...session.user, displayName: newName } }); addToast({ type: 'success', title: 'Perfil atualizado', detail: 'Nome de exibição salvo com sucesso.' }); }} onClose={() => setProfileModalOpen(false)} /> : view === 'alerts' ? <AlertsCenter alerts={alerts} mode={alertMode} loading={alertsLoading} onModeChange={setAlertMode} onAction={changeAlert} onRetry={() => void loadAlerts(alertMode).catch((r: Error) => setError(r.message))} /> : view === 'reports' ? <IncidentReports alerts={[...activeAlerts, ...resolvedAlerts]} units={units} onRefresh={() => { void Promise.all([loadAlerts('active'), loadResolvedAlerts()]); }} /> : view === 'users' ? <UsersPanel users={managedUsers} requests={accessRequests} loading={usersLoading} token={session.accessToken} onRefresh={loadUsers} onChange={changeUser} onToast={addToast} creating={usersCreating} onCreatingChange={setUsersCreating} editingUserId={editingUserId} onEditingUserIdChange={setEditingUserId} /> : view === 'command' ? <CommandCenter key={commandScope} units={units} equipment={equipment} agents={agents} alerts={activeAlerts} resolvedAlerts={resolvedAlerts} summary={summary} scope={commandScope} token={session.accessToken} onInventoryRefresh={refreshInventory} onError={setError} onSelectUnit={(unitId) => { setSelectedUnitId(unitId); setView('mobile-units'); }} onToast={addToast} /> : view === 'connections' ? <ConnectionStatus integrationStatus={zabbixStatus} onRefresh={loadZabbixStatus} onOpenZabbix={() => { setView('zabbix'); void loadZabbixCandidates(); }} /> : view === 'zabbix' ? <ZabbixIntegration candidates={zabbixCandidates} units={units} loading={zabbixLoading} onRefresh={loadZabbixCandidates} onStatusRefresh={loadZabbixStatus} onInventoryRefresh={refreshInventory} onAlertsRefresh={refreshAlerts} onError={setError} onToast={addToast} token={session.accessToken} /> : <Fragment key={view}><InventoryActions token={session.accessToken} selectedUnit={selectedUnit} creating={equipmentCreating} onCreatingChange={setEquipmentCreating} onRefresh={refreshInventory} onError={(message) => { setError(message); addToast({ type: 'error', title: 'Falha no cadastro', detail: message }); }} onToast={addToast} /><UnitsView units={units.filter((unit) => unit.unit_type === (view === 'mobile-units' ? 'mobile' : 'fixed'))} selectedUnit={selectedUnit} selectedEquipment={selectedEquipment} loading={loading} summary={{ online: units.filter((u) => u.unit_type === (view === 'mobile-units' ? 'mobile' : 'fixed') && u.operational_status === 'online').length, attention: units.filter((u) => u.unit_type === (view === 'mobile-units' ? 'mobile' : 'fixed') && u.operational_status === 'degraded').length, offline: units.filter((u) => u.unit_type === (view === 'mobile-units' ? 'mobile' : 'fixed') && u.operational_status === 'offline').length, unknown: units.filter((u) => u.unit_type === (view === 'mobile-units' ? 'mobile' : 'fixed') && u.operational_status === 'unknown').length }} unitType={view === 'mobile-units' ? 'mobile' : 'fixed'} creating={unitCreating} onCreatingChange={setUnitCreating} equipmentCreating={equipmentCreating} editingUnitId={editingUnitId} onEditingUnitIdChange={setEditingUnitId} editingEquipmentId={editingEquipmentId} onEditingEquipmentIdChange={setEditingEquipmentId} onCreateEquipment={(id) => { setSelectedUnitId(id); setEquipmentCreating(true); }} onSelectUnit={setSelectedUnitId} onBack={() => setSelectedUnitId(null)} onInventoryRefresh={refreshInventory} token={session.accessToken} onToast={addToast} /></Fragment>}
         </section>
       </main>
-      {profileModalOpen && <EditProfileModal session={session} onSave={(newName) => { setSession({ ...session, user: { ...session.user, displayName: newName } }); addToast({ type: 'success', title: 'Perfil atualizado', detail: 'Nome de exibição salvo com sucesso.' }); }} onClose={() => setProfileModalOpen(false)} />}
       <ToastStack toasts={toasts} />
       {sessionExpired && (
         <div
@@ -423,12 +472,19 @@ function getStateFill(uf: string, units: Unit[]) {
   return mapStatusColor.degraded;
 }
 
-function AgentOverview({ agents, onSelectUnit }: { agents: AgentRecord[]; onSelectUnit: (unitId: string) => void }) {
+const AGENT_PAGE_SIZE = 25;
+
+function AgentOverview({ agents, onSelectUnit, filters }: { agents: AgentRecord[]; onSelectUnit: (unitId: string) => void; filters?: ReactNode }) {
   const online = agents.filter((agent) => agent.status === 'online').length;
   const offline = agents.filter((agent) => agent.status === 'offline').length;
   const pending = agents.filter((agent) => agent.status === 'pending').length;
   const unlinked = agents.filter((agent) => agent.status === 'unlinked').length;
-  return <div className="agent-overview"><div className="command-summary"><CommandMetric label="Unidades móveis" value={String(agents.length)} note="no recorte atual" tone="neutral" /><CommandMetric label="Agentes em execução" value={String(online)} note="heartbeat ≤ 30s" tone="ok" /><CommandMetric label="Agentes parados" value={String(offline)} note="sem heartbeat recente" tone="danger" /><CommandMetric label="Sem vínculo" value={String(unlinked + pending)} note={pending ? `${pending} aguardando instalação` : 'nenhuma instalação pendente'} tone="warn" /></div><div className="agent-list">{agents.length === 0 ? <div className="empty-state"><h3>Nenhuma unidade móvel encontrada</h3><p>Cadastre um servidor e uma fonte para gerar o agente.</p></div> : agents.map((agent) => <button className="agent-row" key={agent.unitId} onClick={() => onSelectUnit(agent.unitId)}><span className={`legend-dot ${agent.status === 'online' || agent.status === 'offline' ? agent.status : 'unknown'}`} /><span><strong>{agent.unitCode} · {agent.unitName}</strong><small>{agent.city}/{agent.stateCode} · {agent.equipmentName ?? 'Nenhum servidor vinculado'}{agent.version ? ` · v${agent.version}` : ''}</small></span><em className={`status ${agent.status === 'online' || agent.status === 'offline' ? agent.status : 'unknown'}`}>{agentStatusLabel(agent.status)}</em></button>)}</div></div>;
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(agents.length / AGENT_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedAgents = agents.slice((currentPage - 1) * AGENT_PAGE_SIZE, currentPage * AGENT_PAGE_SIZE);
+  useEffect(() => { setPage(1); }, [agents.length]);
+  return <div className="agent-overview"><div className="command-summary"><CommandMetric label="Unidades móveis" value={String(agents.length)} note="no recorte atual" tone="neutral" /><CommandMetric label="Agentes em execução" value={String(online)} note="heartbeat ≤ 30s" tone="ok" /><CommandMetric label="Agentes parados" value={String(offline)} note="sem heartbeat recente" tone="danger" /><CommandMetric label="Sem vínculo" value={String(unlinked + pending)} note={pending ? `${pending} aguardando instalação` : 'nenhuma instalação pendente'} tone="warn" /></div>{filters}<div className="agent-panel panel"><div className="agent-list">{agents.length === 0 ? <div className="empty-state"><h3>Nenhuma unidade móvel encontrada</h3><p>Cadastre um servidor e uma fonte para gerar o agente.</p></div> : <><div className="agent-list-scroll">{pagedAgents.map((agent) => <button className={`agent-row agent-${agent.status}`} key={agent.unitId} onClick={() => onSelectUnit(agent.unitId)}><span><strong>{agent.unitCode} · {agent.unitName}</strong><small>{agent.city}/{agent.stateCode} · {agent.equipmentName ?? 'Nenhum servidor vinculado'}{agent.version ? ` · v${agent.version}` : ''}</small></span><em className={`status ${agent.status === 'online' || agent.status === 'offline' ? agent.status : agent.status === 'pending' ? 'pending' : 'unknown'}`}>{agentStatusLabel(agent.status)}</em></button>)}</div>{totalPages > 1 && <div className="pagination"><button type="button" className="secondary-button compact" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Anterior</button><span>Página {currentPage} de {totalPages}</span><button type="button" className="secondary-button compact" disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)}>Próxima</button></div>}</>}</div></div></div>;
 }
 
 function CommandCenter({ units, equipment, agents, alerts: _alerts, resolvedAlerts, summary: _summary, scope, token, onInventoryRefresh, onError, onSelectUnit, onToast = () => undefined }: { units: Unit[]; equipment: Equipment[]; agents: AgentRecord[]; alerts: Alert[]; resolvedAlerts: Alert[]; summary: { online: number; attention: number; offline: number; unknown: number }; scope: 'all' | 'links' | 'agents' | 'servers'; token: string; onInventoryRefresh: () => Promise<void>; onError: (message: string) => void; onSelectUnit: (unitId: string) => void; onToast?: (toast: Omit<Toast, 'id'>) => void }) {
@@ -477,20 +533,22 @@ function CommandCenter({ units, equipment, agents, alerts: _alerts, resolvedAler
     window.addEventListener('keydown', closeOnEscape);
     return () => { window.removeEventListener('mousedown', close); window.removeEventListener('keydown', closeOnEscape); };
   }, [mapContext]);
+  const filtersBar = <div className="command-filters"><div className="command-filter-summary"><p className="eyebrow">FILTROS OPERACIONAIS</p><strong>{filteredUnits.length} unidade(s) no recorte atual</strong></div><div className="command-filter-controls"><label>Tipo de unidade<AppDropdown value={unitTypeFilter} onChange={(next) => setUnitTypeFilter(next as typeof unitTypeFilter)} options={[{ value: 'all', label: 'Todas' }, { value: 'fixed', label: 'Unidades fixas' }, { value: 'mobile', label: 'Unidades móveis' }]} /></label><label>Situação<AppDropdown value={statusFilter} onChange={(next) => setStatusFilter(next as typeof statusFilter)} options={[{ value: 'all', label: 'Todas' }, { value: 'online', label: 'Operacionais' }, { value: 'degraded', label: 'Em atenção' }, { value: 'offline', label: 'Indisponíveis' }, { value: 'unknown', label: 'Sem telemetria' }]} /></label><label>UF<AppDropdown value={stateFilter} onChange={(next) => { setStateFilter(next); setSelectedStateCode(next === 'all' ? null : next); }} options={[{ value: 'all', label: 'Brasil inteiro' }, ...stateOptions.map((code) => ({ value: code, label: `${code} · ${stateNameByCode[code] ?? code}` }))]} /></label>{(unitTypeFilter !== 'all' || stateFilter !== 'all' || statusFilter !== 'all') && <button type="button" className="secondary-button compact clear-filters-button" onClick={() => { setUnitTypeFilter('all'); setStateFilter('all'); setStatusFilter('all'); setSelectedStateCode(null); }}><ClearFilterIcon /> Limpar filtros</button>}</div></div>;
   return <section className="command-center">
-    {scope === 'agents' ? <AgentOverview agents={agents.filter((agent) => visibleUnitCodes.has(agent.unitCode))} onSelectUnit={onSelectUnit} /> : stateMapCode && createPortal(<StateLocationMap stateCode={stateMapCode} units={filteredUnits.filter((unit) => unit.state_code.toUpperCase() === stateMapCode)} equipment={visibleEquipment} telemetry={linkTelemetry} alerts={[..._alerts, ...resolvedAlerts]} onClose={() => setStateMapCode(null)} onSelectUnit={onSelectUnit} onLocateUnit={onSelectUnit} onAddEquipment={setEquipmentModalUnit} onDiagnostic={async (target, action) => api<DiagnosticResult>(`/v1/equipment/${target.equipment_id}/diagnostics`, token, { method: 'POST', body: JSON.stringify({ action }) })} />, document.body)}
+    {scope !== 'agents' && stateMapCode && createPortal(<StateLocationMap stateCode={stateMapCode} units={filteredUnits.filter((unit) => unit.state_code.toUpperCase() === stateMapCode)} equipment={visibleEquipment} telemetry={linkTelemetry} alerts={[..._alerts, ...resolvedAlerts]} onClose={() => setStateMapCode(null)} onSelectUnit={onSelectUnit} onLocateUnit={onSelectUnit} onAddEquipment={setEquipmentModalUnit} onDiagnostic={async (target, action) => api<DiagnosticResult>(`/v1/equipment/${target.equipment_id}/diagnostics`, token, { method: 'POST', body: JSON.stringify({ action }) })} />, document.body)}
     {equipmentModalUnit && createPortal(<EquipmentForm token={token} unit={equipmentModalUnit} onCreated={async () => { setEquipmentModalUnit(null); await onInventoryRefresh(); }} onCancel={() => setEquipmentModalUnit(null)} onError={onError} onToast={onToast} />, document.body)}
-    <div className="command-scope-heading"><p className="eyebrow">CENTRO OPERACIONAL · VISÃO FILTRADA</p><h2>{scopeLabel}</h2><small>{scope === 'all' ? 'Todas as unidades e equipamentos monitorados.' : `Unidades com equipamentos classificados como ${scopeLabel.toLowerCase()}.`}</small></div>
+    <div className="section-heading units-module-heading command-scope-heading"><div><p className="eyebrow">CENTRO OPERACIONAL · VISÃO FILTRADA</p><h2>{scopeLabel}</h2><small>{scope === 'all' ? 'Todas as unidades e equipamentos monitorados.' : `Unidades com equipamentos classificados como ${scopeLabel.toLowerCase()}.`}</small></div></div>
     {quickCreateStateCode && <div className="map-quick-create"><UnitForm token={token} initialStateCode={quickCreateStateCode} onCreated={async () => { setQuickCreateStateCode(null); await onInventoryRefresh(); }} onCancel={() => setQuickCreateStateCode(null)} onToast={onToast} /></div>}
-    <div className="command-summary">
+    {scope !== 'agents' && <div className="command-summary">
       <CommandMetric label="Total unidades" value={String(visibleUnits.length)} note="inventário monitorado" tone="neutral" />
       <CommandMetric label="Online" value={String(summary.online)} note={`${availability}% respondendo`} tone="ok" />
       <CommandMetric label="Offline" value={String(summary.offline)} note="sem comunicação" tone="danger" />
       <CommandMetric label="Degradadas" value={String(summary.attention)} note="exigem atenção" tone="warn" />
       <CommandMetric label="Disponibilidade média" value={`${availability}%`} note="janela operacional" tone="cyan" />
       <CommandMetric label="Alertas críticos" value={String(alerts.filter((alert) => alert.severity >= 4).length)} note={`${alerts.length} em aberto`} tone="danger" />
-    </div>
-    <div className="command-filters"><div className="command-filter-summary"><p className="eyebrow">FILTROS OPERACIONAIS</p><strong>{filteredUnits.length} unidade(s) no recorte atual</strong></div><div className="command-filter-controls"><label>Tipo de unidade<AppDropdown value={unitTypeFilter} onChange={(next) => setUnitTypeFilter(next as typeof unitTypeFilter)} options={[{ value: 'all', label: 'Todas' }, { value: 'fixed', label: 'Unidades fixas' }, { value: 'mobile', label: 'Unidades móveis' }]} /></label><label>Situação<AppDropdown value={statusFilter} onChange={(next) => setStatusFilter(next as typeof statusFilter)} options={[{ value: 'all', label: 'Todas' }, { value: 'online', label: 'Operacionais' }, { value: 'degraded', label: 'Em atenção' }, { value: 'offline', label: 'Indisponíveis' }, { value: 'unknown', label: 'Sem telemetria' }]} /></label><label>UF<AppDropdown value={stateFilter} onChange={(next) => { setStateFilter(next); setSelectedStateCode(next === 'all' ? null : next); }} options={[{ value: 'all', label: 'Brasil inteiro' }, ...stateOptions.map((code) => ({ value: code, label: `${code} · ${stateNameByCode[code] ?? code}` }))]} /></label>{(unitTypeFilter !== 'all' || stateFilter !== 'all' || statusFilter !== 'all') && <button type="button" className="secondary-button compact clear-filters-button" onClick={() => { setUnitTypeFilter('all'); setStateFilter('all'); setStatusFilter('all'); setSelectedStateCode(null); }}><ClearFilterIcon /> Limpar filtros</button>}</div></div>
+    </div>}
+    {scope !== 'agents' && filtersBar}
+    {scope === 'agents' && <AgentOverview agents={agents.filter((agent) => filteredUnits.some((unit) => unit.code === agent.unitCode))} onSelectUnit={onSelectUnit} filters={filtersBar} />}
     {scope !== 'agents' && <div className="command-grid">
       <article className="map-panel">
         <div className="panel-heading"><div><p className="eyebrow">MONITORAMENTO · BRASIL INTEIRO</p><h2>Mapa operacional</h2><small>Clique em um estado para filtrar a operação.</small></div><div className="map-supervisor"><span>CONTROLE SUPERVISOR</span><strong>NOC · acesso auditado</strong></div></div>
@@ -504,13 +562,13 @@ function CommandCenter({ units, equipment, agents, alerts: _alerts, resolvedAler
             return <path key={code} d={location.path} className={`map-location ${status} ${selectedStateCode === code ? 'selected' : ''}`} fill={getStateFill(code, filteredUnits)} tabIndex={0} role="button" aria-label={`${stateName} (${code}) · ${statusLabel[status]}`} onMouseEnter={() => setHoveredStateCode(code)} onMouseLeave={() => setHoveredStateCode(null)} onFocus={() => setHoveredStateCode(code)} onBlur={() => setHoveredStateCode(null)} onClick={() => { setSelectedStateCode(code); setStateMapCode(code); setMapContext(null); }} onContextMenu={(event) => { event.preventDefault(); setSelectedStateCode(code); setHoveredStateCode(null); const posX = event.clientX + 260 > window.innerWidth ? Math.max(12, event.clientX - 260) : event.clientX; const posY = event.clientY + 180 > window.innerHeight ? Math.max(12, event.clientY - 180) : event.clientY; setMapContext({ stateCode: code, x: posX, y: posY }); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedStateCode(code); setStateMapCode(code); } }} />;
           })}
         </svg>{hoveredStateCode && <div className="map-tooltip"><span>{hoveredStateCode}</span><strong>{stateNameByCode[hoveredStateCode] ?? mapLocations.find((location) => location.id.toUpperCase() === hoveredStateCode)?.name}</strong><small>{hoveredUnits.length ? `${hoveredUnits.length} unidade(s) · ${statusLabel[hoveredStatus]}` : 'Nenhuma unidade cadastrada'}</small></div>}</div>
-        <div className="map-selection">{selectedStateCode ? <><strong>{selectedStateCode}</strong><span>{selectedUnits.length ? `${selectedUnits.length} unidade(s) · ${statusLabel[hoveredStatus]}` : 'Nenhuma unidade cadastrada neste estado'}</span><button className="map-open-detail" onClick={() => setStateMapCode(selectedStateCode)}>Explorar mapa</button></> : <span>Selecione um estado no mapa para consultar a prontidão local.</span>}</div>
-        {selectedStateCode && selectedUnits.length > 0 && <div className="map-unit-list">{selectedUnits.map((unit) => <button key={unit.unit_id} className={unit.operational_status} onClick={() => onSelectUnit(unit.unit_id)}><span className={`legend-dot ${unit.operational_status}`} /><span><strong>{unit.code}</strong><small>{unit.name}</small></span><span className={`status ${unit.operational_status}`}>{statusLabel[unit.operational_status]}</span></button>)}</div>}
+        <div className="map-selection">{selectedStateCode ? <><strong>{selectedStateCode}</strong><span>{selectedUnits.length ? `${selectedUnits.length} unidade(s) · ${statusLabel[hoveredStatus]}` : 'Nenhuma unidade cadastrada neste estado'}</span><button className="primary compact map-open-detail" onClick={() => setStateMapCode(selectedStateCode)}><MapIcon /> Explorar mapa</button></> : <span>Selecione um estado no mapa para consultar a prontidão local.</span>}</div>
+        {selectedStateCode && selectedUnits.length > 0 && <div className="map-unit-list">{selectedUnits.map((unit) => <button key={unit.unit_id} className={unit.operational_status} onClick={() => onSelectUnit(unit.unit_id)}><span><strong>{unit.code}</strong><small>{unit.name}</small></span><span className={`status ${unit.operational_status}`}>{statusLabel[unit.operational_status]}</span></button>)}</div>}
         <div className="map-legend"><span><i className="legend-dot online" /> 100% online</span><span><i className="legend-dot degraded" /> Atenção / instável</span><span><i className="legend-dot offline" /> &gt;50% offline</span><span><i className="legend-dot unknown" /> Sem unidades</span><span><i className="legend-dot selected" /> UF selecionada</span></div>
       </article>
       <OperationalOverview units={filteredUnits} equipment={visibleEquipment} alerts={alerts} resolvedAlerts={scopedResolvedAlerts} summary={summary} onSelectUnit={onSelectUnit} />
     </div>}
-    {mapContext && <div className="map-context-card" style={{ left: mapContext.x, top: mapContext.y }} onMouseDown={(event) => event.stopPropagation()}><button className="map-context-close" aria-label="Fechar menu" onClick={() => setMapContext(null)}><CloseIcon /></button><p>AÇÃO RÁPIDA · {mapContext.stateCode}</p><strong>{stateNameByCode[mapContext.stateCode] ?? mapContext.stateCode}</strong><small>Cadastre uma unidade diretamente neste estado.</small><button className="primary compact" onClick={() => { setQuickCreateStateCode(mapContext.stateCode); setMapContext(null); }}><PlusIcon /> Adicionar unidade</button></div>}
+    {mapContext && <div className="map-context-card" style={{ left: mapContext.x, top: mapContext.y }} onMouseDown={(event) => event.stopPropagation()}><button type="button" className="icon-button clear-filters-button map-context-close" aria-label="Fechar" onClick={() => setMapContext(null)}><CloseIcon /></button><p>AÇÃO RÁPIDA · {mapContext.stateCode}</p><strong>{stateNameByCode[mapContext.stateCode] ?? mapContext.stateCode}</strong><small>Cadastre uma unidade diretamente neste estado.</small><button className="primary compact" onClick={() => { setQuickCreateStateCode(mapContext.stateCode); setMapContext(null); }}><PlusIcon /> Adicionar unidade</button></div>}
   </section>;
 }
 
@@ -710,7 +768,7 @@ function StateLocationMap({ stateCode, units, equipment = [], telemetry = [], al
   };
   return <div className="state-map-backdrop" role="presentation" onMouseDown={onClose}>
     <section className="state-map-dialog" role="dialog" aria-modal="true" aria-label={`Localização das unidades em ${stateNameByCode[stateCode] ?? stateCode}`} onMouseDown={(event) => event.stopPropagation()}>
-      <header className="state-map-header"><div><p className="eyebrow">VISÃO GEOGRÁFICA · {stateCode}</p><h2>{stateNameByCode[stateCode] ?? stateCode}</h2><small>{units.length} unidade(s) no estado · {locatedUnits.length} georreferenciada(s)</small></div><div className="state-map-header-actions"><div className="map-theme-switch" role="group" aria-label="Tema do mapa"><span className={`map-theme-thumb ${mapTheme}`} /><button className={mapTheme === 'dark' ? 'active' : ''} onClick={() => changeMapTheme('dark')} aria-pressed={mapTheme === 'dark'}><MoonIcon /> Dark</button><button className={mapTheme === 'light' ? 'active' : ''} onClick={() => changeMapTheme('light')} aria-pressed={mapTheme === 'light'}><SunIcon /> Claro</button></div><button className="state-map-close" onClick={onClose} aria-label="Fechar mapa"><CloseIcon /></button></div></header>
+      <header className="state-map-header"><div><p className="eyebrow">VISÃO GEOGRÁFICA · {stateCode}</p><h2>{stateNameByCode[stateCode] ?? stateCode}</h2><small>{units.length} unidade(s) no estado · {locatedUnits.length} georreferenciada(s)</small></div><div className="state-map-header-actions"><div className="map-theme-switch" role="group" aria-label="Tema do mapa"><span className={`map-theme-thumb ${mapTheme}`} /><button className={mapTheme === 'dark' ? 'active' : ''} onClick={() => changeMapTheme('dark')} aria-pressed={mapTheme === 'dark'}><MoonIcon /> Dark</button><button className={mapTheme === 'light' ? 'active' : ''} onClick={() => changeMapTheme('light')} aria-pressed={mapTheme === 'light'}><SunIcon /> Claro</button></div><button type="button" className="icon-button clear-filters-button state-map-close" onClick={onClose} aria-label="Fechar mapa"><CloseIcon /></button></div></header>
       <div className="state-map-body">
         <div className={`state-map-canvas ${mapTheme === 'light' ? 'map-theme-light' : ''}`}>
           <Map ref={mapRef} key={`${stateCode}-${mapTheme}-${mapFallback ? 'raster' : 'vector'}`} initialViewState={{ longitude, latitude, zoom: locatedUnits.length > 1 ? 8 : locatedUnits.length === 1 ? 12 : 6 }} mapStyle={mapFallback ? (mapTheme === 'dark' ? mapRasterFallbackStyle : mapRasterLightFallbackStyle) : (mapTheme === 'dark' ? 'https://tiles.openfreemap.org/styles/dark' : 'https://tiles.openfreemap.org/styles/bright')} onLoad={(event) => { setMapReady(true); if (mapBounds) { event.target.fitBounds([[mapBounds.minLng, mapBounds.minLat], [mapBounds.maxLng, mapBounds.maxLat]], { padding: 90, maxZoom: 12, duration: 0 }); } else if (locatedUnits.length === 1) { event.target.setZoom(12); } }} onIdle={() => setMapReady(true)} onError={() => setMapFallback(true)} attributionControl={{}}>
@@ -724,8 +782,8 @@ function StateLocationMap({ stateCode, units, equipment = [], telemetry = [], al
         </div>
         <aside className="state-map-units state-links-panel"><div className="state-links-heading"><div><h3>Ativos das unidades</h3><span>{equipment.length} equipamento(s)</span></div></div>{units.length === 0 ? <div className="state-map-list-empty">Nenhuma unidade cadastrada.</div> : panelUnits.map((unit) => { const located = locatedUnits.includes(unit); const unitTelemetry = telemetryByUnit.get(unit.unit_id) ?? []; const unitEquipment = equipment.filter((item) => item.unit_id === unit.unit_id); const telemetryEquipmentIds = new Set(unitTelemetry.map((item) => item.equipment_id)); const isExpanded = expandedUnitIds.has(unit.unit_id); const onlineLinks = unitTelemetry.filter((link) => link.operational_status === 'online').length; const attentionLinks = unitTelemetry.filter((link) => link.operational_status === 'degraded').length; const hasAssets = hasUnitAssets(unit.unit_id, unitEquipment, unitTelemetry); return <section className={`state-unit-assets ${selectedUnit?.unit_id === unit.unit_id ? 'selected' : ''} ${isExpanded ? 'expanded' : 'collapsed'}`} key={unit.unit_id} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); openUnitContext(unit, Math.max(12, Math.min(event.clientX, window.innerWidth - 250)), Math.max(12, Math.min(event.clientY, window.innerHeight - 210))); }}><div className="state-unit-assets-head"><button type="button" className="state-unit-assets-title" onClick={() => { setSelectedUnit(unit); setSelectedLink(null); setDetailUnit(null); setDiagnosticEquipmentId(null); setExpandedUnitIds((current) => new Set(current).add(unit.unit_id)); }}><strong>{unit.name}</strong><small>{unit.code} · {unit.city}/{unit.state_code}</small></button><div className="state-unit-assets-actions"><span>{unitEquipment.length} ativo(s)</span><button type="button" className="state-unit-expand-toggle" aria-label={`${isExpanded ? 'Recolher' : 'Expandir'} ativos de ${unit.name}`} aria-expanded={isExpanded} onClick={() => toggleUnitExpanded(unit.unit_id)}><span className="state-unit-expand-arrow" aria-hidden="true">›</span></button></div></div><div className="state-unit-link-summary"><span><b>{unitTelemetry.length}</b> link(s)</span><span className="online"><b>{onlineLinks}</b> operacionais</span><span className={attentionLinks ? 'attention' : ''}><b>{attentionLinks}</b> atenção</span></div>{isExpanded && <>{unitTelemetry.length > 0 && <div className="state-unit-links">{unitTelemetry.map((link) => <LinkTelemetryCard key={link.equipment_id} unit={unit} link={link} located={located} diagnosticLatencyMs={diagnosticLatencyByUnit[unit.unit_id]} onView={() => selectAsset(unit, link.equipment_id, link)} onContext={(event) => { event.preventDefault(); event.stopPropagation(); openUnitContext(unit, Math.max(12, Math.min(event.clientX, window.innerWidth - 250)), Math.max(12, Math.min(event.clientY, window.innerHeight - 210)), link.equipment_id); }} />)}</div>}{unitEquipment.filter((item) => !telemetryEquipmentIds.has(item.equipment_id)).map((item) => <button className={`state-inventory-row ${diagnosticEquipmentId === item.equipment_id ? 'selected' : ''}`} key={item.equipment_id} onClick={(event) => { selectAsset(unit, item.equipment_id); openUnitContext(unit, Math.max(12, Math.min(event.clientX, window.innerWidth - 250)), Math.max(12, Math.min(event.clientY, window.innerHeight - 210)), item.equipment_id); }} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); openUnitContext(unit, Math.max(12, Math.min(event.clientX, window.innerWidth - 250)), Math.max(12, Math.min(event.clientY, window.innerHeight - 210)), item.equipment_id); }}><span className={`legend-dot ${item.operational_status}`} /><span><strong>{item.name}</strong><small>{item.equipment_type.replaceAll('_', ' ')}</small></span><em>{statusLabel[item.operational_status]}</em></button>)}{!hasAssets && <div className="state-unit-empty"><p>Nenhum equipamento ou link cadastrado nesta unidade.</p><button type="button" className="primary compact" onClick={() => onAddEquipment(unit)}><PlusIcon /> Cadastrar equipamento</button></div>}</>}</section>; })}{pendingUnits.length > 0 && <p className="state-map-pending-note">Use LOCAL para adicionar as coordenadas da unidade.</p>}</aside>
       </div>
-      <footer className="state-map-footer"><span><i className="legend-dot online" /> Operacional</span><span><i className="legend-dot degraded" /> Atenção</span><span><i className="legend-dot offline" /> Indisponível</span><span><i className="legend-dot unknown" /> Sem telemetria</span><small>Mapa {mapTheme === 'dark' ? 'dark' : 'claro'} · OpenFreeMap / OpenStreetMap</small></footer>
-      {unitContext && <div className="map-context-card map-unit-context-card" style={{ left: unitContext.x, top: unitContext.y }} onMouseDown={(event) => event.stopPropagation()}><button className="map-context-close" aria-label="Fechar menu" onClick={() => setUnitContext(null)}><CloseIcon /></button><p>AÇÃO RÁPIDA · UNIDADE</p><strong>{unitContext.unit.name}</strong><small>{unitContext.unit.code} · {unitContext.unit.city}/{unitContext.unit.state_code}</small>{contextEquipment.length > 0 ? <label className="diagnostic-target-field"><span>Equipamento-alvo</span><AppDropdown className="diagnostic-target-select" value={diagnosticEquipmentId ?? ''} onChange={setDiagnosticEquipmentId} options={contextEquipment.map((item) => ({ value: item.equipment_id, label: `${item.name} · ${item.management_address}` }))} /></label> : <small className="diagnostic-target-empty">Nenhum equipamento desta unidade possui endereço de gerenciamento.</small>}<button className="context-action" disabled={!diagnosticEquipmentId} onClick={() => void runDiagnostic(unitContext.unit, 'ping')}><PingIcon /> Ping</button><button className="context-action" disabled={!diagnosticEquipmentId} onClick={() => void runDiagnostic(unitContext.unit, 'tracert')}><TracertIcon /> Tracert</button><button className="primary compact" onClick={() => { setUnitContext(null); onAddEquipment(unitContext.unit); }}><PlusIcon /> Adicionar equipamento</button></div>}
+      <footer className="state-map-footer"><span><i className="legend-dot online" /> Operacional</span><span><i className="legend-dot degraded" /> Atenção</span><span><i className="legend-dot offline" /> Indisponível</span><span><i className="legend-dot unknown" /> Sem telemetria</span><small>Mapa {mapTheme === 'dark' ? 'dark' : 'claro'} · OpenStreetMap</small></footer>
+      {unitContext && <div className="map-context-card map-unit-context-card" style={{ left: unitContext.x, top: unitContext.y }} onMouseDown={(event) => event.stopPropagation()}><button type="button" className="icon-button clear-filters-button map-context-close" aria-label="Fechar" onClick={() => setUnitContext(null)}><CloseIcon /></button><p>AÇÃO RÁPIDA · UNIDADE</p><strong>{unitContext.unit.name}</strong><small>{unitContext.unit.code} · {unitContext.unit.city}/{unitContext.unit.state_code}</small>{contextEquipment.length > 0 ? <label className="diagnostic-target-field"><span>Equipamento-alvo</span><AppDropdown className="diagnostic-target-select" value={diagnosticEquipmentId ?? ''} onChange={setDiagnosticEquipmentId} options={contextEquipment.map((item) => ({ value: item.equipment_id, label: `${item.name} · ${item.management_address}` }))} /></label> : <small className="diagnostic-target-empty">Nenhum equipamento desta unidade possui endereço de gerenciamento.</small>}<button className="context-action" disabled={!diagnosticEquipmentId} onClick={() => void runDiagnostic(unitContext.unit, 'ping')}><PingIcon /> Ping</button><button className="context-action" disabled={!diagnosticEquipmentId} onClick={() => void runDiagnostic(unitContext.unit, 'tracert')}><TracertIcon /> Tracert</button><button className="primary compact" onClick={() => { setUnitContext(null); onAddEquipment(unitContext.unit); }}><PlusIcon /> Adicionar equipamento</button></div>}
       {diagnostic && <div className="diagnostic-float" role="status"><div className="diagnostic-float-head"><div><p className="eyebrow">DIAGNÓSTICO EM TEMPO REAL · {diagnostic.action === 'ping' ? 'PING' : 'TRACERT'}</p><strong>{diagnostic.unit.name}</strong><small>{diagnostic.unit.code} · alvo {diagnostic.result?.target ?? 'endereço de gerenciamento'}</small></div><button className="icon-button clear-filters-button" aria-label="Fechar diagnóstico" onClick={() => setDiagnostic(null)}><CloseIcon /></button></div><div className={`diagnostic-state ${diagnostic.status}`}>{diagnostic.status === 'running' ? 'Executando diagnóstico… aguardando resposta do equipamento.' : diagnostic.status === 'error' ? diagnostic.message : diagnostic.result?.success ? 'Concluído com resposta positiva.' : 'Concluído; o alvo não respondeu.'}</div>{diagnostic.status !== 'running' && <pre>{diagnostic.result?.output ?? diagnostic.message}</pre>}<button className="diagnostic-close" onClick={() => setDiagnostic(null)}>Fechar painel</button></div>}
       {detailUnit && <LinkAnalysisPanel unit={detailUnit} link={selectedLink ?? telemetryByUnit.get(detailUnit.unit_id)?.[0]} alerts={alerts} diagnosticLatencyMs={diagnosticLatencyByUnit[detailUnit.unit_id]} targetEquipment={equipment.find((item) => item.equipment_id === (selectedLink ?? telemetryByUnit.get(detailUnit.unit_id)?.[0])?.equipment_id)} onDiagnostic={(action) => void runDiagnostic(detailUnit, action)} onClose={() => setDetailUnit(null)} onOpenInventory={() => { onClose(); onSelectUnit(detailUnit.unit_id); }} />}
     </section>
@@ -757,7 +815,6 @@ function OperationalOverview({ units, equipment, alerts, resolvedAlerts, summary
     <div className="panel-heading">
       <div><p className="eyebrow">{card.eyebrow}</p><h2>{card.title}</h2><small>{card.subtitle}</small></div>
       <div className="overview-heading-actions">
-        <span className={`problem-count ${card.id === 'history' ? 'resolved-count' : card.id === 'coverage' ? 'neutral-count' : ''}`}>{card.id === 'ranking' ? `${alerts.length} em alerta` : card.id === 'history' ? `${historyAlerts.length} registrados` : `${equipment.length} ativos`}</span>
         <div className="overview-switcher" aria-label="Navegar entre cards operacionais"><button className="overview-nav-button" onClick={() => setCardIndex((index) => (index - 1 + cards.length) % cards.length)} aria-label="Card anterior">&lt;</button><span>{cardIndex + 1}/{cards.length}</span><button className="overview-nav-button" onClick={() => setCardIndex((index) => (index + 1) % cards.length)} aria-label="Próximo card">&gt;</button></div>
       </div>
     </div>
@@ -788,15 +845,22 @@ function CommandMetricIcon({ type }: { type: string }) {
   </svg>;
 }
 
-function InventoryActions({ unitType, token, units, selectedUnit, onRefresh, onError, onToast = () => undefined }: { unitType: 'mobile' | 'fixed'; token: string; units: Unit[]; selectedUnit?: Unit; onRefresh: () => Promise<void>; onError: (message: string) => void; onToast?: (toast: Omit<Toast, 'id'>) => void }) {
-  const [mode, setMode] = useState<'unit' | 'equipment' | null>(null);
-  return <>{!selectedUnit && <div className="admin-toolbar"><div><p className="eyebrow">ADMINISTRAÇÃO DE INVENTÁRIO</p><strong>Cadastre a estrutura antes de vincular ao Zabbix.</strong></div><button className="primary compact" onClick={() => setMode('unit')}><PlusIcon /> Cadastrar unidade {unitType === 'fixed' ? 'fixa' : 'móvel'}</button></div>}{selectedUnit && <div className="admin-toolbar"><div><p className="eyebrow">UNIDADE SELECIONADA · {selectedUnit.code}</p><strong>{selectedUnit.name}</strong></div><button className="primary compact" onClick={() => setMode('equipment')}><PlusIcon /> Cadastrar equipamento</button></div>}{mode === 'unit' && <UnitForm unitType={unitType} lockType token={token} onCreated={async () => { setMode(null); await onRefresh(); }} onCancel={() => setMode(null)} onToast={onToast} />}{mode === 'equipment' && selectedUnit && <EquipmentForm token={token} unit={selectedUnit} onCreated={async () => { setMode(null); await onRefresh(); }} onCancel={() => setMode(null)} onError={onError} onToast={onToast} />}</>;
+function InventoryActions({ token, selectedUnit, creating, onCreatingChange, onRefresh, onError, onToast = () => undefined }: { token: string; selectedUnit?: Unit; creating: boolean; onCreatingChange: (value: boolean) => void; onRefresh: () => Promise<void>; onError: (message: string) => void; onToast?: (toast: Omit<Toast, 'id'>) => void }) {
+  if (creating && selectedUnit) return <EquipmentForm token={token} unit={selectedUnit} onCreated={async () => { onCreatingChange(false); await onRefresh(); }} onCancel={() => onCreatingChange(false)} onError={onError} onToast={onToast} />;
+  return null;
 }
 
 function ConfirmDialog({ title, message, confirmLabel = 'Confirmar', confirmIcon = <TrashIcon />, tone = 'danger', busy = false, onConfirm, onCancel }: { title: string; message: string; confirmLabel?: string; confirmIcon?: ReactNode; tone?: 'danger' | 'warning' | 'positive'; busy?: boolean; onConfirm: () => void; onCancel: () => void }) {
   useEffect(() => { const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') onCancel(); }; window.addEventListener('keydown', closeOnEscape); return () => window.removeEventListener('keydown', closeOnEscape); }, [onCancel]);
+  useEffect(() => {
+    const body = document.body.style.overflow;
+    const root = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = body; document.documentElement.style.overflow = root; };
+  }, []);
   const toneClass = tone === 'warning' ? 'warning-button' : tone === 'positive' ? 'positive-button' : 'danger-button';
-  return <div className="form-modal-backdrop" role="presentation" onMouseDown={onCancel}>
+  return createPortal(<div className="form-modal-backdrop" role="presentation" onMouseDown={onCancel} onWheel={(event) => event.stopPropagation()}>
     <article className="form-card confirm-dialog" role="alertdialog" aria-modal="true" aria-label={title} onMouseDown={(event) => event.stopPropagation()}>
       <div className="panel-title"><div><p className="eyebrow">CONFIRMAÇÃO NECESSÁRIA</p><h3>{title}</h3></div><button className="icon-button clear-filters-button" onClick={onCancel} aria-label="Fechar">{<CloseIcon />}</button></div>
       <p className="confirm-dialog-message">{message}</p>
@@ -805,7 +869,7 @@ function ConfirmDialog({ title, message, confirmLabel = 'Confirmar', confirmIcon
         <button type="button" className={toneClass} onClick={onConfirm} disabled={busy}>{confirmIcon} {busy ? 'Processando…' : confirmLabel}</button>
       </div>
     </article>
-  </div>;
+  </div>, document.body);
 }
 
 function FormCard({ title, children, onCancel }: { title: string; children: ReactNode; onCancel: () => void }) {
@@ -853,18 +917,84 @@ function UnitForm({ token, initialStateCode = '', unitType = 'mobile', lockType 
     } catch (reason) { setFormError(reason instanceof Error ? reason.message : 'Falha ao cadastrar unidade.'); }
     finally { setSaving(false); }
   }
-  return <FormCard title={`Nova unidade ${type === 'fixed' ? 'fixa' : 'móvel'}`} onCancel={onCancel}><form className="inline-form validated-form" noValidate onSubmit={submit}>
-    <div className="required-fields-note"><strong>Dados da unidade</strong><small>Os campos marcados com <b>*</b> são obrigatórios.</small></div>{formError && <div className="form-error" role="alert">{formError}</div>}
-    <label><span className="field-label">Tipo de unidade <b>*</b></span><AppDropdown value={type} disabled={lockType} onChange={(next) => setType(next as 'mobile' | 'fixed')} options={[{ value: 'fixed', label: 'Unidade fixa' }, { value: 'mobile', label: 'Unidade móvel' }]} />{lockType && <small className="field-hint">Definido pelo módulo atual.</small>}</label>
-    <label><span className="field-label">Código <b>*</b></span><input required className={validationRequested && unitValidation.code ? 'field-invalid' : ''} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="Ex.: UMS-011" />{validationRequested && unitValidation.code && <small className="field-error">Informe o código da unidade.</small>}</label>
-    <label><span className="field-label">Nome <b>*</b></span><input required className={validationRequested && unitValidation.name ? 'field-invalid' : ''} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder={type === 'fixed' ? 'Ex.: Unidade Fixa Manaus' : 'Ex.: Unidade Móvel Manaus'} />{validationRequested && unitValidation.name && <small className="field-error">Informe o nome da unidade.</small>}</label>
-    <label><span className="field-label">UF <b>*</b></span><GlassCombobox value={form.stateCode} options={brazilStateCodes.map((code) => ({ value: code, label: stateNameByCode[code] }))} onChange={(value) => setForm({ ...form, stateCode: value.toUpperCase().slice(0, 2), city: '' })} placeholder="Escolha ou digite a UF" invalid={validationRequested && unitValidation.stateCode} compact />{validationRequested && unitValidation.stateCode && <small className="field-error">Selecione ou informe uma UF válida.</small>}</label>
-    <label><span className="field-label">Cidade <b>*</b></span><GlassCombobox value={form.city} options={cities.map((city) => ({ value: city, label: city }))} onChange={(value) => setForm({ ...form, city: value })} placeholder={loadingCities ? 'Carregando cidades…' : 'Escolha ou digite a cidade'} invalid={validationRequested && unitValidation.city} disabled={!validState || loadingCities} />{validationRequested && unitValidation.city ? <small className="field-error">Selecione ou informe a cidade.</small> : <small className="field-hint">{loadingCities ? 'Consultando municípios da UF…' : cities.length ? `${cities.length} cidades disponíveis para ${form.stateCode}` : 'Informe uma UF válida para carregar as cidades.'}</small>}</label>
-    <label><span className="field-label">Latitude <em>opcional</em></span><input inputMode="decimal" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} placeholder="-3.1186" />{validationRequested && unitValidation.coordinates && <small className="field-error">Informe latitude entre -90 e 90.</small>}</label>
-    <label><span className="field-label">Longitude <em>opcional</em></span><input inputMode="decimal" value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} placeholder="-60.0217" />{validationRequested && unitValidation.coordinates && <small className="field-error">Informe longitude entre -180 e 180.</small>}</label>
-    <small className="field-hint location-hint" style={{ gridColumn: '1 / -1' }}>Você pode informar a localização agora ou adicioná-la depois pelo mapa.</small>
-    <div className="form-actions"><button type="button" className="secondary-button clear-filters-button" onClick={onCancel}><CloseIcon /> Cancelar</button><button className="primary" disabled={saving}>{saving ? 'Salvando…' : <><PlusIcon /> Cadastrar unidade</>}</button></div>
-  </form></FormCard>;
+  return <section className="users-page">
+    <div className="section-heading">
+      <div><p className="eyebrow">CADASTRO DE INVENTÁRIO</p><h2>Nova unidade {type === 'fixed' ? 'fixa' : 'móvel'}</h2><small>Preencha os dados abaixo para registrar a unidade no inventário.</small></div>
+    </div>
+    <button className="back-button" onClick={onCancel}>← Voltar para a lista de unidades {type === 'fixed' ? 'fixas' : 'móveis'}</button>
+    <form className="user-form panel users-create-form" onSubmit={submit} noValidate>
+      <div className="panel-title">
+        <div>
+          <p className="eyebrow">DADOS DA UNIDADE</p>
+          <h3>Dados da unidade</h3>
+          <small className="muted" style={{ margin: 0 }}>Os campos marcados com <b className="req">*</b> são obrigatórios.</small>
+        </div>
+      </div>
+      {formError && <div className="form-error" role="alert">{formError}</div>}
+      <div className="user-form-grid">
+        <div className="mfield">
+          <div className="input-group has-icon is-dropdown">
+            <span className="input-icon" aria-hidden="true"><NavServerIcon /></span>
+            <AppDropdown value={type} disabled={lockType} onChange={(next) => setType(next as 'mobile' | 'fixed')} options={[{ value: 'fixed', label: 'Unidade fixa' }, { value: 'mobile', label: 'Unidade móvel' }]} />
+            <span className="input-group-label">Tipo de unidade <b className="req">*</b></span>
+          </div>
+          {lockType && <span className="field-hint">Definido pelo módulo atual.</span>}
+        </div>
+        <div className="mfield">
+          <div className="input-group has-icon is-dropdown">
+            <span className="input-icon" aria-hidden="true"><NavGeneralIcon /></span>
+            <GlassCombobox value={form.stateCode} options={brazilStateCodes.map((code) => ({ value: code, label: stateNameByCode[code] }))} onChange={(value) => setForm({ ...form, stateCode: value.toUpperCase().slice(0, 2), city: '' })} placeholder="Escolha ou digite a UF" invalid={validationRequested && unitValidation.stateCode} compact />
+            <span className="input-group-label">UF <b className="req">*</b></span>
+          </div>
+          {validationRequested && unitValidation.stateCode && <span className="field-error-text">Selecione ou informe uma UF válida.</span>}
+        </div>
+        <div className="mfield">
+          <div className="input-group has-icon is-dropdown">
+            <span className="input-icon" aria-hidden="true"><HomeIcon /></span>
+            <GlassCombobox value={form.city} options={cities.map((city) => ({ value: city, label: city }))} onChange={(value) => setForm({ ...form, city: value })} placeholder={loadingCities ? 'Carregando cidades…' : 'Escolha ou digite a cidade'} invalid={validationRequested && unitValidation.city} disabled={!validState || loadingCities} />
+            <span className="input-group-label">Cidade <b className="req">*</b></span>
+          </div>
+          {validationRequested && unitValidation.city ? <span className="field-error-text">Selecione ou informe a cidade.</span> : (loadingCities || cities.length > 0) && <span className="field-hint">{loadingCities ? 'Consultando municípios da UF…' : `${cities.length} cidades disponíveis para ${form.stateCode}`}</span>}
+        </div>
+        <div className="mfield">
+          <div className="input-group has-icon">
+            <span className="input-icon" aria-hidden="true"><BadgeIcon /></span>
+            <input id="cu-unit-code" value={form.code} className={validationRequested && unitValidation.code ? 'field-invalid' : ''} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder=" " required />
+            <label htmlFor="cu-unit-code">Código <b className="req">*</b></label>
+          </div>
+          {validationRequested && unitValidation.code ? <span className="field-error-text">Informe o código da unidade.</span> : <span className="field-hint">Ex.: {type === 'fixed' ? 'UFX-011' : 'UMS-011'}</span>}
+        </div>
+        <div className="mfield">
+          <div className="input-group has-icon">
+            <span className="input-icon" aria-hidden="true"><FolderIcon /></span>
+            <input id="cu-unit-name" value={form.name} className={validationRequested && unitValidation.name ? 'field-invalid' : ''} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder=" " required />
+            <label htmlFor="cu-unit-name">Nome <b className="req">*</b></label>
+          </div>
+          {validationRequested && unitValidation.name && <span className="field-error-text">Informe o nome da unidade.</span>}
+        </div>
+        <div className="mfield">
+          <div className="input-group has-icon">
+            <span className="input-icon" aria-hidden="true"><PingIcon /></span>
+            <input id="cu-unit-lat" inputMode="decimal" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} placeholder=" " />
+            <label htmlFor="cu-unit-lat">Latitude <em>opcional</em></label>
+          </div>
+          {validationRequested && unitValidation.coordinates ? <span className="field-error-text">Informe latitude entre -90 e 90.</span> : <span className="field-hint">Você pode informar a localização agora ou adicioná-la depois pelo mapa.</span>}
+        </div>
+        <div className="mfield">
+          <div className="input-group has-icon">
+            <span className="input-icon" aria-hidden="true"><PingIcon /></span>
+            <input id="cu-unit-lng" inputMode="decimal" value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} placeholder=" " />
+            <label htmlFor="cu-unit-lng">Longitude <em>opcional</em></label>
+          </div>
+          {validationRequested && unitValidation.coordinates ? <span className="field-error-text">Informe longitude entre -180 e 180.</span> : <span className="field-hint">Você pode informar a localização agora ou adicioná-la depois pelo mapa.</span>}
+        </div>
+      </div>
+      <div className="form-actions">
+        <button type="button" className="secondary-button clear-filters-button" onClick={onCancel}><CloseIcon /> Cancelar</button>
+        <button className="primary" disabled={saving}>{saving ? 'Salvando…' : <><PlusIcon /> Cadastrar unidade {type === 'fixed' ? 'fixa' : 'móvel'}</>}</button>
+      </div>
+    </form>
+  </section>;
 }
 
 function UnitFormWithoutLocation({ token, initialStateCode = '', onCreated, onCancel, onError = () => undefined }: { token: string; initialStateCode?: string; onCreated: () => Promise<void>; onCancel: () => void; onError?: (message: string) => void }) {
@@ -1022,7 +1152,76 @@ function EquipmentForm({ token, unit, onCreated, onCancel, onError = () => undef
   const linkFieldsVisible = isLinkEquipmentType(form.equipmentTypeCode);
   const equipmentValidation = { type: !form.equipmentTypeCode, name: !form.name.trim(), contractedDownloadMbps: Boolean(form.contractedDownloadMbps) && Number(form.contractedDownloadMbps) <= 0, contractedUploadMbps: Boolean(form.contractedUploadMbps) && Number(form.contractedUploadMbps) <= 0 };
   async function submit(event: FormEvent) { event.preventDefault(); setValidationRequested(true); if (Object.values(equipmentValidation).some(Boolean)) return; setSaving(true); try { await api(`/v1/units/${unit.unit_id}/equipment`, token, { method: 'POST', body: JSON.stringify({ equipmentTypeCode: form.equipmentTypeCode, name: form.name, serialNumber: form.serialNumber || undefined, managementAddress: form.managementAddress || undefined, contractedDownloadMbps: linkFieldsVisible && form.contractedDownloadMbps ? Number(form.contractedDownloadMbps) : undefined, contractedUploadMbps: linkFieldsVisible && form.contractedUploadMbps ? Number(form.contractedUploadMbps) : undefined }) }); await onCreated(); onToast({ type: 'success', title: 'Equipamento cadastrado', detail: `${form.name} foi adicionado à unidade ${unit.name}.` }); } catch (reason) { onError(reason instanceof Error ? reason.message : 'Falha ao cadastrar equipamento.'); } finally { setSaving(false); } }
-  return <FormCard title={`Novo equipamento · ${unit.name}`} onCancel={onCancel}><form className="inline-form validated-form" noValidate onSubmit={submit}><div className="required-fields-note"><strong>Dados do equipamento</strong><small>Os campos marcados com <b>*</b> são obrigatórios.</small></div><label><span className="field-label">Tipo <b>*</b></span><AppDropdown invalid={validationRequested && equipmentValidation.type} value={form.equipmentTypeCode} onChange={(next) => setForm({ ...form, equipmentTypeCode: next })} options={[{ value: 'linux_server', label: 'Servidor Linux' }, { value: 'mikrotik', label: 'Mikrotik' }, { value: 'starlink', label: 'Starlink' }, { value: 'vpn', label: 'VPN' }, { value: 'internet_link', label: 'Link de internet' }]} />{validationRequested && equipmentValidation.type && <small className="field-error">Selecione o tipo do equipamento.</small>}</label><label><span className="field-label">Nome <b>*</b></span><input required className={validationRequested && equipmentValidation.name ? 'field-invalid' : ''} aria-invalid={validationRequested && equipmentValidation.name} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex.: Mikrotik - UMS-011" />{validationRequested && equipmentValidation.name && <small className="field-error">Informe o nome do equipamento.</small>}</label><label><span className="field-label">Endereço de gerenciamento <em>opcional</em></span><input value={form.managementAddress} onChange={(e) => setForm({ ...form, managementAddress: e.target.value })} placeholder="10.0.0.50" /></label><label><span className="field-label">Número de série <em>opcional</em></span><input value={form.serialNumber} onChange={(e) => setForm({ ...form, serialNumber: e.target.value })} /></label>{linkFieldsVisible && <><div className="bandwidth-fields-note"><strong>Plano contratado</strong><small>Informe somente valores confirmados pelo contrato/provedor. Em branco será exibido como N/D.</small></div><label><span className="field-label">Download contratado <em>Mbps · opcional</em></span><input type="number" min="0.001" max="1000000" step="0.001" className={validationRequested && equipmentValidation.contractedDownloadMbps ? 'field-invalid' : ''} value={form.contractedDownloadMbps} onChange={(e) => setForm({ ...form, contractedDownloadMbps: e.target.value })} placeholder="Ex.: 500" />{validationRequested && equipmentValidation.contractedDownloadMbps && <small className="field-error">Informe um valor maior que zero.</small>}</label><label><span className="field-label">Upload contratado <em>Mbps · opcional</em></span><input type="number" min="0.001" max="1000000" step="0.001" className={validationRequested && equipmentValidation.contractedUploadMbps ? 'field-invalid' : ''} value={form.contractedUploadMbps} onChange={(e) => setForm({ ...form, contractedUploadMbps: e.target.value })} placeholder="Ex.: 250" />{validationRequested && equipmentValidation.contractedUploadMbps && <small className="field-error">Informe um valor maior que zero.</small>}</label></>}<div className="form-actions"><button type="button" className="secondary-button clear-filters-button" onClick={onCancel}><CloseIcon /> Cancelar</button><button className="primary" disabled={saving}>{saving ? 'Salvando…' : <><PlusIcon /> Cadastrar equipamento</>}</button></div></form></FormCard>;
+  return <section className="users-page">
+    <div className="section-heading">
+      <div><p className="eyebrow">CADASTRO DE INVENTÁRIO</p><h2>Novo equipamento</h2><small>Vincule um novo ativo à unidade {unit.name}.</small></div>
+    </div>
+    <button className="back-button" onClick={onCancel}>← Voltar para a unidade</button>
+    <form className="user-form panel users-create-form" onSubmit={submit} noValidate>
+      <div className="panel-title">
+        <div>
+          <p className="eyebrow">DADOS DO EQUIPAMENTO</p>
+          <h3>Dados do equipamento</h3>
+          <small className="muted" style={{ margin: 0 }}>Os campos marcados com <b className="req">*</b> são obrigatórios.</small>
+        </div>
+      </div>
+      <div className="user-form-grid">
+        <div className="mfield">
+          <div className="input-group has-icon is-dropdown">
+            <span className="input-icon" aria-hidden="true"><PackageIcon /></span>
+            <AppDropdown invalid={validationRequested && equipmentValidation.type} value={form.equipmentTypeCode} onChange={(next) => setForm({ ...form, equipmentTypeCode: next })} options={[{ value: 'linux_server', label: 'Servidor Linux' }, { value: 'mikrotik', label: 'Mikrotik' }, { value: 'starlink', label: 'Starlink' }, { value: 'vpn', label: 'VPN' }, { value: 'internet_link', label: 'Link de internet' }]} />
+            <span className="input-group-label">Tipo <b className="req">*</b></span>
+          </div>
+          {validationRequested && equipmentValidation.type && <span className="field-error-text">Selecione o tipo do equipamento.</span>}
+        </div>
+        <div className="mfield">
+          <div className="input-group has-icon">
+            <span className="input-icon" aria-hidden="true"><FolderIcon /></span>
+            <input id="ce-name" value={form.name} className={validationRequested && equipmentValidation.name ? 'field-invalid' : ''} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder=" " required />
+            <label htmlFor="ce-name">Nome <b className="req">*</b></label>
+          </div>
+          {validationRequested && equipmentValidation.name ? <span className="field-error-text">Informe o nome do equipamento.</span> : <span className="field-hint">Ex.: Mikrotik - {unit.code}</span>}
+        </div>
+        <div className="mfield">
+          <div className="input-group has-icon">
+            <span className="input-icon" aria-hidden="true"><NavLinkIcon /></span>
+            <input id="ce-address" value={form.managementAddress} onChange={(e) => setForm({ ...form, managementAddress: e.target.value })} placeholder=" " />
+            <label htmlFor="ce-address">Endereço de gerenciamento <em>opcional</em></label>
+          </div>
+          <span className="field-hint">Ex.: 10.0.0.50</span>
+        </div>
+        <div className="mfield">
+          <div className="input-group has-icon">
+            <span className="input-icon" aria-hidden="true"><BadgeIcon /></span>
+            <input id="ce-serial" value={form.serialNumber} onChange={(e) => setForm({ ...form, serialNumber: e.target.value })} placeholder=" " />
+            <label htmlFor="ce-serial">Número de série <em>opcional</em></label>
+          </div>
+        </div>
+        {linkFieldsVisible && <>
+          <div className="mfield">
+            <div className="input-group has-icon">
+              <span className="input-icon" aria-hidden="true"><PingIcon /></span>
+              <input id="ce-down" type="number" min="0.001" max="1000000" step="0.001" value={form.contractedDownloadMbps} className={validationRequested && equipmentValidation.contractedDownloadMbps ? 'field-invalid' : ''} onChange={(e) => setForm({ ...form, contractedDownloadMbps: e.target.value })} placeholder=" " />
+              <label htmlFor="ce-down">Download contratado <em>Mbps · opcional</em></label>
+            </div>
+            {validationRequested && equipmentValidation.contractedDownloadMbps ? <span className="field-error-text">Informe um valor maior que zero.</span> : <span className="field-hint">Somente valores confirmados pelo contrato/provedor.</span>}
+          </div>
+          <div className="mfield">
+            <div className="input-group has-icon">
+              <span className="input-icon" aria-hidden="true"><PingIcon /></span>
+              <input id="ce-up" type="number" min="0.001" max="1000000" step="0.001" value={form.contractedUploadMbps} className={validationRequested && equipmentValidation.contractedUploadMbps ? 'field-invalid' : ''} onChange={(e) => setForm({ ...form, contractedUploadMbps: e.target.value })} placeholder=" " />
+              <label htmlFor="ce-up">Upload contratado <em>Mbps · opcional</em></label>
+            </div>
+            {validationRequested && equipmentValidation.contractedUploadMbps && <span className="field-error-text">Informe um valor maior que zero.</span>}
+          </div>
+        </>}
+      </div>
+      <div className="form-actions">
+        <button type="button" className="secondary-button clear-filters-button" onClick={onCancel}><CloseIcon /> Cancelar</button>
+        <button className="primary" disabled={saving}>{saving ? 'Salvando…' : <><PlusIcon /> Cadastrar equipamento</>}</button>
+      </div>
+    </form>
+  </section>;
 }
 
 function syncStatusLabel(status: ZabbixSyncStatus | null) {
@@ -1063,22 +1262,10 @@ function ConnectionStatus({ integrationStatus, onRefresh, onOpenZabbix }: { inte
   </section>;
 }
 
-function ZabbixStatusPanel({ status, onRefresh }: { status: ZabbixSyncStatus | null; onRefresh: () => Promise<void> }) {
-  const [, setNow] = useState(() => Date.now());
-  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
-  const health = status?.health_status ?? 'unknown';
-  const lastSuccess = status?.last_success_at ? new Date(status.last_success_at).toLocaleString('pt-BR') : 'Ainda não registrada';
-  const lastAttempt = status?.last_attempt_at ? new Date(status.last_attempt_at).getTime() : 0;
-  const seconds = Math.ceil(Math.max(0, 60_000 - (Date.now() - lastAttempt)) / 1000);
-  return <article className={`zabbix-status-panel ${health}`}>
-    <div className="zabbix-status-heading"><span className="connection-logo">Z</span><div><p className="eyebrow">STATUS DE CONEXÕES</p><h3>{syncStatusLabel(status)}</h3><small>Última coleta válida · {lastSuccess}</small></div><span className={`health-indicator ${health}`} /><button className="secondary-button compact" onClick={() => void onRefresh()}><RefreshIcon /> Atualizar</button></div>
-    <div className="zabbix-status-metrics"><div><span>Hosts encontrados</span><strong>{status?.hosts_seen ?? 0}</strong></div><div><span>Hosts vinculados</span><strong>{status?.mapped_hosts ?? 0}</strong></div><div><span>Problemas recebidos</span><strong>{status?.problems_seen ?? 0}</strong></div><div><span>Próxima sincronização</span><strong>{lastAttempt ? `${seconds}s` : 'aguardando'}</strong></div></div>
-  </article>;
-}
-
-function ZabbixIntegration({ candidates, integrationStatus, units, loading, onRefresh, onStatusRefresh, onInventoryRefresh, onAlertsRefresh, onError, onToast = () => undefined, token }: { candidates: ZabbixCandidates | null; integrationStatus: ZabbixSyncStatus | null; units: Unit[]; loading: boolean; onRefresh: () => Promise<void>; onStatusRefresh: () => Promise<void>; onInventoryRefresh: () => Promise<void>; onAlertsRefresh: () => Promise<void>; onError: (message: string) => void; onToast?: (toast: Omit<Toast, 'id'>) => void; token: string }) {
+function ZabbixIntegration({ candidates, units, loading, onRefresh, onStatusRefresh, onInventoryRefresh, onAlertsRefresh, onError, onToast = () => undefined, token }: { candidates: ZabbixCandidates | null; units: Unit[]; loading: boolean; onRefresh: () => Promise<void>; onStatusRefresh: () => Promise<void>; onInventoryRefresh: () => Promise<void>; onAlertsRefresh: () => Promise<void>; onError: (message: string) => void; onToast?: (toast: Omit<Toast, 'id'>) => void; token: string }) {
   const [hostSearch, setHostSearch] = useState(''); const [selectedHost, setSelectedHost] = useState(''); const [selectedEquipment, setSelectedEquipment] = useState(''); const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [tab, setTab] = useState<'overview' | 'bridge'>('overview');
   const mappings = candidates?.mappings ?? []; const filteredHosts = (candidates?.hosts ?? []).filter((host) => `${host.name} ${host.host} ${host.hostid}`.toLowerCase().includes(hostSearch.toLowerCase()));
   // `Map` é também o componente React-MapLibre importado acima; use o construtor global explicitamente.
   const linkedEquipment = new globalThis.Map(mappings.map((mapping) => [mapping.zabbix_host_id, mapping.equipment_id]));
@@ -1149,18 +1336,19 @@ function ZabbixIntegration({ candidates, integrationStatus, units, loading, onRe
       onError(reason instanceof Error ? reason.message : 'Falha ao sincronizar com o Zabbix.');
     } finally { setSyncing(false); }
   }
+  const syncActions = <div className="section-actions"><button type="button" className="secondary-button compact" onClick={() => void onRefresh()}>{loading ? 'Atualizando…' : <><RefreshIcon /> Atualizar hosts</>}</button><button type="button" className="primary compact" disabled={syncing} onClick={() => void synchronizeNow()}>{syncing ? 'Sincronizando…' : <><SyncIcon /> Sincronizar agora</>}</button></div>;
   return <section className="integration-page">
-    <ZabbixStatusPanel status={integrationStatus} onRefresh={onStatusRefresh} />
-    <AgentVersionsPanel token={token} onToast={onToast} />
-    <div className="section-heading"><div><p className="eyebrow">INTEGRAÇÃO · ZABBIX</p><h2>Hosts e vínculos operacionais</h2><small>Associe cada host a um equipamento cadastrado e mantenha a unidade rastreável.</small></div><div className="section-actions"><button className="secondary-button compact" onClick={() => void onRefresh()}>{loading ? 'Atualizando…' : <><RefreshIcon /> Atualizar hosts</>}</button><button className="primary compact" disabled={syncing} onClick={() => void synchronizeNow()}>{syncing ? 'Sincronizando…' : <><SyncIcon /> Sincronizar agora</>}</button></div></div>
+    <div className="section-heading"><div><p className="eyebrow">INTEGRAÇÃO · ZABBIX</p><h2>Hosts e vínculos operacionais</h2><small>Associe cada host a um equipamento cadastrado e mantenha a unidade rastreável.</small></div>{candidates && <div className="alert-tabs integration-tabs" role="tablist"><button type="button" role="tab" aria-selected={tab === 'overview'} className={`alert-tab ${tab === 'overview' ? 'active' : ''}`} onClick={() => setTab('overview')}>Visão geral <span>{tab === 'overview' ? candidates.hosts.length : '—'}</span></button><button type="button" role="tab" aria-selected={tab === 'bridge'} className={`alert-tab ${tab === 'bridge' ? 'active' : ''}`} onClick={() => setTab('bridge')}>Ponte de hosts <span>{tab === 'bridge' ? mappings.length : '—'}</span></button></div>}</div>
     {!candidates && <div className="empty-state compact-empty"><span className="empty-glyph"><RefreshIcon /></span><h3>{loading ? 'Consultando Zabbix…' : 'Nenhum catálogo carregado'}</h3><button className="primary" onClick={() => void onRefresh()}><RefreshIcon /> Carregar hosts</button></div>}
     {candidates && <>
+      {tab === 'overview' && <div className="integration-overview">
       <div className="integration-stats"><Metric label="Hosts encontrados" value={candidates.hosts.length} tone="neutral" /><Metric label="Já vinculados" value={mappings.length} tone="ok" /><Metric label="Pendentes" value={Math.max(candidates.hosts.length - mappings.length, 0)} tone="warn" /></div>
-      <div className="host-bridge-heading"><div><p className="eyebrow">PONTE DE HOSTS</p><h3>Catálogo Zabbix e vínculos</h3><small>Selecione um host, escolha o equipamento correspondente e mantenha a unidade rastreável.</small></div><span className="problem-count neutral-count">{mappings.length} vinculados</span></div>
-      <div className="integration-grid">
-        <article className="host-panel"><div className="panel-title"><div><p className="eyebrow">INVENTÁRIO DO ZABBIX</p><h3>Selecione um host</h3></div><strong>{filteredHosts.length}</strong></div><div className="search-input-wrap"><SearchIcon /><input className="search-input" value={hostSearch} onChange={(e) => setHostSearch(e.target.value)} placeholder="Buscar por nome ou ID…" /></div><div className="host-list">{filteredHosts.map((host) => { const hasCoordinates = Number.isFinite(Number(host.inventory?.location_lat)) && Number.isFinite(Number(host.inventory?.location_lon)); return <button key={host.hostid} className={`host-row ${linkedEquipment.has(host.hostid) ? 'linked' : 'pending'} ${selectedHost === host.hostid ? 'selected' : ''}`} onClick={() => setSelectedHost(host.hostid)}><span className={`host-status ${Number(host.status) === 0 ? 'online' : 'offline'}`} /><div><strong>{host.name || host.host}</strong><small>{host.host} · ID {host.hostid}{host.interfaces?.[0]?.ip ? ` · ${host.interfaces[0].ip}` : ''}{hasCoordinates ? ' · localização no inventário' : ''}</small></div><span className={`status ${linkedEquipment.has(host.hostid) ? 'online' : 'degraded'}`}>{linkedEquipment.has(host.hostid) ? 'Vinculado' : 'Pendente'}</span></button>; })}</div></article>
+      <AgentVersionsPanel token={token} onToast={onToast} actions={syncActions} />
+      </div>}
+      {tab === 'bridge' && <div className="integration-grid">
+        <article className="host-panel"><div className="panel-title"><div><p className="eyebrow">INVENTÁRIO DO ZABBIX</p><h3>Selecione um host</h3></div><strong>{filteredHosts.length}</strong></div><div className="search-input-wrap"><SearchIcon /><input className="search-input" value={hostSearch} onChange={(e) => setHostSearch(e.target.value)} placeholder="Buscar por nome ou ID…" /></div><div className="host-list">{filteredHosts.map((host) => { const hasCoordinates = Number.isFinite(Number(host.inventory?.location_lat)) && Number.isFinite(Number(host.inventory?.location_lon)); return <button key={host.hostid} className={`host-row ${linkedEquipment.has(host.hostid) ? 'linked' : 'pending'} ${selectedHost === host.hostid ? 'selected' : ''}`} onClick={() => setSelectedHost(host.hostid)}><div><strong>{host.name || host.host}</strong><small>{host.host} · ID {host.hostid}{host.interfaces?.[0]?.ip ? ` · ${host.interfaces[0].ip}` : ''}{hasCoordinates ? ' · localização no inventário' : ''}</small></div><span className={`status ${linkedEquipment.has(host.hostid) ? 'online' : 'degraded'}`}>{linkedEquipment.has(host.hostid) ? 'Vinculado' : 'Pendente'}</span></button>; })}</div></article>
         <article className="link-panel">
-          <div className="panel-title"><div><p className="eyebrow">DESTINO DO VÍNCULO</p><h3>Equipamento do HealthLink</h3></div></div>
+          <div className="panel-title"><div><p className="eyebrow">DESTINO DO VÍNCULO</p><h3>Equipamento do HealthLink</h3></div>{syncActions}</div>
           <p className="muted">O host é associado ao equipamento; a unidade é herdada automaticamente.</p>
           {currentMapping && <div className="current-mapping"><span>VÍNCULO ATUAL</span><strong>{currentEquipment?.name ?? currentMapping.equipment_id}</strong><small>{currentUnit ? `${currentUnit.code} · ${currentUnit.name}` : 'Unidade não localizada no catálogo atual'}</small></div>}
           {!currentMapping && selectedHost && (suggestedUnit || suggestedType) && <button type="button" className={`suggestion-box suggestion-action ${suggestedEquipment && selectedEquipment === suggestedEquipment.id ? 'selected' : ''}`} disabled={!suggestedEquipment} aria-pressed={Boolean(suggestedEquipment && selectedEquipment === suggestedEquipment.id)} onClick={() => { if (suggestedEquipment) setSelectedEquipment(suggestedEquipment.id); }}><span>SUGESTÃO AUTOMÁTICA</span><strong>{suggestedEquipment?.name ?? (suggestedUnit ? `${suggestedUnit.code} · ${suggestedUnit.name}` : 'Unidade não identificada')}</strong><small>{suggestedEquipment ? `${suggestedEquipment.equipment_type.replaceAll('_', ' ')} · clique para selecionar` : suggestedType ? `Tipo detectado: ${suggestedType.replaceAll('_', ' ')} · confirme o equipamento manualmente.` : 'Confirme o equipamento manualmente.'}</small></button>}
@@ -1170,26 +1358,25 @@ function ZabbixIntegration({ candidates, integrationStatus, units, loading, onRe
           <div className="mapping-actions"><button className="primary wide" disabled={!selectedHost || !selectedEquipment || saving || unchanged} onClick={() => void link()}>{saving ? 'Processando…' : unchanged ? <><CheckIcon /> Vínculo atual confirmado</> : currentMapping ? <><CheckIcon /> Trocar vínculo</> : <><PlusIcon /> Vincular host ao equipamento</>}</button>{currentMapping && <button className="secondary-button warning-action-button wide" disabled={saving} onClick={() => void unlink()}><RejectIcon /> Desvincular host</button>}</div>
           <div className="link-help"><span>Fluxo seguro</span><small>Host Zabbix → Equipamento → Unidade móvel · alterações auditadas</small></div>
         </article>
-      </div>
+      </div>}
     </>}
     {confirmMove && <ConfirmDialog title="Mover vínculo" message={`O equipamento já está ligado ao host "${selectedEquipmentHost?.name ?? selectedEquipmentMapping?.zabbix_host_id}". Deseja mover o vínculo para "${currentHost?.name ?? selectedHost}"?`} confirmLabel="Mover vínculo" confirmIcon={<CheckIcon />} tone="warning" busy={saving} onConfirm={() => void link()} onCancel={() => setConfirmMove(false)} />}
     {confirmUnlink && <ConfirmDialog title="Desvincular host" message={`Desvincular o host "${currentHost?.name ?? selectedHost}" de "${currentEquipment?.name ?? 'seu equipamento'}"? O histórico será preservado.`} confirmLabel="Desvincular" confirmIcon={<RejectIcon />} tone="warning" busy={saving} onConfirm={() => void unlink()} onCancel={() => setConfirmUnlink(false)} />}
   </section>;
 }
 
-function UnitsView({ units, selectedUnit, selectedEquipment, loading, summary, onSelectUnit, onBack, onInventoryRefresh, token, onToast = () => undefined }: { units: Unit[]; selectedUnit?: Unit; selectedEquipment: Equipment[]; loading: boolean; summary: { online: number; attention: number; offline: number; unknown: number }; onSelectUnit: (unitId: string) => void; onBack: () => void; onInventoryRefresh: () => Promise<void>; token: string; onToast?: (toast: Omit<Toast, 'id'>) => void }) {
-  const [editing, setEditing] = useState<Equipment | null>(null);
+function UnitsView({ units, selectedUnit, selectedEquipment, loading, summary, unitType, creating, onCreatingChange, equipmentCreating, editingUnitId, onEditingUnitIdChange, editingEquipmentId, onEditingEquipmentIdChange, onCreateEquipment, onSelectUnit, onBack, onInventoryRefresh, token, onToast = () => undefined }: { units: Unit[]; selectedUnit?: Unit; selectedEquipment: Equipment[]; loading: boolean; summary: { online: number; attention: number; offline: number; unknown: number }; unitType: 'mobile' | 'fixed'; creating: boolean; onCreatingChange: (value: boolean) => void; equipmentCreating: boolean; editingUnitId: string | null; onEditingUnitIdChange: (value: string | null) => void; editingEquipmentId: string | null; onEditingEquipmentIdChange: (value: string | null) => void; onCreateEquipment: (unitId: string) => void; onSelectUnit: (unitId: string) => void; onBack: () => void; onInventoryRefresh: () => Promise<void>; token: string; onToast?: (toast: Omit<Toast, 'id'>) => void }) {
+  const editing = editingEquipmentId ? selectedEquipment.find((item) => item.equipment_id === editingEquipmentId) ?? null : null;
   const [contextMenu, setContextMenu] = useState<{ unit: Unit; x: number; y: number } | null>(null);
-  const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
-  const [addingEquipment, setAddingEquipment] = useState<Unit | null>(null);
+  const editingUnit = editingUnitId ? units.find((u) => u.unit_id === editingUnitId) ?? selectedUnit ?? null : null;
   const [deleteTarget, setDeleteTarget] = useState<Unit | null>(null);
   const [deletingUnit, setDeletingUnit] = useState(false);
   const [nameFilter, setNameFilter] = useState('');
   const [regionFilter, setRegionFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  useEffect(() => { const close = () => setContextMenu(null); window.addEventListener('mousedown', close); window.addEventListener('scroll', close, true); return () => { window.removeEventListener('mousedown', close); window.removeEventListener('scroll', close, true); }; }, []);
-  const refresh = async () => { setEditing(null); setEditingUnit(null); setAddingEquipment(null); await onInventoryRefresh(); };
-  const menuAction = (action: 'open' | 'edit' | 'equipment' | 'delete') => { if (!contextMenu) return; const unit = contextMenu.unit; setContextMenu(null); if (action === 'open') onSelectUnit(unit.unit_id); else if (action === 'edit') setEditingUnit(unit); else if (action === 'equipment') setAddingEquipment(unit); else setDeleteTarget(unit); };
+  useEffect(() => { const close = () => setContextMenu(null); const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setContextMenu(null); }; window.addEventListener('mousedown', close); window.addEventListener('scroll', close, true); window.addEventListener('keydown', onKey); return () => { window.removeEventListener('mousedown', close); window.removeEventListener('scroll', close, true); window.removeEventListener('keydown', onKey); }; }, []);
+  const refresh = async () => { onEditingEquipmentIdChange(null); onEditingUnitIdChange(null); await onInventoryRefresh(); };
+  const menuAction = (action: 'open' | 'edit' | 'equipment' | 'delete') => { if (!contextMenu) return; const unit = contextMenu.unit; setContextMenu(null); if (action === 'open') onSelectUnit(unit.unit_id); else if (action === 'edit') onEditingUnitIdChange(unit.unit_id); else if (action === 'equipment') onCreateEquipment(unit.unit_id); else setDeleteTarget(unit); };
   async function confirmDeleteUnit() {
     if (!deleteTarget) return;
     setDeletingUnit(true);
@@ -1210,16 +1397,18 @@ function UnitsView({ units, selectedUnit, selectedEquipment, loading, summary, o
     return true;
   });
   const clearUnitFilters = () => { setNameFilter(''); setRegionFilter(''); setStatusFilter(''); };
-  return <><div className="summary-grid"><Metric label="Unidades monitoradas" value={units.length} tone="neutral" /><Metric label="Operacionais" value={summary.online} tone="ok" /><Metric label="Em atenção" value={summary.attention} tone="warn" /><Metric label="Indisponíveis" value={summary.offline} tone="danger" /></div>{editingUnit && <UnitEditForm unit={editingUnit} token={token} onSaved={refresh} onCancel={() => setEditingUnit(null)} onToast={onToast} />}{addingEquipment && <EquipmentForm token={token} unit={addingEquipment} onCreated={refresh} onCancel={() => setAddingEquipment(null)} onToast={onToast} />}{selectedUnit ? <>{editing && <EquipmentEditForm equipment={editing} token={token} onSaved={refresh} onCancel={() => setEditing(null)} onToast={onToast} />}<UnitDetail unit={selectedUnit} equipment={selectedEquipment} onBack={onBack} onEdit={setEditing} onRefresh={refresh} onToast={onToast} onRequestDelete={setDeleteTarget} /></> : <><div className="section-heading"><div><p className="eyebrow">FROTA E INFRAESTRUTURA</p><h2>Estado das unidades</h2></div><span className="problem-count neutral-count">{loading ? 'Atualizando…' : `${summary.unknown} sem telemetria`}</span></div><div className="unit-filters"><div className="search-input-wrap"><SearchIcon /><input className="search-input" placeholder="Pesquisar por nome ou código…" value={nameFilter} onChange={(e) => setNameFilter(e.target.value)} /></div><AppDropdown placeholder="Todas as regiões" value={regionFilter} onChange={setRegionFilter} options={[{ value: '', label: 'Todas as regiões' }, ...regionOptions]} /><AppDropdown placeholder="Todos os status" value={statusFilter} onChange={setStatusFilter} options={[{ value: '', label: 'Todos os status' }, { value: 'online', label: 'Operacional' }, { value: 'degraded', label: 'Atenção' }, { value: 'offline', label: 'Indisponível' }, { value: 'unknown', label: 'Sem telemetria' }]} />{(nameFilter || regionFilter || statusFilter) && <button type="button" className="secondary-button compact clear-filters-button" onClick={clearUnitFilters}><ClearFilterIcon /> Limpar</button>}</div>{filteredUnits.length === 0 ? <div className="empty-state compact-empty"><p>Nenhuma unidade encontrada.</p></div> : <div className="unit-grid">{filteredUnits.map((unit) => <button className={`unit-card ${unit.operational_status}`} key={unit.unit_id} onClick={() => onSelectUnit(unit.unit_id)} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); setContextMenu({ unit, x: Math.min(event.clientX, window.innerWidth - 240), y: Math.min(event.clientY, window.innerHeight - 170) }); }}><div className="unit-card-head"><span className="unit-code">{unit.code}</span><span className={`status ${unit.operational_status}`}>{statusLabel[unit.operational_status]}</span></div><h3>{unit.name}</h3><p>{unit.city} · {unit.state_code}</p><div className="telemetry"><span><strong>{unit.offline_equipment}</strong> indisponíveis</span><span><strong>{unit.degraded_equipment}</strong> atenção</span></div><div className="signal-line"><i /><i /><i /><i /></div></button>)}</div>}</>}{contextMenu && <div className="unit-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} role="menu" onMouseDown={(event) => event.stopPropagation()}><p>{contextMenu.unit.code}</p><strong>{contextMenu.unit.name}</strong><button onClick={() => menuAction('open')}>Abrir unidade</button><button onClick={() => menuAction('edit')}><EditIcon /> Editar unidade</button><button onClick={() => menuAction('equipment')}>Cadastrar equipamento</button><button className="context-delete-action" onClick={() => menuAction('delete')}><TrashIcon /> Excluir unidade</button><button className="context-cancel" onClick={() => setContextMenu(null)}>Cancelar</button></div>}{deleteTarget && <ConfirmDialog title="Excluir unidade definitivamente" message={`Excluir a unidade "${deleteTarget.name}"? Todos os equipamentos, links, agentes, telemetrias, alertas e histórico operacional vinculados serão apagados. Esta ação não pode ser desfeita.`} confirmLabel="Excluir unidade" busy={deletingUnit} onConfirm={() => void confirmDeleteUnit()} onCancel={() => setDeleteTarget(null)} />}</>;
+  const UNITS_PAGE_SIZE = 12;
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [nameFilter, regionFilter, statusFilter]);
+  const totalPages = Math.max(1, Math.ceil(filteredUnits.length / UNITS_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedUnits = filteredUnits.slice((currentPage - 1) * UNITS_PAGE_SIZE, currentPage * UNITS_PAGE_SIZE);
+  if (creating) return <UnitForm unitType={unitType} lockType token={token} onCreated={async () => { onCreatingChange(false); await onInventoryRefresh(); }} onCancel={() => onCreatingChange(false)} onToast={onToast} />;
+  if (editingUnit) return <UnitEditForm unit={editingUnit} token={token} onSaved={refresh} onCancel={() => onEditingUnitIdChange(null)} onToast={onToast} />;
+  if (editing) return <EquipmentEditForm equipment={editing} token={token} onSaved={refresh} onCancel={() => onEditingEquipmentIdChange(null)} onToast={onToast} />;
+  return <>{!selectedUnit && <div className="section-heading units-module-heading"><div><p className="eyebrow">FROTA E INFRAESTRUTURA · {unitType === 'mobile' ? 'MÓVEIS' : 'FIXAS'}</p><h2>{unitType === 'mobile' ? 'Unidades móveis' : 'Unidades fixas'}</h2><small>{unitType === 'mobile' ? 'Monitoramento das ambulâncias e unidades itinerantes em operação de campo.' : 'Monitoramento de hospitais, postos e instalações permanentes.'}</small></div><button type="button" className="primary" onClick={() => onCreatingChange(true)}><PlusIcon /> Cadastrar unidade {unitType === 'mobile' ? 'móvel' : 'fixa'}</button></div>}{!selectedUnit && <div className="summary-grid"><Metric label={`${unitType === 'mobile' ? 'Unidades móveis' : 'Unidades fixas'} monitoradas`} value={units.length} tone="neutral" /><Metric label={`${unitType === 'mobile' ? 'Unidades móveis' : 'Unidades fixas'} operacionais`} value={summary.online} tone="ok" /><Metric label={`${unitType === 'mobile' ? 'Unidades móveis' : 'Unidades fixas'} em atenção`} value={summary.attention} tone="warn" /><Metric label={`${unitType === 'mobile' ? 'Unidades móveis' : 'Unidades fixas'} indisponíveis`} value={summary.offline} tone="danger" /></div>}{selectedUnit ? (equipmentCreating ? null : <UnitDetail unit={selectedUnit} equipment={selectedEquipment} onBack={onBack} onEdit={(item) => onEditingEquipmentIdChange(item.equipment_id)} onRequestEdit={(u) => onEditingUnitIdChange(u.unit_id)} onCreateEquipment={() => onCreateEquipment(selectedUnit.unit_id)} onRefresh={refresh} onToast={onToast} onRequestDelete={setDeleteTarget} />) : <><div className="units-list panel"><div className="section-heading"><div><p className="eyebrow">FROTA E INFRAESTRUTURA</p><h2>Estado das unidades</h2></div></div><div className="unit-filters"><div className="search-input-wrap"><SearchIcon /><input className="search-input" placeholder="Pesquisar por nome ou código…" value={nameFilter} onChange={(e) => setNameFilter(e.target.value)} /></div><AppDropdown placeholder="Todas as regiões" value={regionFilter} onChange={setRegionFilter} options={[{ value: '', label: 'Todas as regiões' }, ...regionOptions]} /><AppDropdown placeholder="Todos os status" value={statusFilter} onChange={setStatusFilter} options={[{ value: '', label: 'Todos os status' }, { value: 'online', label: 'Operacional' }, { value: 'degraded', label: 'Atenção' }, { value: 'offline', label: 'Indisponível' }, { value: 'unknown', label: 'Sem telemetria' }]} />{(nameFilter || regionFilter || statusFilter) && <button type="button" className="secondary-button compact clear-filters-button" onClick={clearUnitFilters}><ClearFilterIcon /> Limpar</button>}</div>{filteredUnits.length === 0 ? <div className="empty-state compact-empty"><p>Nenhuma unidade encontrada.</p></div> : <><div className="unit-grid unit-grid-scroll">{pagedUnits.map((unit) => <button className={`unit-card ${unit.operational_status}`} key={unit.unit_id} onClick={() => onSelectUnit(unit.unit_id)} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); setContextMenu({ unit, x: Math.min(event.clientX, window.innerWidth - 240), y: Math.min(event.clientY, window.innerHeight - 170) }); }}><div className="unit-card-head"><span className="unit-code">{unit.code}</span><span className={`status ${unit.operational_status}`}>{statusLabel[unit.operational_status]}</span></div><h3>{unit.name}</h3><p>{unit.city} · {unit.state_code}</p><div className="telemetry"><span><strong>{unit.offline_equipment}</strong> indisponíveis</span><span><strong>{unit.degraded_equipment}</strong> atenção</span></div><div className="signal-line"><i /><i /><i /><i /></div></button>)}</div>{totalPages > 1 && <div className="pagination"><button type="button" className="secondary-button compact" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Anterior</button><span>Página {currentPage} de {totalPages}</span><button type="button" className="secondary-button compact" disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)}>Próxima</button></div>}</>}</div></>}{contextMenu && <div className="unit-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} role="menu" onMouseDown={(event) => event.stopPropagation()}><div className="unit-context-menu-head"><span>{contextMenu.unit.code}</span><strong title={contextMenu.unit.name}>{contextMenu.unit.name}</strong></div><div className="dropdown-divider" /><button type="button" role="menuitem" className="dropdown-item" onClick={() => menuAction('open')}><span className="dropdown-item-icon"><ChevronRightIcon /></span><span>Abrir unidade</span></button><button type="button" role="menuitem" className="dropdown-item" onClick={() => menuAction('edit')}><span className="dropdown-item-icon"><EditIcon /></span><span>Editar unidade</span></button><button type="button" role="menuitem" className="dropdown-item" onClick={() => menuAction('equipment')}><span className="dropdown-item-icon"><PlusIcon /></span><span>Cadastrar equipamento</span></button><div className="dropdown-divider" /><button type="button" role="menuitem" className="dropdown-item logout" onClick={() => menuAction('delete')}><span className="dropdown-item-icon"><TrashIcon /></span><span>Excluir unidade</span></button></div>}{deleteTarget && <ConfirmDialog title="Excluir unidade definitivamente" message={`Excluir a unidade "${deleteTarget.name}"? Todos os equipamentos, links, agentes, telemetrias, alertas e histórico operacional vinculados serão apagados. Esta ação não pode ser desfeita.`} confirmLabel="Excluir unidade" busy={deletingUnit} onConfirm={() => void confirmDeleteUnit()} onCancel={() => setDeleteTarget(null)} />}</>;
 }
 
-function UnitsViewLegacy({ units, selectedUnit, selectedEquipment, loading, summary, onSelectUnit, onBack, onInventoryRefresh, token }: { units: Unit[]; selectedUnit?: Unit; selectedEquipment: Equipment[]; loading: boolean; summary: { online: number; attention: number; offline: number; unknown: number }; onSelectUnit: (unitId: string) => void; onBack: () => void; onInventoryRefresh: () => Promise<void>; token: string }) {
-  const [showUnitForm, setShowUnitForm] = useState(false);
-  const [showEquipmentForm, setShowEquipmentForm] = useState(false);
-  const [editing, setEditing] = useState<Equipment | null>(null);
-  const refresh = async () => { setEditing(null); await onInventoryRefresh(); };
-  return <><div className="summary-grid"><Metric label="Unidades monitoradas" value={units.length} tone="neutral" /><Metric label="Operacionais" value={summary.online} tone="ok" /><Metric label="Em atenção" value={summary.attention} tone="warn" /><Metric label="Indisponíveis" value={summary.offline} tone="danger" /></div>{selectedUnit ? <>{editing && <EquipmentEditForm equipment={editing} token={token} onSaved={refresh} onCancel={() => setEditing(null)} />}<UnitDetail unit={selectedUnit} equipment={selectedEquipment} onBack={onBack} onEdit={setEditing} onRefresh={refresh} onRequestDelete={() => undefined} /></> : <><div className="section-heading"><div><p className="eyebrow">FROTA E INFRAESTRUTURA</p><h2>Estado das unidades</h2></div><span className="problem-count neutral-count">{loading ? 'Atualizando…' : `${summary.unknown} sem telemetria`}</span></div><div className="unit-grid">{units.map((unit) => <button className={`unit-card ${unit.operational_status}`} key={unit.unit_id} onClick={() => onSelectUnit(unit.unit_id)}><div className="unit-card-head"><span className="unit-code">{unit.code}</span><span className={`status ${unit.operational_status}`}>{statusLabel[unit.operational_status]}</span></div><h3>{unit.name}</h3><p>{unit.city} · {unit.state_code}</p><div className="telemetry"><span><strong>{unit.offline_equipment}</strong> indisponíveis</span><span><strong>{unit.degraded_equipment}</strong> atenção</span></div><div className="signal-line"><i /><i /><i /><i /></div></button>)}</div></>}</>;
-}
 
 function UnitEditForm({ unit, token, onSaved, onCancel, onToast = () => undefined }: { unit: Unit; token: string; onSaved: () => Promise<void>; onCancel: () => void; onToast?: (toast: Omit<Toast, 'id'>) => void }) {
   const initialForm = useRef({ code: unit.code, name: unit.name, stateCode: unit.state_code, city: unit.city, latitude: unit.latitude == null ? '' : String(unit.latitude), longitude: unit.longitude == null ? '' : String(unit.longitude) }).current;
@@ -1241,18 +1430,31 @@ function UnitEditForm({ unit, token, onSaved, onCancel, onToast = () => undefine
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Falha ao atualizar unidade.'); }
     finally { setSaving(false); }
   }
-  return <FormCard title={`Editar unidade · ${unit.name}`} onCancel={onCancel}><form className="inline-form validated-form" noValidate onSubmit={submit}>
-    <div className="required-fields-note"><strong>Dados da unidade</strong><small>Os campos marcados com <b>*</b> são obrigatórios.</small></div>
-    {error && <div className="error-banner">{error}</div>}
-    <label><span className="field-label">Código <b>*</b></span><input className={validationRequested && unitValidation.code ? 'field-invalid' : ''} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />{validationRequested && unitValidation.code && <small className="field-error">Informe o código da unidade.</small>}</label>
-    <label><span className="field-label">Nome <b>*</b></span><input className={validationRequested && unitValidation.name ? 'field-invalid' : ''} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />{validationRequested && unitValidation.name && <small className="field-error">Informe o nome da unidade.</small>}</label>
-    <label><span className="field-label">UF <b>*</b></span><input className={validationRequested && unitValidation.stateCode ? 'field-invalid' : ''} maxLength={2} value={form.stateCode} onChange={(e) => setForm({ ...form, stateCode: e.target.value.toUpperCase() })} />{validationRequested && unitValidation.stateCode && <small className="field-error">Informe uma UF válida.</small>}</label>
-    <label><span className="field-label">Cidade <b>*</b></span><input className={validationRequested && unitValidation.city ? 'field-invalid' : ''} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />{validationRequested && unitValidation.city && <small className="field-error">Informe a cidade.</small>}</label>
-    <label><span className="field-label">Latitude <em>opcional</em></span><input inputMode="decimal" className={validationRequested && unitValidation.coordinates ? 'field-invalid' : ''} value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} placeholder="-3.1186" />{validationRequested && unitValidation.coordinates && <small className="field-error">Informe latitude entre -90 e 90.</small>}</label>
-    <label><span className="field-label">Longitude <em>opcional</em></span><input inputMode="decimal" className={validationRequested && unitValidation.coordinates ? 'field-invalid' : ''} value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} placeholder="-60.0217" />{validationRequested && unitValidation.coordinates && <small className="field-error">Informe longitude entre -180 e 180.</small>}</label>
-    <small className="field-hint location-hint" style={{ gridColumn: '1 / -1' }}>Informe as coordenadas para posicionar a unidade no mapa. Deixe ambas vazias para remover a localização.</small>
-    <div className="form-actions"><button type="button" className="secondary-button clear-filters-button" onClick={onCancel}><CloseIcon /> Cancelar</button><button className="primary" disabled={saving || !isDirty}>{saving ? 'Salvando…' : <><CheckIcon /> Salvar alterações</>}</button></div>
-  </form></FormCard>;
+  return <section className="users-page">
+    <div className="section-heading">
+      <div><p className="eyebrow">CADASTRO DE INVENTÁRIO</p><h2>Editar unidade</h2><small>Atualize os dados de {unit.name}.</small></div>
+    </div>
+    <button className="back-button" onClick={onCancel}>← Voltar para a unidade</button>
+    <form className="user-form panel users-create-form" onSubmit={submit} noValidate>
+      <div className="panel-title">
+        <div>
+          <p className="eyebrow">DADOS DA UNIDADE</p>
+          <h3>Dados da unidade</h3>
+          <small className="muted" style={{ margin: 0 }}>Os campos marcados com <b className="req">*</b> são obrigatórios.</small>
+        </div>
+      </div>
+      {error && <div className="form-error" role="alert">{error}</div>}
+      <div className="user-form-grid">
+        <div className="mfield"><div className="input-group has-icon"><span className="input-icon" aria-hidden="true"><NavGeneralIcon /></span><input id="eu-unit-uf" value={form.stateCode} placeholder=" " disabled /><label htmlFor="eu-unit-uf">UF</label></div><span className="field-hint">Não editável — definido no cadastro da unidade.</span></div>
+        <div className="mfield"><div className="input-group has-icon"><span className="input-icon" aria-hidden="true"><HomeIcon /></span><input id="eu-unit-city" value={form.city} placeholder=" " disabled /><label htmlFor="eu-unit-city">Cidade</label></div></div>
+        <div className="mfield"><div className="input-group has-icon"><span className="input-icon" aria-hidden="true"><BadgeIcon /></span><input id="eu-unit-code" value={form.code} className={validationRequested && unitValidation.code ? 'field-invalid' : ''} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder=" " /><label htmlFor="eu-unit-code">Código <b className="req">*</b></label></div>{validationRequested && unitValidation.code && <span className="field-error-text">Informe o código da unidade.</span>}</div>
+        <div className="mfield"><div className="input-group has-icon"><span className="input-icon" aria-hidden="true"><FolderIcon /></span><input id="eu-unit-name" value={form.name} className={validationRequested && unitValidation.name ? 'field-invalid' : ''} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder=" " /><label htmlFor="eu-unit-name">Nome <b className="req">*</b></label></div>{validationRequested && unitValidation.name && <span className="field-error-text">Informe o nome da unidade.</span>}</div>
+        <div className="mfield"><div className="input-group has-icon"><span className="input-icon" aria-hidden="true"><PingIcon /></span><input id="eu-unit-lat" inputMode="decimal" value={form.latitude} className={validationRequested && unitValidation.coordinates ? 'field-invalid' : ''} onChange={(e) => setForm({ ...form, latitude: e.target.value })} placeholder=" " /><label htmlFor="eu-unit-lat">Latitude <em>opcional</em></label></div>{validationRequested && unitValidation.coordinates ? <span className="field-error-text">Informe latitude entre -90 e 90.</span> : <span className="field-hint">Deixe latitude e longitude vazias para remover a localização.</span>}</div>
+        <div className="mfield"><div className="input-group has-icon"><span className="input-icon" aria-hidden="true"><PingIcon /></span><input id="eu-unit-lng" inputMode="decimal" value={form.longitude} className={validationRequested && unitValidation.coordinates ? 'field-invalid' : ''} onChange={(e) => setForm({ ...form, longitude: e.target.value })} placeholder=" " /><label htmlFor="eu-unit-lng">Longitude <em>opcional</em></label></div>{validationRequested && unitValidation.coordinates && <span className="field-error-text">Informe longitude entre -180 e 180.</span>}</div>
+      </div>
+      <div className="form-actions"><button type="button" className="secondary-button clear-filters-button" onClick={onCancel}><CloseIcon /> Cancelar</button><button className="primary" disabled={saving || !isDirty}>{saving ? 'Salvando…' : <><CheckIcon /> Salvar alterações</>}</button></div>
+    </form>
+  </section>;
 }
 
 function UnitEditFormWithoutLocation({ unit, token, onSaved, onCancel }: { unit: Unit; token: string; onSaved: () => Promise<void>; onCancel: () => void }) {
@@ -1278,7 +1480,76 @@ function EquipmentEditForm({ equipment, token, onSaved, onCancel, onToast = () =
   const linkFieldsVisible = isLinkEquipmentType(form.equipmentTypeCode);
   const equipmentValidation = { name: !form.name.trim(), contractedDownloadMbps: Boolean(form.contractedDownloadMbps) && Number(form.contractedDownloadMbps) <= 0, contractedUploadMbps: Boolean(form.contractedUploadMbps) && Number(form.contractedUploadMbps) <= 0 };
   async function submit(event: FormEvent) { event.preventDefault(); setValidationRequested(true); setError(''); if (Object.values(equipmentValidation).some(Boolean)) return; if (!isDirty) { onCancel(); return; } setSaving(true); try { await api(`/v1/equipment/${equipment.equipment_id}`, token, { method: 'PATCH', body: JSON.stringify({ equipmentTypeCode: form.equipmentTypeCode, name: form.name, serialNumber: form.serialNumber || undefined, managementAddress: form.managementAddress || undefined, contractedDownloadMbps: linkFieldsVisible && form.contractedDownloadMbps ? Number(form.contractedDownloadMbps) : undefined, contractedUploadMbps: linkFieldsVisible && form.contractedUploadMbps ? Number(form.contractedUploadMbps) : undefined }) }); await onSaved(); onToast({ type: 'success', title: 'Equipamento atualizado', detail: `As alterações em ${form.name} foram salvas.` }); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Falha ao atualizar equipamento.'); } finally { setSaving(false); } }
-  return <FormCard title={`Editar equipamento · ${equipment.name}`} onCancel={onCancel}><form className="inline-form validated-form" noValidate onSubmit={submit}><div className="required-fields-note"><strong>Dados do equipamento</strong><small>Os campos marcados com <b>*</b> são obrigatórios.</small></div>{error && <div className="error-banner">{error}</div>}<label><span className="field-label">Tipo <b>*</b></span><AppDropdown value={form.equipmentTypeCode} onChange={(next) => setForm({ ...form, equipmentTypeCode: next })} options={[{ value: 'linux_server', label: 'Servidor Linux' }, { value: 'mikrotik', label: 'Mikrotik' }, { value: 'starlink', label: 'Starlink' }, { value: 'vpn', label: 'VPN' }, { value: 'internet_link', label: 'Link de internet' }]} /></label><label><span className="field-label">Nome <b>*</b></span><input className={validationRequested && equipmentValidation.name ? 'field-invalid' : ''} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />{validationRequested && equipmentValidation.name && <small className="field-error">Informe o nome do equipamento.</small>}</label><label><span className="field-label">Endereço de gerenciamento <em>opcional</em></span><input value={form.managementAddress} onChange={(e) => setForm({ ...form, managementAddress: e.target.value })} /></label><label><span className="field-label">Número de série <em>opcional</em></span><input value={form.serialNumber} onChange={(e) => setForm({ ...form, serialNumber: e.target.value })} /></label>{linkFieldsVisible && <><div className="bandwidth-fields-note"><strong>Plano contratado</strong><small>Campos vazios são apresentados como N/D e nunca preenchidos pela telemetria.</small></div><label><span className="field-label">Download contratado <em>Mbps · opcional</em></span><input type="number" min="0.001" max="1000000" step="0.001" className={validationRequested && equipmentValidation.contractedDownloadMbps ? 'field-invalid' : ''} value={form.contractedDownloadMbps} onChange={(e) => setForm({ ...form, contractedDownloadMbps: e.target.value })} placeholder="Ex.: 500" />{validationRequested && equipmentValidation.contractedDownloadMbps && <small className="field-error">Informe um valor maior que zero.</small>}</label><label><span className="field-label">Upload contratado <em>Mbps · opcional</em></span><input type="number" min="0.001" max="1000000" step="0.001" className={validationRequested && equipmentValidation.contractedUploadMbps ? 'field-invalid' : ''} value={form.contractedUploadMbps} onChange={(e) => setForm({ ...form, contractedUploadMbps: e.target.value })} placeholder="Ex.: 250" />{validationRequested && equipmentValidation.contractedUploadMbps && <small className="field-error">Informe um valor maior que zero.</small>}</label></>}<div className="form-actions"><button type="button" className="secondary-button clear-filters-button" onClick={onCancel}><CloseIcon /> Cancelar</button><button className="primary" disabled={saving || !isDirty}>{saving ? 'Salvando…' : <><CheckIcon /> Salvar alterações</>}</button></div></form></FormCard>;
+  return <section className="users-page">
+    <div className="section-heading">
+      <div><p className="eyebrow">CADASTRO DE INVENTÁRIO</p><h2>Editar equipamento</h2><small>Atualize os dados de {equipment.name}.</small></div>
+    </div>
+    <button className="back-button" onClick={onCancel}>← Voltar para a unidade</button>
+    <form className="user-form panel users-create-form" onSubmit={submit} noValidate>
+      <div className="panel-title">
+        <div>
+          <p className="eyebrow">DADOS DO EQUIPAMENTO</p>
+          <h3>Dados do equipamento</h3>
+          <small className="muted" style={{ margin: 0 }}>Os campos marcados com <b className="req">*</b> são obrigatórios.</small>
+        </div>
+      </div>
+      {error && <div className="form-error" role="alert">{error}</div>}
+      <div className="user-form-grid">
+        <div className="mfield">
+          <div className="input-group has-icon is-dropdown">
+            <span className="input-icon" aria-hidden="true"><PackageIcon /></span>
+            <AppDropdown value={form.equipmentTypeCode} onChange={(next) => setForm({ ...form, equipmentTypeCode: next })} options={[{ value: 'linux_server', label: 'Servidor Linux' }, { value: 'mikrotik', label: 'Mikrotik' }, { value: 'starlink', label: 'Starlink' }, { value: 'vpn', label: 'VPN' }, { value: 'internet_link', label: 'Link de internet' }]} />
+            <span className="input-group-label">Tipo <b className="req">*</b></span>
+          </div>
+        </div>
+        <div className="mfield">
+          <div className="input-group has-icon">
+            <span className="input-icon" aria-hidden="true"><FolderIcon /></span>
+            <input id="ee-name" value={form.name} className={validationRequested && equipmentValidation.name ? 'field-invalid' : ''} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder=" " required />
+            <label htmlFor="ee-name">Nome <b className="req">*</b></label>
+          </div>
+          {validationRequested && equipmentValidation.name && <span className="field-error-text">Informe o nome do equipamento.</span>}
+        </div>
+        <div className="mfield">
+          <div className="input-group has-icon">
+            <span className="input-icon" aria-hidden="true"><NavLinkIcon /></span>
+            <input id="ee-address" value={form.managementAddress} onChange={(e) => setForm({ ...form, managementAddress: e.target.value })} placeholder=" " />
+            <label htmlFor="ee-address">Endereço de gerenciamento <em>opcional</em></label>
+          </div>
+          <span className="field-hint">Ex.: 10.0.0.50</span>
+        </div>
+        <div className="mfield">
+          <div className="input-group has-icon">
+            <span className="input-icon" aria-hidden="true"><BadgeIcon /></span>
+            <input id="ee-serial" value={form.serialNumber} onChange={(e) => setForm({ ...form, serialNumber: e.target.value })} placeholder=" " />
+            <label htmlFor="ee-serial">Número de série <em>opcional</em></label>
+          </div>
+        </div>
+        {linkFieldsVisible && <>
+          <div className="mfield">
+            <div className="input-group has-icon">
+              <span className="input-icon" aria-hidden="true"><PingIcon /></span>
+              <input id="ee-down" type="number" min="0.001" max="1000000" step="0.001" value={form.contractedDownloadMbps} className={validationRequested && equipmentValidation.contractedDownloadMbps ? 'field-invalid' : ''} onChange={(e) => setForm({ ...form, contractedDownloadMbps: e.target.value })} placeholder=" " />
+              <label htmlFor="ee-down">Download contratado <em>Mbps · opcional</em></label>
+            </div>
+            {validationRequested && equipmentValidation.contractedDownloadMbps ? <span className="field-error-text">Informe um valor maior que zero.</span> : <span className="field-hint">Campos vazios são apresentados como N/D.</span>}
+          </div>
+          <div className="mfield">
+            <div className="input-group has-icon">
+              <span className="input-icon" aria-hidden="true"><PingIcon /></span>
+              <input id="ee-up" type="number" min="0.001" max="1000000" step="0.001" value={form.contractedUploadMbps} className={validationRequested && equipmentValidation.contractedUploadMbps ? 'field-invalid' : ''} onChange={(e) => setForm({ ...form, contractedUploadMbps: e.target.value })} placeholder=" " />
+              <label htmlFor="ee-up">Upload contratado <em>Mbps · opcional</em></label>
+            </div>
+            {validationRequested && equipmentValidation.contractedUploadMbps && <span className="field-error-text">Informe um valor maior que zero.</span>}
+          </div>
+        </>}
+      </div>
+      <div className="form-actions">
+        <button type="button" className="secondary-button clear-filters-button" onClick={onCancel}><CloseIcon /> Cancelar</button>
+        <button className="primary" disabled={saving || !isDirty}>{saving ? 'Salvando…' : <><CheckIcon /> Salvar alterações</>}</button>
+      </div>
+    </form>
+  </section>;
 }
 
 const starlinkMetricLabels: Record<string, string> = {
@@ -1304,7 +1575,7 @@ function starlinkSampleValue(metrics: StarlinkTelemetry['metrics'], key: string,
   return sample ? formatStarlinkMetric(sample, stale) : 'N/D';
 }
 
-function StarlinkTelemetryPanel({ unit, equipment, token }: { unit: Unit; equipment: Equipment[]; token: string }) {
+function StarlinkTelemetryPanel({ unit, equipment, token, actionsSlot }: { unit: Unit; equipment: Equipment[]; token: string; actionsSlot?: HTMLElement | null }) {
   const starlinks = equipment.filter((item) => item.equipment_type === 'starlink');
   const [telemetry, setTelemetry] = useState<StarlinkTelemetry[]>([]);
   const [linkedAgents, setLinkedAgents] = useState<Record<string, boolean>>({});
@@ -1312,6 +1583,8 @@ function StarlinkTelemetryPanel({ unit, equipment, token }: { unit: Unit; equipm
   const [sourceMessage, setSourceMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const STARLINK_PAGE_SIZE = 3;
+  const [starlinkPage, setStarlinkPage] = useState(1);
   async function refresh() {
     if (!starlinks.length) { setTelemetry([]); return; }
     setLoading(true); setError('');
@@ -1331,10 +1604,17 @@ function StarlinkTelemetryPanel({ unit, equipment, token }: { unit: Unit; equipm
   }
   useEffect(() => { void refresh(); const timer = window.setInterval(() => void refresh(), 15_000); return () => window.clearInterval(timer); }, [equipment, token]);
   if (!starlinks.length) return null;
-  return <section className="starlink-telemetry-panel panel"><div className="panel-title"><div><p className="eyebrow">TELEMETRIA STARLINK</p><h3>Métricas da antena</h3><small className="starlink-unit-location">Unidade vinculada: {unit.name} · {unit.city}/{unit.state_code}</small></div><button className="secondary-button compact" onClick={() => void refresh()} disabled={loading}><RefreshIcon /> {loading ? 'Atualizando…' : 'Atualizar'}</button></div>{error && <div className="error-banner">{error}</div>}{sourceMessage && <div className="success-banner">{sourceMessage}</div>}{telemetry.map((item) => { const stale = !item.observedAt || Date.now() - new Date(item.observedAt).getTime() > 30_000; const latitude = starlinkSampleValue(item.metrics, 'starlink.location.latitude', stale); const longitude = starlinkSampleValue(item.metrics, 'starlink.location.longitude', stale); const linked = linkedAgents[item.equipmentId] === true; return <article className="starlink-telemetry-card" key={item.equipmentId}><div className="starlink-telemetry-card-head"><strong>{item.equipmentName}</strong><button className="secondary-button compact" onClick={() => void toggleLocalAgent(item.equipmentId)} disabled={sourceBusy === item.equipmentId}>{sourceBusy === item.equipmentId ? 'Salvando…' : linked ? <><CloseIcon /> Desvincular agente</> : <><PlusIcon /> Vincular agente local</>}</button></div>{(item.collectorError || stale) && <div className="error-banner starlink-collector-error">{item.collectorError ?? 'Agente Starlink sem comunicação recente.'}</div>}{item.metrics.length ? <div className="starlink-table-wrap"><table className="starlink-collector-table"><thead><tr><th>Hora</th><th>Latência</th><th>Perda</th><th>Download</th><th>Upload</th><th>Obstrução</th><th>Localização da antena</th><th>Origem</th></tr></thead><tbody><tr><td>{item.observedAt ? new Date(item.observedAt).toLocaleTimeString('pt-BR') : 'N/D'}</td><td>{starlinkSampleValue(item.metrics, 'starlink.latency.ms', stale)}</td><td>{starlinkSampleValue(item.metrics, 'starlink.loss.pct', stale)}</td><td>{starlinkSampleValue(item.metrics, 'starlink.download.bps', stale)}</td><td>{starlinkSampleValue(item.metrics, 'starlink.upload.bps', stale)}</td><td>{starlinkSampleValue(item.metrics, 'starlink.obstruction.pct', stale)}</td><td>{latitude !== 'N/D' && longitude !== 'N/D' ? `${latitude} · ${longitude}` : 'N/D'}</td><td>local_agent</td></tr></tbody></table></div> : <p className="muted">Aguardando o agente enviar a primeira amostra.</p>}<div className="starlink-collector-log"><div className="starlink-collector-log-head"><span>ÚLTIMA COLETA</span><small>{item.observedAt ? new Date(item.observedAt).toLocaleTimeString('pt-BR') : 'aguardando'}</small></div><div className="starlink-log-empty">A linha acima é atualizada a cada coleta. A localidade da unidade permanece {unit.city}/{unit.state_code}; a localização da antena usa a última latitude/longitude recebida.</div></div></article>; })}</section>;
+  const starlinkTotalPages = Math.max(1, Math.ceil(telemetry.length / STARLINK_PAGE_SIZE));
+  const starlinkCurrentPage = Math.min(starlinkPage, starlinkTotalPages);
+  const pagedTelemetry = telemetry.slice((starlinkCurrentPage - 1) * STARLINK_PAGE_SIZE, starlinkCurrentPage * STARLINK_PAGE_SIZE);
+  const soloItem = pagedTelemetry.length === 1 ? pagedTelemetry[0] : null;
+  const headerActions = <><button className="secondary-button" onClick={() => void refresh()} disabled={loading}><RefreshIcon /> {loading ? 'Atualizando…' : 'Atualizar'}</button>{soloItem && (linkedAgents[soloItem.equipmentId] === true
+      ? <button className="secondary-button clear-filters-button" onClick={() => void toggleLocalAgent(soloItem.equipmentId)} disabled={sourceBusy === soloItem.equipmentId}>{sourceBusy === soloItem.equipmentId ? 'Salvando…' : <><CloseIcon /> Desvincular agente</>}</button>
+      : <button className="primary" onClick={() => void toggleLocalAgent(soloItem.equipmentId)} disabled={sourceBusy === soloItem.equipmentId}>{sourceBusy === soloItem.equipmentId ? 'Salvando…' : <><PlusIcon /> Vincular agente local</>}</button>)}</>;
+  return <section className="starlink-telemetry-panel panel">{actionsSlot ? createPortal(headerActions, actionsSlot) : null}<div className="panel-title"><div><p className="eyebrow">TELEMETRIA STARLINK</p><h3>Métricas da antena</h3><small className="starlink-unit-location">Unidade vinculada: {unit.name} · {unit.city}/{unit.state_code}</small></div>{!actionsSlot && <div className="starlink-header-actions">{headerActions}</div>}</div>{error && <div className="error-banner">{error}</div>}{sourceMessage && <div className="success-banner">{sourceMessage}</div>}{pagedTelemetry.map((item) => { const stale = !item.observedAt || Date.now() - new Date(item.observedAt).getTime() > 30_000; const latitude = starlinkSampleValue(item.metrics, 'starlink.location.latitude', stale); const longitude = starlinkSampleValue(item.metrics, 'starlink.location.longitude', stale); const linked = linkedAgents[item.equipmentId] === true; return <article className="starlink-telemetry-card" key={item.equipmentId}>{!soloItem && <div className="starlink-telemetry-card-head"><strong>{item.equipmentName}</strong><button className="secondary-button compact" onClick={() => void toggleLocalAgent(item.equipmentId)} disabled={sourceBusy === item.equipmentId}>{sourceBusy === item.equipmentId ? 'Salvando…' : linked ? <><CloseIcon /> Desvincular agente</> : <><PlusIcon /> Vincular agente local</>}</button></div>}{(item.collectorError || stale) && <div className="error-banner starlink-collector-error">{item.collectorError ?? 'Agente Starlink sem comunicação recente.'}</div>}{item.metrics.length ? <div className="starlink-table-wrap"><table className="starlink-collector-table"><thead><tr><th>Hora</th><th>Latência</th><th>Perda</th><th>Download</th><th>Upload</th><th>Obstrução</th><th>Localização da antena</th><th>Origem</th></tr></thead><tbody><tr><td>{item.observedAt ? new Date(item.observedAt).toLocaleTimeString('pt-BR') : 'N/D'}</td><td>{starlinkSampleValue(item.metrics, 'starlink.latency.ms', stale)}</td><td>{starlinkSampleValue(item.metrics, 'starlink.loss.pct', stale)}</td><td>{starlinkSampleValue(item.metrics, 'starlink.download.bps', stale)}</td><td>{starlinkSampleValue(item.metrics, 'starlink.upload.bps', stale)}</td><td>{starlinkSampleValue(item.metrics, 'starlink.obstruction.pct', stale)}</td><td>{latitude !== 'N/D' && longitude !== 'N/D' ? `${latitude} · ${longitude}` : 'N/D'}</td><td>local_agent</td></tr></tbody></table></div> : <p className="muted">Aguardando o agente enviar a primeira amostra.</p>}<div className="starlink-collector-log"><div className="starlink-collector-log-head"><span>ÚLTIMA COLETA</span><small>{item.observedAt ? new Date(item.observedAt).toLocaleTimeString('pt-BR') : 'aguardando'}</small></div><div className="starlink-log-empty">A linha acima é atualizada a cada coleta. A localidade da unidade permanece {unit.city}/{unit.state_code}; a localização da antena usa a última latitude/longitude recebida.</div></div></article>; })}{starlinkTotalPages > 1 && <div className="pagination"><button type="button" className="secondary-button compact" disabled={starlinkCurrentPage <= 1} onClick={() => setStarlinkPage(starlinkCurrentPage - 1)}>Anterior</button><span>Página {starlinkCurrentPage} de {starlinkTotalPages}</span><button type="button" className="secondary-button compact" disabled={starlinkCurrentPage >= starlinkTotalPages} onClick={() => setStarlinkPage(starlinkCurrentPage + 1)}>Próxima</button></div>}</section>;
 }
 
-function AgentVersionsPanel({ token, onToast }: { token: string; onToast: (toast: Omit<Toast, 'id'>) => void }) {
+function AgentVersionsPanel({ token, onToast, actions }: { token: string; onToast: (toast: Omit<Toast, 'id'>) => void; actions?: ReactNode }) {
   const [versions, setVersions] = useState<AgentVersionRecord[]>([]);
   const [platform, setPlatform] = useState<AgentPlatform>('windows');
   const [file, setFile] = useState<File | null>(null);
@@ -1364,9 +1644,8 @@ function AgentVersionsPanel({ token, onToast }: { token: string; onToast: (toast
           <h3>Versões Windows e Linux</h3>
           <small>Publique um bundle Node <code>.cjs</code> ou <code>.js</code>; a API calcula a versão automaticamente, embute a numeração e valida o checksum SHA-256.</small>
         </div>
-        <div className="agent-versions-badge">
-          <span className="badge-count-icon"><PackageIcon /></span>
-          <span>{loaded ? `${versions.length} pacote(s)` : '…'}</span>
+        <div className="agent-versions-header-side">
+          {actions}
         </div>
       </div>
 
@@ -1419,9 +1698,8 @@ function AgentVersionsPanel({ token, onToast }: { token: string; onToast: (toast
             </div>
           ) : (
             versions.map((item) => (
-              <div className="agent-version-card" key={item.id}>
+              <div className={`agent-version-card ${item.active ? 'is-active' : 'is-inactive'}`} key={item.id}>
                 <div className="agent-version-main">
-                  <span className={`legend-dot ${item.active ? 'online' : 'unknown'}`} />
                   <div className="agent-version-title-group">
                     <strong>{item.platform === 'windows' ? 'Windows' : 'Linux'}</strong>
                     <span className="version-tag">v{item.version}</span>
@@ -1443,9 +1721,18 @@ function AgentVersionsPanel({ token, onToast }: { token: string; onToast: (toast
   );
 }
 
-function UnitDetail({ unit, equipment, onBack, onEdit, onRefresh, onRequestDelete, onToast = () => undefined }: { unit: Unit; equipment: Equipment[]; onBack: () => void; onEdit: (equipment: Equipment) => void; onRefresh: () => Promise<void>; onRequestDelete: (unit: Unit) => void; onToast?: (toast: Omit<Toast, 'id'>) => void }) {
+function UnitDetail({ unit, equipment, onBack, onEdit, onRequestEdit, onCreateEquipment, onRefresh, onRequestDelete, onToast = () => undefined }: { unit: Unit; equipment: Equipment[]; onBack: () => void; onEdit: (equipment: Equipment) => void; onRequestEdit: (unit: Unit) => void; onCreateEquipment: () => void; onRefresh: () => Promise<void>; onRequestDelete: (unit: Unit) => void; onToast?: (toast: Omit<Toast, 'id'>) => void }) {
   const token = (JSON.parse(sessionStorage.getItem('healthlink.session') ?? '{}') as { accessToken?: string }).accessToken ?? '';
-  const [editingUnit, setEditingUnit] = useState(false);
+  const starlinkCount = equipment.filter((item) => item.equipment_type === 'starlink').length;
+  const hasStarlink = starlinkCount > 0;
+  const [tab, setTab] = useState<'overview' | 'equipment' | 'starlink'>('overview');
+  useEffect(() => { if (tab === 'starlink' && !hasStarlink) setTab('overview'); }, [tab, hasStarlink]);
+  const EQUIPMENT_PAGE_SIZE = 10;
+  const [equipmentPage, setEquipmentPage] = useState(1);
+  const equipmentTotalPages = Math.max(1, Math.ceil(equipment.length / EQUIPMENT_PAGE_SIZE));
+  const equipmentCurrentPage = Math.min(equipmentPage, equipmentTotalPages);
+  const pagedEquipment = equipment.slice((equipmentCurrentPage - 1) * EQUIPMENT_PAGE_SIZE, equipmentCurrentPage * EQUIPMENT_PAGE_SIZE);
+  useEffect(() => { setEquipmentPage(1); }, [tab, equipment.length]);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [blockTarget, setBlockTarget] = useState<Equipment | null>(null);
   const [unblockTarget, setUnblockTarget] = useState<Equipment | null>(null);
@@ -1515,14 +1802,30 @@ function UnitDetail({ unit, equipment, onBack, onEdit, onRefresh, onRequestDelet
     catch (reason) { onToast({ type: 'error', title: 'Falha ao excluir equipamento', detail: reason instanceof Error ? reason.message : 'Tente novamente em instantes.' }); setProcessingId(null); setDeleteTarget(null); }
   }
   return <section className="unit-detail">
+    <div className="section-heading units-module-heading">
+      <div><p className="eyebrow">UNIDADE SELECIONADA · {unit.code}</p><h2>{unit.name}</h2><small>Gerencie os equipamentos e ativos vinculados a esta unidade.</small></div>
+    </div>
     <button className="back-button" onClick={onBack}>← Voltar ao centro operacional</button>
-    <div className="detail-hero"><div><p className="eyebrow">UNIDADE {unit.code} · {unit.state_code}</p><h2>{unit.name}</h2><p>{unit.city} · monitoramento de infraestrutura</p></div><div className="detail-hero-actions"><button className="secondary-button compact" onClick={() => setEditingUnit((current) => !current)}>{editingUnit ? 'Fechar edição' : <><EditIcon /> Editar unidade</>}</button><button className="danger-button compact" onClick={() => onRequestDelete(unit)}><TrashIcon /> Excluir unidade</button><span className={`status large-status ${unit.operational_status}`}>{statusLabel[unit.operational_status]}</span></div></div>
-    {editingUnit && <UnitEditForm unit={unit} token={token} onSaved={async () => { setEditingUnit(false); await onRefresh(); }} onCancel={() => setEditingUnit(false)} onToast={onToast} />}
-    <div className="detail-grid"><article className="equipment-panel"><div className="panel-title"><div><p className="eyebrow">ATIVOS MONITORADOS</p><h3>Infraestrutura da unidade</h3></div><div className="panel-title-actions"><strong>{equipment.length}</strong></div></div>
-      <div className="agent-provisioning"><div><p className="eyebrow">AGENTE DE COLETA</p><h4>Instalação em arquivo único</h4><small>{missingAgentRequirements.length ? `Requisitos pendentes: ${missingAgentRequirements.join(' ')}` : `${servers.length} servidor(es) e ${agentRequirements.sources.length} fonte(s) elegíveis. Use o botão no servidor escolhido.`}</small></div>{missingAgentRequirements.length > 0 && <button className="secondary-button compact" onClick={() => onToast({ type: 'warning', title: 'Requisitos ausentes', detail: missingAgentRequirements.join(' ') })}>Ver requisitos</button>}</div>
-      <div className="equipment-list">{equipment.map((item) => { const blocked = item.active === false; const isServer = item.equipment_type === 'server' || item.equipment_type === 'linux_server'; return <div className={`equipment-row ${blocked ? 'blocked' : ''}`} key={item.equipment_id}><span className={`equipment-indicator ${blocked ? 'blocked' : item.operational_status}`} /><div><strong>{item.name}</strong><small>{item.equipment_type.replaceAll('_', ' ')} · {item.management_address ?? 'sem endereço'}</small></div><div className="equipment-state"><span className={`status ${blocked ? 'blocked' : item.operational_status}`}>{blocked ? 'Bloqueado' : statusLabel[item.operational_status]}</span><small>{blocked ? 'telemetria desativada' : item.observed_at ? new Date(item.observed_at).toLocaleString('pt-BR') : 'aguardando coleta'}</small></div><div className="equipment-actions">{isServer && !blocked && <button className="secondary-button compact" onClick={() => openAgentGenerator(item)}><AgentIcon /> Gerar agente</button>}<button className="secondary-button compact" onClick={() => onEdit(item)}><EditIcon /> Editar</button>{blocked ? <button className="secondary-button compact" disabled={processingId === item.equipment_id} onClick={() => setUnblockTarget(item)}><UnblockIcon /> Desbloquear</button> : <button className="secondary-button compact warning-action-button" disabled={processingId === item.equipment_id} onClick={() => setBlockTarget(item)}><BlockIcon /> Bloquear</button>}<button className="secondary-button compact clear-filters-button" disabled={processingId === item.equipment_id} onClick={() => setDeleteTarget(item)}><TrashIcon /> Excluir</button></div></div>; })}</div>
-    </article><aside className="readiness-panel"><p className="eyebrow">PRONTIDÃO OPERACIONAL</p><div className="readiness-score"><strong>{equipment.filter((item) => item.operational_status === 'online').length}</strong><span>de {equipment.length}<small>ativos confirmados</small></span></div><div className="readiness-line"><i style={{ width: `${equipment.length ? equipment.filter((item) => item.operational_status === 'online').length / equipment.length * 100 : 0}%` }} /></div><dl><div><dt>Indisponíveis</dt><dd>{equipment.filter((item) => item.operational_status === 'offline').length}</dd></div><div><dt>Em atenção</dt><dd>{equipment.filter((item) => item.operational_status === 'degraded').length}</dd></div><div><dt>Sem telemetria</dt><dd>{equipment.filter((item) => item.operational_status === 'unknown').length}</dd></div></dl></aside></div>
-    <StarlinkTelemetryPanel unit={unit} equipment={equipment} token={token} />
+    <div className="unit-detail-tabbar">
+      <div className="alert-tabs unit-detail-tabs" role="tablist">
+        <button type="button" role="tab" aria-selected={tab === 'overview'} className={`alert-tab ${tab === 'overview' ? 'active' : ''}`} onClick={() => setTab('overview')}>Visão geral <span>—</span></button>
+        <button type="button" role="tab" aria-selected={tab === 'equipment'} className={`alert-tab ${tab === 'equipment' ? 'active' : ''}`} onClick={() => setTab('equipment')}>Equipamentos <span>{tab === 'equipment' ? equipment.length : '—'}</span></button>
+        {hasStarlink && <button type="button" role="tab" aria-selected={tab === 'starlink'} className={`alert-tab ${tab === 'starlink' ? 'active' : ''}`} onClick={() => setTab('starlink')}>Telemetria Starlink <span>{tab === 'starlink' ? starlinkCount : '—'}</span></button>}
+      </div>
+      <div className="unit-detail-tabbar-actions">
+        <span className={`status ${unit.operational_status}`}>{statusLabel[unit.operational_status]}</span>
+      </div>
+    </div>
+    {tab === 'overview' && <article className="panel unit-overview-panel" key="overview">
+      <div className="section-heading"><div><p className="eyebrow">PRONTIDÃO OPERACIONAL</p><h2>Resumo da unidade</h2><small>Situação consolidada dos ativos monitorados nesta unidade.</small></div><div className="units-heading-actions"><button type="button" className="secondary-button clear-filters-button" onClick={() => onRequestDelete(unit)}><TrashIcon /> Excluir unidade</button><button type="button" className="primary" onClick={() => onRequestEdit(unit)}><EditIcon /> Editar unidade</button></div></div>
+      <div className="readiness-panel readiness-block"><div className="readiness-score"><strong>{equipment.filter((item) => item.operational_status === 'online').length}</strong><span>de {equipment.length}<small>ativos confirmados</small></span></div><div className="readiness-line"><i style={{ width: `${equipment.length ? equipment.filter((item) => item.operational_status === 'online').length / equipment.length * 100 : 0}%` }} /></div><dl><div><dt>Indisponíveis</dt><dd>{equipment.filter((item) => item.operational_status === 'offline').length}</dd></div><div><dt>Em atenção</dt><dd>{equipment.filter((item) => item.operational_status === 'degraded').length}</dd></div><div><dt>Sem telemetria</dt><dd>{equipment.filter((item) => item.operational_status === 'unknown').length}</dd></div></dl></div>
+    </article>}
+    {tab === 'equipment' && <article className="panel" key="equipment">
+      <div className="section-heading"><div><p className="eyebrow">ATIVOS MONITORADOS</p><h2>Infraestrutura da unidade</h2></div><button type="button" className="primary" onClick={onCreateEquipment}><PlusIcon /> Cadastrar equipamento</button></div>
+      <div className="agent-provisioning"><div><p className="eyebrow">AGENTE DE COLETA</p><h4>Instalação em arquivo único</h4><small>{missingAgentRequirements.length ? `Requisitos pendentes: ${missingAgentRequirements.join(' ')}` : `${servers.length} servidor(es) e ${agentRequirements.sources.length} fonte(s) elegíveis. Use o botão no servidor escolhido.`}</small></div>{missingAgentRequirements.length > 0 && <button className="secondary-button compact" onClick={() => onToast({ type: 'warning', title: 'Requisitos ausentes', detail: missingAgentRequirements.join(' ') })}><WarningIcon /> Ver requisitos</button>}</div>
+      {equipment.length === 0 ? <div className="empty-state compact-empty"><p>Nenhum equipamento cadastrado nesta unidade.</p></div> : <><div className="equipment-list">{pagedEquipment.map((item) => { const blocked = item.active === false; const isServer = item.equipment_type === 'server' || item.equipment_type === 'linux_server'; return <div className={`equipment-row ${blocked ? 'blocked' : item.operational_status}`} key={item.equipment_id}><span className={`equipment-indicator ${blocked ? 'blocked' : item.operational_status}`} /><div><strong>{item.name}</strong><small>{item.equipment_type.replaceAll('_', ' ')} · {item.management_address ?? 'sem endereço'}</small></div><div className="equipment-state"><span className={`status ${blocked ? 'blocked' : item.operational_status}`}>{blocked ? 'Bloqueado' : statusLabel[item.operational_status]}</span><small>{blocked ? 'telemetria desativada' : item.observed_at ? new Date(item.observed_at).toLocaleString('pt-BR') : 'aguardando coleta'}</small></div><div className="equipment-actions"><RowActionsMenu active={!blocked} label={`Ações de ${item.name}`} onGenerateAgent={isServer && !blocked ? () => openAgentGenerator(item) : undefined} onEdit={() => onEdit(item)} onBlock={() => setBlockTarget(item)} onUnblock={() => setUnblockTarget(item)} onDelete={() => setDeleteTarget(item)} /></div></div>; })}</div>{equipmentTotalPages > 1 && <div className="pagination"><button type="button" className="secondary-button compact" disabled={equipmentCurrentPage <= 1} onClick={() => setEquipmentPage(equipmentCurrentPage - 1)}>Anterior</button><span>Página {equipmentCurrentPage} de {equipmentTotalPages}</span><button type="button" className="secondary-button compact" disabled={equipmentCurrentPage >= equipmentTotalPages} onClick={() => setEquipmentPage(equipmentCurrentPage + 1)}>Próxima</button></div>}</>}
+    </article>}
+    {tab === 'starlink' && <StarlinkTelemetryPanel unit={unit} equipment={equipment} token={token} />}
     {agentServer && <FormCard title={`Gerar agente · ${agentServer.name}`} onCancel={() => { if (!agentGenerating) setAgentServer(null); }}><form className="inline-form" onSubmit={(event) => { event.preventDefault(); void generateAgentInstaller(); }}><div className="agent-installer-summary"><p className="eyebrow">ARQUIVO ÚNICO · SEM CONFIGURAÇÃO MANUAL</p><p>O instalador já leva o vínculo desta unidade, o servidor e as fontes elegíveis. Execute uma única vez no equipamento servidor; depois o serviço coleta, envia heartbeat e atualiza o agente sozinho.</p><small>O link de instalação expira em 30 minutos e só pode ser consumido uma vez.</small></div><label>Sistema operacional<AppDropdown value={agentPlatform} onChange={(next) => setAgentPlatform(next as AgentPlatform)} disabled={agentGenerating} options={[{ value: 'windows', label: 'Windows · PowerShell' }, { value: 'linux', label: 'Linux · systemd' }]} /></label><div className="agent-installer-sources"><span className="field-label">Fontes que serão vinculadas</span>{agentRequirements.sources.map((source) => <small key={source.equipment_id}>● {equipment.find((item) => item.equipment_id === source.equipment_id)?.name ?? source.equipment_type} · {source.equipment_type.replaceAll('_', ' ')}</small>)}</div>{agentGenerationError && <div className="error-banner" role="alert">{agentGenerationError}</div>}<div className="form-actions"><button type="button" className="secondary-button clear-filters-button" onClick={() => setAgentServer(null)} disabled={agentGenerating}><CloseIcon /> Cancelar</button><button className="primary" disabled={agentGenerating}>{agentGenerating ? 'Gerando e preparando download…' : 'Gerar e baixar instalador'}</button></div></form></FormCard>}
     {blockTarget && <ConfirmDialog title="Bloquear equipamento" message={`Bloquear o equipamento "${blockTarget.name}"? Ele para de contar para o status da unidade e para de receber telemetria, assim como um usuário bloqueado. O histórico será preservado.`} confirmLabel="Bloquear" confirmIcon={<BlockIcon />} tone="warning" busy={processingId === blockTarget.equipment_id} onConfirm={() => void confirmDeactivate()} onCancel={() => setBlockTarget(null)} />}
     {unblockTarget && <ConfirmDialog title="Desbloquear equipamento" message={`Desbloquear o equipamento "${unblockTarget.name}"? Ele volta a contar para o status da unidade e a receber telemetria normalmente.`} confirmLabel="Desbloquear" confirmIcon={<UnblockIcon />} tone="positive" busy={processingId === unblockTarget.equipment_id} onConfirm={() => void confirmReactivate()} onCancel={() => setUnblockTarget(null)} />}
@@ -1530,20 +1833,78 @@ function UnitDetail({ unit, equipment, onBack, onEdit, onRefresh, onRequestDelet
   </section>;
 }
 
-function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onToast }: { users: ManagedUser[]; requests: AccessRequest[]; loading: boolean; token: string; onRefresh: () => Promise<void>; onChange: (id: string, action: 'block' | 'unblock' | 'delete') => Promise<void>; onToast: (toast: Omit<Toast, 'id'>) => void }) {
+function RowActionsMenu({ active, onGenerateAgent, onEdit, onBlock, onUnblock, onDelete, label = 'Ações' }: { active: boolean; onGenerateAgent?: () => void; onEdit: () => void; onBlock: () => void; onUnblock: () => void; onDelete: () => void; label?: string }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: MouseEvent) => { if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false); };
+    const onEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false); };
+    window.addEventListener('mousedown', close);
+    window.addEventListener('keydown', onEscape);
+    return () => { window.removeEventListener('mousedown', close); window.removeEventListener('keydown', onEscape); };
+  }, [open]);
+  return <div className={`row-menu ${open ? 'open' : ''}`} ref={rootRef}>
+    <button type="button" className="icon-button row-menu-trigger" aria-haspopup="menu" aria-expanded={open} aria-label={label} onClick={() => setOpen((prev) => !prev)}><MoreVerticalIcon /></button>
+    {open && <div className="row-menu-dropdown" role="menu" onMouseDown={(event) => event.stopPropagation()}>
+      {onGenerateAgent && <button type="button" role="menuitem" className="dropdown-item" onClick={() => { setOpen(false); onGenerateAgent(); }}><span className="dropdown-item-icon"><AgentIcon /></span><span>Gerar agente</span></button>}
+      <button type="button" role="menuitem" className="dropdown-item" onClick={() => { setOpen(false); onEdit(); }}><span className="dropdown-item-icon"><EditIcon /></span><span>Editar</span></button>
+      {active
+        ? <button type="button" role="menuitem" className="dropdown-item" onClick={() => { setOpen(false); onBlock(); }}><span className="dropdown-item-icon"><BlockIcon /></span><span>Bloquear</span></button>
+        : <button type="button" role="menuitem" className="dropdown-item" onClick={() => { setOpen(false); onUnblock(); }}><span className="dropdown-item-icon"><UnblockIcon /></span><span>Desbloquear</span></button>}
+      <div className="dropdown-divider" />
+      <button type="button" role="menuitem" className="dropdown-item logout" onClick={() => { setOpen(false); onDelete(); }}><span className="dropdown-item-icon"><TrashIcon /></span><span>Excluir</span></button>
+    </div>}
+  </div>;
+}
+
+function UnitActionsMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: MouseEvent) => { if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false); };
+    const onEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false); };
+    window.addEventListener('mousedown', close);
+    window.addEventListener('keydown', onEscape);
+    return () => { window.removeEventListener('mousedown', close); window.removeEventListener('keydown', onEscape); };
+  }, [open]);
+  return <div className={`row-menu ${open ? 'open' : ''}`} ref={rootRef}>
+    <button type="button" className="icon-button row-menu-trigger" aria-haspopup="menu" aria-expanded={open} aria-label="Ações da unidade" onClick={() => setOpen((prev) => !prev)}><MoreVerticalIcon /></button>
+    {open && <div className="row-menu-dropdown" role="menu" onMouseDown={(event) => event.stopPropagation()}>
+      <button type="button" role="menuitem" className="dropdown-item" onClick={() => { setOpen(false); onEdit(); }}><span className="dropdown-item-icon"><EditIcon /></span><span>Editar unidade</span></button>
+      <div className="dropdown-divider" />
+      <button type="button" role="menuitem" className="dropdown-item logout" onClick={() => { setOpen(false); onDelete(); }}><span className="dropdown-item-icon"><TrashIcon /></span><span>Excluir unidade</span></button>
+    </div>}
+  </div>;
+}
+
+
+function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onToast, creating, onCreatingChange, editingUserId, onEditingUserIdChange }: { users: ManagedUser[]; requests: AccessRequest[]; loading: boolean; token: string; onRefresh: () => Promise<void>; onChange: (id: string, action: 'block' | 'unblock' | 'delete') => Promise<void>; onToast: (toast: Omit<Toast, 'id'>) => void; creating: boolean; onCreatingChange: (value: boolean) => void; editingUserId: string | null; onEditingUserIdChange: (value: string | null) => void }) {
   const emptyUserForm = { displayName: '', email: '', password: '', role: '', cpf: '', coligada: 'HealthLink Sentinel', active: true };
   const [form, setForm] = useState(emptyUserForm);
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [editing, setEditing] = useState<string | null>(null);
+  function resetCreateForm() { setForm(emptyUserForm); setConfirmPassword(''); setShowPassword(false); setShowConfirmPassword(false); }
+  const createEmailMissing = submitted && !form.email.trim();
+  const createEmailInvalid = submitted && !createEmailMissing && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
+  const editing = editingUserId;
+  const setEditing = onEditingUserIdChange;
   const [editForm, setEditForm] = useState(emptyUserForm);
   const [initialEditForm, setInitialEditForm] = useState(emptyUserForm);
+  const [editConfirmPassword, setEditConfirmPassword] = useState('');
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [showEditConfirm, setShowEditConfirm] = useState(false);
   const [editSubmitted, setEditSubmitted] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const isDirty = JSON.stringify(editForm) !== JSON.stringify(initialEditForm);
   const editingIsGlobalAdmin = editing ? users.find((user) => user.id === editing)?.roles.includes('global_administrator') ?? false : false;
   useEffect(() => { if (!editing) return; const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') cancelEdit(); }; window.addEventListener('keydown', closeOnEscape); return () => window.removeEventListener('keydown', closeOnEscape); }, [editing]);
   const [approvalOpen, setApprovalOpen] = useState(false);
+  const setCreating = onCreatingChange;
   const [deleteTarget, setDeleteTarget] = useState<ManagedUser | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [blockTarget, setBlockTarget] = useState<ManagedUser | null>(null);
@@ -1594,14 +1955,14 @@ function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onTo
 
   async function submit(event: FormEvent) {
     event.preventDefault(); setSubmitted(true);
-    if (validateManagedUserForm({ displayName: form.displayName, email: form.email, role: form.role, password: form.password, editing: false }).length > 0) {
+    if (validateManagedUserForm({ displayName: form.displayName, email: form.email, role: form.role, password: form.password, editing: false }).length > 0 || confirmPassword !== form.password) {
       return;
     }
     setSaving(true);
     try {
       await api('/v1/users', token, { method: 'POST', body: JSON.stringify({ displayName: form.displayName, email: form.email, password: form.password, role: form.role }) });
-      setForm(emptyUserForm);
-      setSubmitted(false); await onRefresh();
+      resetCreateForm();
+      setSubmitted(false); setCreating(false); await onRefresh();
       onToast({ type: 'success', title: 'Usuário criado', detail: 'O novo usuário foi cadastrado com a senha definida no formulário.' });
     } catch (reason) { onToast({ type: 'error', title: 'Falha ao criar usuário', detail: friendlyMessage(reason, 'Não foi possível salvar o usuário. Tente novamente.') }); }
     finally { setSaving(false); }
@@ -1613,11 +1974,12 @@ function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onTo
     if (validateManagedUserForm({ displayName: editForm.displayName, email: editForm.email, role: editingIsGlobalAdmin ? 'global_administrator' : editForm.role, password: editForm.password, editing: true }).length > 0) {
       return;
     }
+    if (editForm.password && editConfirmPassword !== editForm.password) return;
     if (!isDirty) { cancelEdit(); return; }
     setEditSaving(true);
     try {
       await api(`/v1/users/${editing}`, token, { method: 'PATCH', body: JSON.stringify({ displayName: editForm.displayName, password: editForm.password || undefined, role: editingIsGlobalAdmin ? undefined : editForm.role, active: editForm.active }) });
-      setEditing(null); setEditSubmitted(false); await onRefresh();
+      setEditing(null); setEditSubmitted(false); setEditConfirmPassword(''); setShowEditPassword(false); setShowEditConfirm(false); await onRefresh();
       onToast({ type: 'success', title: 'Usuário atualizado', detail: 'As alterações foram salvas com sucesso.' });
     } catch (reason) { onToast({ type: 'error', title: 'Falha ao atualizar usuário', detail: friendlyMessage(reason, 'Não foi possível salvar o usuário. Tente novamente.') }); }
     finally { setEditSaving(false); }
@@ -1628,11 +1990,17 @@ function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onTo
     const nextForm = { displayName: user.display_name, email: user.email, password: '', role: user.roles[0] ?? 'viewer', cpf: '000.000.000-00', coligada: 'HealthLink Sentinel', active: user.active };
     setEditForm(nextForm);
     setInitialEditForm(nextForm);
+    setEditConfirmPassword('');
+    setShowEditPassword(false);
+    setShowEditConfirm(false);
     setEditSubmitted(false);
   }
 
   function cancelEdit() {
     setEditing(null);
+    setEditConfirmPassword('');
+    setShowEditPassword(false);
+    setShowEditConfirm(false);
     setEditSubmitted(false);
   }
 
@@ -1641,56 +2009,12 @@ function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onTo
     {deleteTarget && <ConfirmDialog title="Excluir usuário" message={`Excluir "${deleteTarget.display_name}" do tenant? O histórico global será preservado, mas ele não aparecerá mais nesta lista.`} confirmLabel="Excluir" busy={deleting} onConfirm={() => void confirmDelete()} onCancel={() => setDeleteTarget(null)} />}
     {blockTarget && <ConfirmDialog title="Bloquear usuário" message={`Bloquear "${blockTarget.display_name}"? O acesso dele à plataforma será suspenso até que seja desbloqueado novamente.`} confirmLabel="Bloquear" confirmIcon={<BlockIcon />} tone="warning" busy={blocking} onConfirm={() => void confirmBlock()} onCancel={() => setBlockTarget(null)} />}
     {unblockTarget && <ConfirmDialog title="Desbloquear usuário" message={`Desbloquear "${unblockTarget.display_name}"? O acesso dele à plataforma será restaurado imediatamente.`} confirmLabel="Desbloquear" confirmIcon={<UnblockIcon />} tone="positive" busy={unblocking} onConfirm={() => void confirmUnblock()} onCancel={() => setUnblockTarget(null)} />}
-    <div className="section-heading"><div><p className="eyebrow">GOVERNANÇA DE ACESSO</p><h2>Gerenciamento de usuários</h2><small>Controle de identidades, perfis e acesso ao cliente.</small></div></div>
-    <button className="secondary-button approval-launch" onClick={() => setApprovalOpen(true)}>Aprovações {requests.length > 0 && <b className="nav-badge approval-count">{requests.length}</b>}</button>
-    {editing && <div className="form-modal-backdrop" role="presentation" onMouseDown={cancelEdit}>
-      <article className="form-card" role="dialog" aria-modal="true" aria-label="Editar identidade" onMouseDown={(event) => event.stopPropagation()}>
-        <form className="user-form" onSubmit={submitEdit} noValidate>
-          <div className="panel-title">
-            <div>
-              <p className="eyebrow">EDITAR IDENTIDADE</p>
-              <h3>Atualizar usuário</h3>
-              <small className="muted" style={{ margin: 0 }}>Os campos marcados com <b className="req">*</b> são obrigatórios.</small>
-            </div>
-            <button type="button" className="icon-button clear-filters-button" aria-label="Fechar edição" onClick={cancelEdit}><CloseIcon /></button>
-          </div>
-          <div className="user-form-grid">
-            <label>
-              <span className="field-label">Nome completo <b className="req">*</b></span>
-              <input value={editForm.displayName} className={editSubmitted && !editForm.displayName.trim() ? 'field-invalid' : ''} onChange={(e) => setEditForm({ ...editForm, displayName: e.target.value })} placeholder="Ex.: Nome" required />
-              {editSubmitted && !editForm.displayName.trim() && <span className="field-error-text">Informe o nome completo.</span>}
-            </label>
-            <label>
-              <span className="field-label">E-mail <b className="req">*</b></span>
-              <input type="text" inputMode="email" name="hl-account-email-field" autoComplete="off" data-lpignore="true" data-1p-ignore value={editForm.email} className={editSubmitted && !editForm.email.trim() ? 'field-invalid' : ''} disabled onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} placeholder="nome@empresa.com" required />
-              {editSubmitted && !editForm.email.trim() && <span className="field-error-text">Informe o e-mail.</span>}
-            </label>
-            <label>
-              <span className="field-label">Perfil <b className="req">*</b></span>
-              {editingIsGlobalAdmin
-                ? <AppDropdown placeholder="Administrador global" value="" disabled onChange={() => undefined} options={[]} />
-                : <AppDropdown placeholder="Selecione um perfil" invalid={editSubmitted && !editForm.role} value={editForm.role} onChange={(next) => setEditForm({ ...editForm, role: next })} options={[{ value: 'tenant_administrator', label: 'Administrador' }, { value: 'supervisor', label: 'Supervisor' }, { value: 'mobile_unit_supervisor', label: 'Supervisor de unidades móveis' }, { value: 'noc_operator', label: 'Operador NOC' }, { value: 'service_agent', label: 'Agente de integração' }, { value: 'viewer', label: 'Visualizador' }]} />}
-              {editingIsGlobalAdmin && <span className="field-hint">O perfil de administrador global não pode ser alterado por este formulário.</span>}
-              {!editingIsGlobalAdmin && editSubmitted && !editForm.role && <span className="field-error-text">Selecione o perfil.</span>}
-            </label>
-            <label>
-              <span className="field-label">Status <b className="req">*</b></span>
-              <AppDropdown value={editForm.active ? 'active' : 'inactive'} onChange={(next) => setEditForm({ ...editForm, active: next === 'active' })} options={[{ value: 'active', label: 'Ativo' }, { value: 'inactive', label: 'Bloqueado' }]} />
-            </label>
-            <label>
-              <span className="field-label">Nova senha (opcional)</span>
-              <input type="password" name="hl-new-account-password" autoComplete="new-password" data-lpignore="true" data-1p-ignore minLength={8} value={editForm.password} onChange={(e) => setEditForm({ ...editForm, password: e.target.value })} placeholder="Deixe em branco para manter a atual" />
-            </label>
-          </div>
-          <div className="form-actions">
-            <button type="button" className="secondary-button clear-filters-button" onClick={cancelEdit}><CloseIcon /> Cancelar</button>
-            <button className="primary" disabled={editSaving || !isDirty}>{editSaving ? 'Salvando…' : <><CheckIcon /> Salvar alterações</>}</button>
-          </div>
-        </form>
-      </article>
-    </div>}
-    <div className="users-layout">
-      <form className="user-form panel" onSubmit={submit} noValidate>
+    {editing ? <>
+      <div className="section-heading">
+        <div><p className="eyebrow">GOVERNANÇA DE ACESSO</p><h2>Editar usuário</h2><small>Atualize os dados da identidade selecionada.</small></div>
+      </div>
+      <button className="back-button" onClick={cancelEdit}>← Voltar para a lista de usuários</button>
+      <form className="user-form panel users-create-form" onSubmit={submitEdit} noValidate>
         <div className="panel-title">
           <div>
             <p className="eyebrow">DADOS DO USUÁRIO</p>
@@ -1699,36 +2023,151 @@ function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onTo
           </div>
         </div>
         <div className="user-form-grid">
-          <label>
-            <span className="field-label">Nome completo <b className="req">*</b></span>
-            <input value={form.displayName} className={submitted && !form.displayName.trim() ? 'field-invalid' : ''} onChange={(e) => setForm({ ...form, displayName: e.target.value })} placeholder="Ex.: Nome" required />
-            {submitted && !form.displayName.trim() && <span className="field-error-text">Informe o nome completo.</span>}
-          </label>
-          <label>
-            <span className="field-label">E-mail <b className="req">*</b></span>
-            <input type="text" inputMode="email" name="hl-account-email-field" autoComplete="off" data-lpignore="true" data-1p-ignore value={form.email} className={submitted && !form.email.trim() ? 'field-invalid' : ''} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="nome@empresa.com" required />
-            {submitted && !form.email.trim() && <span className="field-error-text">Informe o e-mail.</span>}
-          </label>
-          <label>
-            <span className="field-label">Perfil <b className="req">*</b></span>
-            <AppDropdown placeholder="Selecione um perfil" invalid={submitted && !form.role} value={form.role} onChange={(next) => setForm({ ...form, role: next })} options={[{ value: 'tenant_administrator', label: 'Administrador' }, { value: 'supervisor', label: 'Supervisor' }, { value: 'mobile_unit_supervisor', label: 'Supervisor de unidades móveis' }, { value: 'noc_operator', label: 'Operador NOC' }, { value: 'service_agent', label: 'Agente de integração' }, { value: 'viewer', label: 'Visualizador' }]} />
-            {submitted && !form.role && <span className="field-error-text">Selecione o perfil.</span>}
-          </label>
-          <label>
-            <span className="field-label">Status <b className="req">*</b></span>
-            <AppDropdown value={form.active ? 'active' : 'inactive'} onChange={(next) => setForm({ ...form, active: next === 'active' })} options={[{ value: 'active', label: 'Ativo' }, { value: 'inactive', label: 'Bloqueado' }]} />
-          </label>
-          <label>
-            <span className="field-label">Senha <b className="req">*</b></span>
-            <input type="password" name="hl-new-account-password" autoComplete="new-password" data-lpignore="true" data-1p-ignore minLength={8} value={form.password} className={submitted && !form.password ? 'field-invalid' : ''} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Mínimo de 8 caracteres" required />
-            {submitted && !form.password && <span className="field-error-text">Informe uma senha para o usuário.</span>}
-          </label>
+          <div className="mfield">
+            <div className="input-group has-icon">
+              <span className="input-icon" aria-hidden="true"><UserIcon /></span>
+              <input id="eu-name" value={editForm.displayName} className={editSubmitted && !editForm.displayName.trim() ? 'field-invalid' : ''} onChange={(e) => setEditForm({ ...editForm, displayName: e.target.value })} placeholder=" " required />
+              <label htmlFor="eu-name">Nome completo <b className="req">*</b></label>
+            </div>
+            {editSubmitted && !editForm.displayName.trim() && <span className="field-error-text">Informe o nome completo.</span>}
+          </div>
+          <div className="mfield">
+            <div className="input-group has-icon">
+              <span className="input-icon" aria-hidden="true"><MailIcon /></span>
+              <input id="eu-email" type="text" value={editForm.email} disabled placeholder=" " />
+              <label htmlFor="eu-email">E-mail</label>
+            </div>
+            <span className="field-hint">O e-mail não pode ser alterado por aqui.</span>
+          </div>
+          <div className="mfield">
+            <div className="input-group has-icon is-dropdown">
+              <span className="input-icon" aria-hidden="true"><BadgeIcon /></span>
+              {editingIsGlobalAdmin
+                ? <AppDropdown placeholder="Administrador global" value="" disabled onChange={() => undefined} options={[]} />
+                : <AppDropdown placeholder="Selecione um perfil" invalid={editSubmitted && !editForm.role} value={editForm.role} onChange={(next) => setEditForm({ ...editForm, role: next })} options={[{ value: 'tenant_administrator', label: 'Administrador' }, { value: 'supervisor', label: 'Supervisor' }, { value: 'mobile_unit_supervisor', label: 'Supervisor de unidades móveis' }, { value: 'noc_operator', label: 'Operador NOC' }, { value: 'service_agent', label: 'Agente de integração' }, { value: 'viewer', label: 'Visualizador' }]} />}
+              <span className="input-group-label">Perfil <b className="req">*</b></span>
+            </div>
+            {editingIsGlobalAdmin && <span className="field-hint">O perfil de administrador global não pode ser alterado por este formulário.</span>}
+            {!editingIsGlobalAdmin && editSubmitted && !editForm.role && <span className="field-error-text">Selecione o perfil.</span>}
+          </div>
+          <div className="mfield">
+            <div className="input-group has-icon is-dropdown">
+              <span className="input-icon" aria-hidden="true"><UnblockIcon /></span>
+              <AppDropdown value={editForm.active ? 'active' : 'inactive'} onChange={(next) => setEditForm({ ...editForm, active: next === 'active' })} options={[{ value: 'active', label: 'Ativo' }, { value: 'inactive', label: 'Bloqueado' }]} />
+              <span className="input-group-label">Status <b className="req">*</b></span>
+            </div>
+          </div>
+          <div className="mfield">
+            <div className="input-group has-icon">
+              <span className="input-icon" aria-hidden="true"><LockIcon /></span>
+              <div className="password-field">
+                <input id="eu-password" type={showEditPassword ? 'text' : 'password'} name="hl-new-account-password" autoComplete="new-password" data-lpignore="true" data-1p-ignore minLength={8} value={editForm.password} className={editSubmitted && !!editForm.password && editForm.password.length < 8 ? 'field-invalid' : ''} onChange={(e) => setEditForm({ ...editForm, password: e.target.value })} placeholder=" " />
+                <button type="button" className="password-toggle" onClick={() => setShowEditPassword((prev) => !prev)} aria-label={showEditPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showEditPassword ? <EyeOffIcon /> : <EyeIcon />}</button>
+              </div>
+              <label htmlFor="eu-password">Nova senha (opcional)</label>
+            </div>
+            {editSubmitted && !!editForm.password && editForm.password.length < 8 && <span className="field-error-text">Pelo menos 8 caracteres.</span>}
+          </div>
+          <div className="mfield">
+            <div className="input-group has-icon">
+              <span className="input-icon" aria-hidden="true"><LockIcon /></span>
+              <div className="password-field">
+                <input id="eu-password-confirm" type={showEditConfirm ? 'text' : 'password'} name="hl-new-account-password-confirm" autoComplete="new-password" data-lpignore="true" data-1p-ignore value={editConfirmPassword} className={editSubmitted && !!editForm.password && editConfirmPassword !== editForm.password ? 'field-invalid' : ''} onChange={(e) => setEditConfirmPassword(e.target.value)} placeholder=" " />
+                <button type="button" className="password-toggle" onClick={() => setShowEditConfirm((prev) => !prev)} aria-label={showEditConfirm ? 'Ocultar senha' : 'Mostrar senha'}>{showEditConfirm ? <EyeOffIcon /> : <EyeIcon />}</button>
+              </div>
+              <label htmlFor="eu-password-confirm">Confirmar nova senha</label>
+            </div>
+            {editSubmitted && !!editForm.password && editConfirmPassword !== editForm.password && <span className="field-error-text">As senhas não coincidem.</span>}
+          </div>
         </div>
         <div className="form-actions">
-          <button type="button" className="secondary-button clear-filters-button" onClick={() => { setForm(emptyUserForm); setSubmitted(false); }}><ClearFilterIcon /> Limpar</button>
+          <button type="button" className="secondary-button clear-filters-button" onClick={cancelEdit}><CloseIcon /> Cancelar</button>
+          <button className="primary" disabled={editSaving || !isDirty}>{editSaving ? 'Salvando…' : <><CheckIcon /> Salvar alterações</>}</button>
+        </div>
+      </form>
+    </> : creating ? <>
+      <div className="section-heading">
+        <div><p className="eyebrow">GOVERNANÇA DE ACESSO</p><h2>Criar novo usuário</h2><small>Preencha os dados abaixo para registrar uma nova identidade.</small></div>
+      </div>
+      <button className="back-button" onClick={() => { setCreating(false); resetCreateForm(); setSubmitted(false); }}>← Voltar para a lista de usuários</button>
+      <form className="user-form panel users-create-form" onSubmit={submit} noValidate>
+        <div className="panel-title">
+          <div>
+            <p className="eyebrow">DADOS DO USUÁRIO</p>
+            <h3>Dados do usuário</h3>
+            <small className="muted" style={{ margin: 0 }}>Os campos marcados com <b className="req">*</b> são obrigatórios.</small>
+          </div>
+        </div>
+        <div className="user-form-grid">
+          <div className="mfield">
+            <div className="input-group has-icon">
+              <span className="input-icon" aria-hidden="true"><UserIcon /></span>
+              <input id="cu-name" value={form.displayName} className={submitted && !form.displayName.trim() ? 'field-invalid' : ''} onChange={(e) => setForm({ ...form, displayName: e.target.value })} placeholder=" " required />
+              <label htmlFor="cu-name">Nome completo <b className="req">*</b></label>
+            </div>
+            {submitted && !form.displayName.trim() && <span className="field-error-text">Informe o nome completo.</span>}
+          </div>
+          <div className="mfield">
+            <div className="input-group has-icon">
+              <span className="input-icon" aria-hidden="true"><MailIcon /></span>
+              <input id="cu-email" type="text" inputMode="email" name="hl-account-email-field" autoComplete="off" data-lpignore="true" data-1p-ignore value={form.email} className={createEmailMissing || createEmailInvalid ? 'field-invalid' : ''} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder=" " required />
+              <label htmlFor="cu-email">E-mail <b className="req">*</b></label>
+            </div>
+            {createEmailMissing && <span className="field-error-text">Informe o e-mail.</span>}
+            {createEmailInvalid && <span className="field-error-text">Informe um e-mail válido, como nome@dominio.com.</span>}
+          </div>
+          <div className="mfield">
+            <div className="input-group has-icon is-dropdown">
+              <span className="input-icon" aria-hidden="true"><BadgeIcon /></span>
+              <AppDropdown placeholder="Selecione um perfil" invalid={submitted && !form.role} value={form.role} onChange={(next) => setForm({ ...form, role: next })} options={[{ value: 'tenant_administrator', label: 'Administrador' }, { value: 'supervisor', label: 'Supervisor' }, { value: 'mobile_unit_supervisor', label: 'Supervisor de unidades móveis' }, { value: 'noc_operator', label: 'Operador NOC' }, { value: 'service_agent', label: 'Agente de integração' }, { value: 'viewer', label: 'Visualizador' }]} />
+              <span className="input-group-label">Perfil <b className="req">*</b></span>
+            </div>
+            {submitted && !form.role && <span className="field-error-text">Selecione o perfil.</span>}
+          </div>
+          <div className="mfield">
+            <div className="input-group has-icon is-dropdown">
+              <span className="input-icon" aria-hidden="true"><UnblockIcon /></span>
+              <AppDropdown value={form.active ? 'active' : 'inactive'} onChange={(next) => setForm({ ...form, active: next === 'active' })} options={[{ value: 'active', label: 'Ativo' }, { value: 'inactive', label: 'Bloqueado' }]} />
+              <span className="input-group-label">Status <b className="req">*</b></span>
+            </div>
+          </div>
+          <div className="mfield">
+            <div className="input-group has-icon">
+              <span className="input-icon" aria-hidden="true"><LockIcon /></span>
+              <div className="password-field">
+                <input id="cu-password" type={showPassword ? 'text' : 'password'} name="hl-new-account-password" autoComplete="new-password" data-lpignore="true" data-1p-ignore minLength={8} value={form.password} className={submitted && (!form.password || form.password.length < 8) ? 'field-invalid' : ''} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder=" " required />
+                <button type="button" className="password-toggle" onClick={() => setShowPassword((prev) => !prev)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOffIcon /> : <EyeIcon />}</button>
+              </div>
+              <label htmlFor="cu-password">Senha <b className="req">*</b></label>
+            </div>
+            {submitted && !form.password && <span className="field-error-text">Informe uma senha para o usuário.</span>}
+            {submitted && !!form.password && form.password.length < 8 && <span className="field-error-text">Pelo menos 8 caracteres.</span>}
+          </div>
+          <div className="mfield">
+            <div className="input-group has-icon">
+              <span className="input-icon" aria-hidden="true"><LockIcon /></span>
+              <div className="password-field">
+                <input id="cu-password-confirm" type={showConfirmPassword ? 'text' : 'password'} name="hl-new-account-password-confirm" autoComplete="new-password" data-lpignore="true" data-1p-ignore value={confirmPassword} className={submitted && confirmPassword !== form.password ? 'field-invalid' : ''} onChange={(e) => setConfirmPassword(e.target.value)} placeholder=" " required />
+                <button type="button" className="password-toggle" onClick={() => setShowConfirmPassword((prev) => !prev)} aria-label={showConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showConfirmPassword ? <EyeOffIcon /> : <EyeIcon />}</button>
+              </div>
+              <label htmlFor="cu-password-confirm">Confirmar senha <b className="req">*</b></label>
+            </div>
+            {submitted && confirmPassword !== form.password && <span className="field-error-text">As senhas não coincidem.</span>}
+          </div>
+        </div>
+        <div className="form-actions">
+          <button type="button" className="secondary-button clear-filters-button" onClick={() => { resetCreateForm(); setSubmitted(false); }}><ClearFilterIcon /> Limpar</button>
           <button className="primary" disabled={saving}>{saving ? 'Salvando…' : <><PlusIcon /> Criar usuário</>}</button>
         </div>
       </form>
+    </> : <>
+      <div className="section-heading">
+        <div><p className="eyebrow">GOVERNANÇA DE ACESSO</p><h2>Gerenciamento de usuários</h2><small>Controle de identidades, perfis e acesso ao cliente.</small></div>
+        <div className="section-heading-actions">
+          <button type="button" className="secondary-button" onClick={() => setApprovalOpen(true)}><ClipboardIcon /> Aprovações {requests.length > 0 && <b className="nav-badge approval-count">{requests.length}</b>}</button>
+          <button type="button" className="primary" onClick={() => { resetCreateForm(); setSubmitted(false); setCreating(true); }}><PlusIcon /> Criar usuário</button>
+        </div>
+      </div>
       <div className="users-list panel">
         <div className="panel-title"><div><p className="eyebrow">USUÁRIOS DO CLIENTE</p><h3>{filteredUsers.length} identidades</h3></div><button className="secondary-button compact action-refresh-button" onClick={() => void onRefresh()} disabled={loading} title="Recarregar lista de usuários"><RefreshIcon /> Atualizar</button></div>
         <div className="user-filters">
@@ -1737,7 +2176,27 @@ function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onTo
           {(nameFilter || statusFilter) && <button type="button" className="secondary-button compact clear-filters-button" onClick={clearUserFilters}><ClearFilterIcon /> Limpar</button>}
         </div>
         {loading ? <div className="empty-state compact-empty"><p>Consultando diretório…</p></div> : filteredUsers.length === 0 ? <div className="empty-state compact-empty"><p>Nenhum usuário encontrado.</p></div> : <>
-          <div className="user-table">{pagedUsers.map((user) => <article className={`user-row ${user.active ? '' : 'blocked'}`} key={user.id}><span className={`user-avatar ${user.active ? 'active' : 'blocked'}`}>{user.display_name.slice(0, 1).toUpperCase()}</span><div className="user-main"><strong>{user.display_name}</strong><small>{user.email}</small></div><div className="user-role"><span>{user.roles[0]?.replaceAll('_', ' ') ?? 'sem perfil'}</span><span className={`status ${user.active ? 'online' : 'blocked'}`}>{user.active ? 'Ativo' : 'Bloqueado'}</span></div><div className="user-actions"><button className="secondary-button compact" onClick={() => startEdit(user)}><EditIcon /> Editar</button>{user.active ? <button className="secondary-button compact warning-action-button" onClick={() => setBlockTarget(user)}><BlockIcon /> Bloquear</button> : <button className="secondary-button compact" onClick={() => setUnblockTarget(user)}><UnblockIcon /> Desbloquear</button>}<button className="secondary-button compact clear-filters-button" onClick={() => setDeleteTarget(user)}><TrashIcon /> Excluir</button></div></article>)}</div>
+          <div className="user-table user-table-scroll">
+            <div className="user-table-head">
+              <span>Nome</span>
+              <span>E-mail</span>
+              <span className="user-cell-role">Papel</span>
+              <span className="user-cell-status">Status</span>
+              <span className="user-cell-actions">Ações</span>
+            </div>
+            {pagedUsers.map((user) => <article className={`user-row ${user.active ? '' : 'blocked'}`} key={user.id}>
+              <div className="user-cell-name">
+                <span className={`user-avatar ${user.active ? 'active' : 'blocked'}`}>{initialsFromName(user.display_name)}</span>
+                <strong className="user-name-text">{user.display_name}</strong>
+              </div>
+              <div className="user-cell-email" title={user.email}>{user.email}</div>
+              <div className="user-cell-role"><span className="role-badge">{roleLabel(user.roles)}</span></div>
+              <div className="user-cell-status"><span className={`status ${user.active ? 'online' : 'blocked'}`}>{user.active ? 'Ativo' : 'Bloqueado'}</span></div>
+              <div className="user-cell-actions">
+                <RowActionsMenu active={user.active} onEdit={() => startEdit(user)} onBlock={() => setBlockTarget(user)} onUnblock={() => setUnblockTarget(user)} onDelete={() => setDeleteTarget(user)} />
+              </div>
+            </article>)}
+          </div>
           {totalPages > 1 && <div className="pagination">
             <button type="button" className="secondary-button compact" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Anterior</button>
             <span>Página {currentPage} de {totalPages}</span>
@@ -1745,7 +2204,7 @@ function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onTo
           </div>}
         </>}
       </div>
-    </div>
+    </>}
   </section>;
 }
 
@@ -1866,9 +2325,20 @@ function AlertRow({ alert, isHistory, onAction }: { alert: Alert; isHistory: boo
 function AlertsCenter({ alerts, mode, loading, onModeChange, onAction, onRetry }: { alerts: Alert[]; mode: 'active' | 'history'; loading: boolean; onModeChange: (mode: 'active' | 'history') => void; onAction: (id: string, action: 'acknowledge' | 'resolve') => Promise<void>; onRetry: () => void }) {
   const isHistory = mode === 'history';
   const criticalCount = !isHistory ? alerts.filter((a) => a.severity >= 4 && a.status !== 'resolved').length : 0;
+  const PAGE_SIZE = 20;
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [mode]);
+  const totalPages = Math.max(1, Math.ceil(alerts.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedAlerts = alerts.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   return (
-    <section className="alerts-center">
-      <div className="alerts-center-header">
+    <section className="alerts-center" key={mode}>
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">GOVERNANÇA OPERACIONAL · RESPOSTA</p>
+          <h2>Central de alertas</h2>
+          <small>Triagem e tratativa dos incidentes monitorados em tempo real.</small>
+        </div>
         <div className="alert-tabs" role="tablist" aria-label="Filtro de alertas">
           <button className={`alert-tab ${!isHistory ? 'active' : ''}`} onClick={() => onModeChange('active')} role="tab" aria-selected={!isHistory}>
             Ativos <span>{!isHistory ? alerts.length : '—'}</span>
@@ -1877,19 +2347,19 @@ function AlertsCenter({ alerts, mode, loading, onModeChange, onAction, onRetry }
             Histórico resolvido <span>{isHistory ? alerts.length : '—'}</span>
           </button>
         </div>
-        {criticalCount > 0 && (
-          <div className="alerts-critical-banner" role="alert">
-            <span className="critical-pulse-dot" />
-            <strong>{criticalCount} incidente(s) crítico(s)</strong> requerem ação imediata
-          </div>
-        )}
       </div>
+      {criticalCount > 0 && (
+        <div className="alerts-critical-banner" role="alert">
+          <span className="critical-pulse-dot" />
+          <strong>{criticalCount} incidente(s) crítico(s)</strong> requerem ação imediata
+        </div>
+      )}
+      <div className="alerts-panel panel">
       <div className="section-heading">
         <div><p className="eyebrow">EVENTOS E INCIDENTES</p><h2>{isHistory ? 'Histórico resolvido' : 'Alertas ativos'}</h2></div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="alerts-heading-actions">
           {loading && <span className="alerts-loading-indicator"><span className="btn-spinner" /> Carregando…</span>}
-          <button className="secondary-button compact action-refresh-button" onClick={onRetry} disabled={loading} title="Recarregar lista de alertas"><RefreshIcon /> Atualizar</button>
-          <span className={`problem-count ${isHistory ? 'resolved-count' : ''}`}>{alerts.length} registro(s)</span>
+          <button className="secondary-button action-refresh-button" onClick={onRetry} disabled={loading} title="Recarregar lista de alertas"><RefreshIcon /> Atualizar</button>
         </div>
       </div>
       {loading && alerts.length === 0 ? (
@@ -1904,10 +2374,18 @@ function AlertsCenter({ alerts, mode, loading, onModeChange, onAction, onRetry }
           {!isHistory && <button className="secondary-button empty-state-action" onClick={onRetry}>Verificar novamente</button>}
         </div>
       ) : (
-        <div className="alert-list">
-          {alerts.map((alert) => <AlertRow key={alert.id} alert={alert} isHistory={isHistory} onAction={onAction} />)}
-        </div>
+        <>
+          <div className="alert-list alert-list-scroll">
+            {pagedAlerts.map((alert) => <AlertRow key={alert.id} alert={alert} isHistory={isHistory} onAction={onAction} />)}
+          </div>
+          {totalPages > 1 && <div className="pagination">
+            <button type="button" className="secondary-button compact" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Anterior</button>
+            <span>Página {currentPage} de {totalPages}</span>
+            <button type="button" className="secondary-button compact" disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)}>Próxima</button>
+          </div>}
+        </>
       )}
+      </div>
     </section>
   );
 }
@@ -1921,6 +2399,15 @@ function IncidentReports({ alerts, units, onRefresh }: { alerts: Alert[]; units:
   const formatDate = (value?: string | null) => value ? new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
   const resolutionTime = (alert: Alert) => alert.resolved_at ? `${Math.max(0, Math.round((new Date(alert.resolved_at).getTime() - new Date(alert.opened_at).getTime()) / 60000))} min` : 'Em aberto';
   const clearFilters = () => { setFilters({ status: 'all', severity: 'all', unitId: '', from: '', to: '' }); setPage(1); };
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  useEffect(() => {
+    const before = () => setPrinting(true);
+    const after = () => setPrinting(false);
+    window.addEventListener('beforeprint', before);
+    window.addEventListener('afterprint', after);
+    return () => { window.removeEventListener('beforeprint', before); window.removeEventListener('afterprint', after); };
+  }, []);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 20;
   const totalPages = Math.max(1, Math.ceil(filteredAlerts.length / PAGE_SIZE));
@@ -1930,28 +2417,33 @@ function IncidentReports({ alerts, units, onRefresh }: { alerts: Alert[]; units:
   return <section className="incident-reports">
     <div className="reports-header">
       <div><p className="eyebrow">GOVERNANÇA OPERACIONAL · AUDITORIA</p><h2>Relatório de incidentes</h2><small>Consolidação dos eventos monitorados, do primeiro alerta ao encerramento.</small></div>
-      <div className="reports-actions"><button type="button" className="secondary-button compact" onClick={onRefresh}><RefreshIcon /> Atualizar</button><button type="button" className="primary compact" onClick={() => window.print()}><NavReportIcon /> Imprimir relatório</button></div>
-    </div>
-    <div className="report-filters">
-      <div className="report-filter-heading"><p className="eyebrow">RECORTE DO RELATÓRIO</p><strong>{filteredAlerts.length} incidente(s) encontrado(s)</strong></div>
-      <label>Período inicial<DateField value={filters.from} onChange={(value) => updateFilter('from', value)} /></label>
-      <label>Período final<DateField value={filters.to} onChange={(value) => updateFilter('to', value)} /></label>
-      <label>Situação<AppDropdown value={filters.status} onChange={(value) => updateFilter('status', value as IncidentReportFilters['status'])} options={[{ value: 'all', label: 'Todas' }, { value: 'open', label: 'Abertos' }, { value: 'acknowledged', label: 'Reconhecidos' }, { value: 'resolved', label: 'Resolvidos' }]} /></label>
-      <label>Severidade<AppDropdown value={filters.severity} onChange={(value) => updateFilter('severity', value as IncidentReportFilters['severity'])} options={[{ value: 'all', label: 'Todas' }, { value: 'critical', label: 'Crítica (S5)' }, { value: 'high', label: 'Alta (S4)' }, { value: 'medium', label: 'Média (S2–S3)' }, { value: 'low', label: 'Baixa (S0–S1)' }]} /></label>
-      <label>Unidade<AppDropdown value={filters.unitId} onChange={(value) => updateFilter('unitId', value)} options={[{ value: '', label: 'Todas as unidades' }, ...units.map((unit) => ({ value: unit.unit_id, label: `${unit.code} · ${unit.name}` }))]} /></label>
-      {hasFilters && <button type="button" className="secondary-button compact clear-filters-button" onClick={clearFilters}><ClearFilterIcon /> Limpar filtros</button>}
+      <div className="reports-actions"><button type="button" className="secondary-button" onClick={onRefresh}><RefreshIcon /> Atualizar</button><button type="button" className="primary" onClick={() => window.print()}><NavReportIcon /> Imprimir relatório</button></div>
     </div>
     <div className="report-summary-grid">
-      <ReportMetric label="Total de incidentes" value={summary.total} tone="neutral" />
-      <ReportMetric label="Em aberto" value={summary.open} tone="danger" />
-      <ReportMetric label="Reconhecidos" value={summary.acknowledged} tone="warn" />
-      <ReportMetric label="Resolvidos" value={summary.resolved} tone="ok" />
-      <ReportMetric label="Críticos" value={summary.critical} tone="danger" />
+      <ReportMetric label="Incidentes no total" value={summary.total} tone="neutral" />
+      <ReportMetric label="Incidentes em aberto" value={summary.open} tone="danger" />
+      <ReportMetric label="Incidentes reconhecidos" value={summary.acknowledged} tone="warn" />
+      <ReportMetric label="Incidentes resolvidos" value={summary.resolved} tone="ok" />
+      <ReportMetric label="Incidentes críticos" value={summary.critical} tone="danger" />
       <ReportMetric label="Tempo médio de resolução" value={summary.averageResolutionMinutes ? `${summary.averageResolutionMinutes} min` : '—'} tone="cyan" />
     </div>
     <div className="report-table-panel">
-      <div className="panel-title"><div><p className="eyebrow">REGISTRO CONSOLIDADO</p><h3>Incidentes monitorados</h3></div><span className="problem-count neutral-count">{filteredAlerts.length} registro(s)</span></div>
-      {filteredAlerts.length === 0 ? <div className="empty-state compact-empty"><span className="empty-glyph"><CheckIcon /></span><strong>Nenhum incidente no recorte</strong><small>Ajuste os filtros ou atualize os dados para consultar novamente.</small></div> : <div className="report-table-wrap"><div className="incident-report-table"><div className="incident-report-head"><span>Incidente</span><span>Severidade</span><span>Unidade / ativo</span><span>Abertura</span><span>Encerramento</span><span>Tempo</span><span>Status</span></div><div className="incident-report-list">{pagedAlerts.map((alert) => { const statusTone = alert.status === 'resolved' ? 'online' : alert.status === 'acknowledged' ? 'degraded' : 'offline'; const statusText = alert.status === 'resolved' ? 'Resolvido' : alert.status === 'acknowledged' ? 'Reconhecido' : 'Aberto'; return <div key={alert.id} className={`incident-row ${statusTone}`}><div><strong>{alert.title}</strong><small>{alert.id.slice(0, 8)} · registro auditável</small></div><div><AlertSeverityBadge severity={alert.severity} /></div><div><strong>{alert.unit_code ?? 'Unidade não associada'}</strong><small>{alert.equipment_name ?? 'Ativo não informado'}</small></div><div>{formatDate(alert.opened_at)}</div><div>{formatDate(alert.resolved_at)}</div><div>{resolutionTime(alert)}</div><div><span className={`status ${statusTone}`}>{statusText}</span></div></div>; })}</div></div></div>}
+      <div className="panel-title">
+        <div><p className="eyebrow">REGISTRO CONSOLIDADO</p><h3>Incidentes monitorados</h3></div>
+        <div className="report-title-actions">
+          {hasFilters && !filtersOpen && <span className="report-filters-flag">filtros ativos</span>}
+          <button type="button" className="secondary-button report-filters-toggle" onClick={() => setFiltersOpen((v) => !v)} aria-expanded={filtersOpen}><ClearFilterIcon /> {filtersOpen ? 'Recolher filtros' : 'Filtros'} <ChevronIcon up={filtersOpen} /></button>
+        </div>
+      </div>
+      {filtersOpen && <div className="report-filters">
+        <label>Período inicial<DateField value={filters.from} onChange={(value) => updateFilter('from', value)} /></label>
+        <label>Período final<DateField value={filters.to} onChange={(value) => updateFilter('to', value)} /></label>
+        <label>Situação<AppDropdown value={filters.status} onChange={(value) => updateFilter('status', value as IncidentReportFilters['status'])} options={[{ value: 'all', label: 'Todas' }, { value: 'open', label: 'Abertos' }, { value: 'acknowledged', label: 'Reconhecidos' }, { value: 'resolved', label: 'Resolvidos' }]} /></label>
+        <label>Severidade<AppDropdown value={filters.severity} onChange={(value) => updateFilter('severity', value as IncidentReportFilters['severity'])} options={[{ value: 'all', label: 'Todas' }, { value: 'critical', label: 'Crítica (S5)' }, { value: 'high', label: 'Alta (S4)' }, { value: 'medium', label: 'Média (S2–S3)' }, { value: 'low', label: 'Baixa (S0–S1)' }]} /></label>
+        <label>Unidade<AppDropdown value={filters.unitId} onChange={(value) => updateFilter('unitId', value)} options={[{ value: '', label: 'Todas as unidades' }, ...units.map((unit) => ({ value: unit.unit_id, label: `${unit.code} · ${unit.name}` }))]} /></label>
+        {hasFilters && <button type="button" className="secondary-button compact clear-filters-button" onClick={clearFilters}><ClearFilterIcon /> Limpar filtros</button>}
+      </div>}
+      {filteredAlerts.length === 0 ? <div className="empty-state compact-empty"><span className="empty-glyph"><CheckIcon /></span><strong>Nenhum incidente no recorte</strong><small>Ajuste os filtros ou atualize os dados para consultar novamente.</small></div> : <div className="report-table-wrap"><div className="incident-report-table incident-report-scroll"><div className="incident-report-head"><span>Incidente</span><span>Severidade</span><span>Unidade / ativo</span><span>Abertura</span><span>Encerramento</span><span>Tempo</span><span>Status</span></div><div className="incident-report-list">{(printing ? filteredAlerts : pagedAlerts).map((alert) => { const statusTone = alert.status === 'resolved' ? 'online' : alert.status === 'acknowledged' ? 'degraded' : 'offline'; const statusText = alert.status === 'resolved' ? 'Resolvido' : alert.status === 'acknowledged' ? 'Reconhecido' : 'Aberto'; return <div key={alert.id} className={`incident-row ${statusTone}`}><div><strong>{alert.title}</strong><small>{alert.id.slice(0, 8)} · registro auditável</small></div><div><AlertSeverityBadge severity={alert.severity} /></div><div><strong>{alert.unit_code ?? 'Unidade não associada'}</strong><small>{alert.equipment_name ?? 'Ativo não informado'}</small></div><div>{formatDate(alert.opened_at)}</div><div>{formatDate(alert.resolved_at)}</div><div>{resolutionTime(alert)}</div><div><span className={`status ${statusTone}`}>{statusText}</span></div></div>; })}</div></div></div>}
       {totalPages > 1 && <div className="pagination">
         <button type="button" className="secondary-button compact" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Anterior</button>
         <span>Página {currentPage} de {totalPages}</span>
@@ -1962,7 +2454,7 @@ function IncidentReports({ alerts, units, onRefresh }: { alerts: Alert[]; units:
 }
 
 function ReportMetric({ label, value, tone }: { label: string; value: number | string; tone: 'neutral' | 'danger' | 'warn' | 'ok' | 'cyan' }) {
-  return <article className={`report-metric ${tone}`}><span>{label}</span><strong>{value}</strong><small>no recorte atual</small></article>;
+  return <article className={`report-metric ${tone}`}><strong>{value}</strong><span>{label}</span></article>;
 }
 
 function ToastStack({ toasts }: { toasts: Toast[] }) {
@@ -1988,67 +2480,100 @@ function ToastStack({ toasts }: { toasts: Toast[] }) {
   );
 }
 
-function EditProfileModal({ session, onSave, onClose }: { session: LoginResponse; onSave: (name: string) => void; onClose: () => void }) {
+function EditProfilePage({ session, onSaved, onClose }: { session: LoginResponse; onSaved: (name: string) => void; onClose: () => void }) {
   const [displayName, setDisplayName] = useState(session.user.displayName);
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [submitted, setSubmitted] = useState(false);
   useEffect(() => { const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); }; window.addEventListener('keydown', closeOnEscape); return () => window.removeEventListener('keydown', closeOnEscape); }, [onClose]);
   const nameMissing = submitted && !displayName.trim();
   const passwordInvalid = submitted && password.length > 0 && password.length < 8;
+  const confirmMismatch = submitted && password.length > 0 && confirmPassword !== password;
   const isDirty = displayName.trim() !== session.user.displayName || password.length > 0;
 
   async function submit(e: FormEvent) {
     e.preventDefault(); setSubmitted(true); setError('');
-    if (!displayName.trim() || (password.length > 0 && password.length < 8)) return;
+    if (!displayName.trim() || (password.length > 0 && password.length < 8) || (password.length > 0 && confirmPassword !== password)) return;
     if (!isDirty) { onClose(); return; }
     setSaving(true);
     try {
       await api(`/v1/users/${session.user.id}`, session.accessToken, { method: 'PATCH', body: JSON.stringify({ displayName: displayName.trim(), password: password || undefined }) });
-      onSave(displayName.trim());
+      onSaved(displayName.trim());
       onClose();
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Falha ao salvar o perfil.'); } finally { setSaving(false); }
   }
 
-  return (
-    <div className="approval-modal" role="dialog" aria-modal="true" onMouseDown={onClose}>
-      <form className="user-form panel user-edit-modal" onSubmit={submit} onMouseDown={(e) => e.stopPropagation()}>
-        <div className="panel-title">
-          <div>
-            <p className="eyebrow">PERFIL CORPORATIVO</p>
-            <h3>Editar perfil</h3>
-          </div>
-          <button type="button" className="icon-button clear-filters-button" aria-label="Fechar edição" onClick={onClose}><CloseIcon /></button>
-        </div>
-        <div className="user-form-grid" style={{ gridTemplateColumns: '1fr' }}>
-          <label>
-            <span className="field-label">Nome completo <b className="req">*</b></span>
-            <input className={nameMissing ? 'field-invalid' : ''} value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
-            {nameMissing && <span className="field-error-text">Informe o nome completo.</span>}
-          </label>
-          <label>
-            E-mail corporativo (não editável)
-            <input value={session.user.email} disabled />
-          </label>
-          <label>
-            Organização / Tenant
-            <input value={session.tenant.name} disabled />
-          </label>
-          <label>
-            Nova senha (opcional)
-            <input type="password" className={passwordInvalid ? 'field-invalid' : ''} minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Deixe em branco para manter a atual" />
-            {passwordInvalid && <span className="field-error-text">A senha deve ter ao menos 8 caracteres.</span>}
-          </label>
-        </div>
-        {error && <div className="form-error">{error}</div>}
-        <div className="form-actions">
-          <button type="button" className="secondary-button clear-filters-button" onClick={onClose}><CloseIcon /> Cancelar</button>
-          <button className="primary" disabled={saving || !isDirty}>{saving ? 'Salvando…' : <><CheckIcon /> Salvar alterações</>}</button>
-        </div>
-      </form>
+  return <section className="users-page">
+    <div className="section-heading">
+      <div><p className="eyebrow">PERFIL CORPORATIVO</p><h2>Editar perfil</h2><small>Atualize seu nome de exibição e a senha de acesso.</small></div>
     </div>
-  );
+    <button className="back-button" onClick={onClose}>← Voltar</button>
+    <form className="user-form panel users-create-form" onSubmit={submit} noValidate>
+      <div className="panel-title">
+        <div>
+          <p className="eyebrow">DADOS DO PERFIL</p>
+          <h3>Dados do perfil</h3>
+          <small className="muted" style={{ margin: 0 }}>Os campos marcados com <b className="req">*</b> são obrigatórios.</small>
+        </div>
+      </div>
+      <div className="user-form-grid">
+        <div className="mfield">
+          <div className="input-group has-icon">
+            <span className="input-icon" aria-hidden="true"><UserIcon /></span>
+            <input id="ep-name" value={displayName} className={nameMissing ? 'field-invalid' : ''} onChange={(e) => setDisplayName(e.target.value)} placeholder=" " required />
+            <label htmlFor="ep-name">Nome completo <b className="req">*</b></label>
+          </div>
+          {nameMissing && <span className="field-error-text">Informe o nome completo.</span>}
+        </div>
+        <div className="mfield">
+          <div className="input-group has-icon">
+            <span className="input-icon" aria-hidden="true"><MailIcon /></span>
+            <input id="ep-email" type="text" value={session.user.email} disabled placeholder=" " />
+            <label htmlFor="ep-email">E-mail corporativo</label>
+          </div>
+          <span className="field-hint">O e-mail não pode ser alterado por aqui.</span>
+        </div>
+        <div className="mfield">
+          <div className="input-group has-icon">
+            <span className="input-icon" aria-hidden="true"><BadgeIcon /></span>
+            <input id="ep-tenant" type="text" value={session.tenant.name} disabled placeholder=" " />
+            <label htmlFor="ep-tenant">Organização / Tenant</label>
+          </div>
+        </div>
+        <div className="mfield">
+          <div className="input-group has-icon">
+            <span className="input-icon" aria-hidden="true"><LockIcon /></span>
+            <div className="password-field">
+              <input id="ep-password" type={showPassword ? 'text' : 'password'} name="hl-new-account-password" autoComplete="new-password" data-lpignore="true" data-1p-ignore minLength={8} value={password} className={passwordInvalid ? 'field-invalid' : ''} onChange={(e) => setPassword(e.target.value)} placeholder=" " />
+              <button type="button" className="password-toggle" onClick={() => setShowPassword((prev) => !prev)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOffIcon /> : <EyeIcon />}</button>
+            </div>
+            <label htmlFor="ep-password">Nova senha (opcional)</label>
+          </div>
+          {passwordInvalid && <span className="field-error-text">Pelo menos 8 caracteres.</span>}
+        </div>
+        <div className="mfield">
+          <div className="input-group has-icon">
+            <span className="input-icon" aria-hidden="true"><LockIcon /></span>
+            <div className="password-field">
+              <input id="ep-password-confirm" type={showConfirmPassword ? 'text' : 'password'} name="hl-new-account-password-confirm" autoComplete="new-password" data-lpignore="true" data-1p-ignore value={confirmPassword} className={confirmMismatch ? 'field-invalid' : ''} onChange={(e) => setConfirmPassword(e.target.value)} placeholder=" " />
+              <button type="button" className="password-toggle" onClick={() => setShowConfirmPassword((prev) => !prev)} aria-label={showConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showConfirmPassword ? <EyeOffIcon /> : <EyeIcon />}</button>
+            </div>
+            <label htmlFor="ep-password-confirm">Confirmar nova senha</label>
+          </div>
+          {confirmMismatch && <span className="field-error-text">As senhas não coincidem.</span>}
+        </div>
+      </div>
+      {error && <div className="form-error">{error}</div>}
+      <div className="form-actions">
+        <button type="button" className="secondary-button clear-filters-button" onClick={onClose}><CloseIcon /> Cancelar</button>
+        <button className="primary" disabled={saving || !isDirty}>{saving ? 'Salvando…' : <><CheckIcon /> Salvar alterações</>}</button>
+      </div>
+    </form>
+  </section>;
 }
 
 function Metric({ label, value, tone }: { label: string; value: number; tone: string }) {
@@ -2088,7 +2613,7 @@ function LoginWithRequest({ onSuccess, showLogoutToast = false }: { onSuccess: (
       onSuccess(await response.json() as LoginResponse);
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'E-mail ou senha incorretos. Confira os dados e tente novamente.'); }
   }
-  return <div className="login-page"><section className="login-context"><div className="brand large"><img className="brand-mark" src={brandIcon} alt="HealthLink Sentinel" width={46} height={46} /><div><strong>HealthLink</strong><small>SENTINEL</small></div></div><div className="context-copy"><p className="eyebrow">PLATAFORMA DE MISSÃO CRÍTICA</p><AnimatedHeroTitle /><p>Monitoramento contínuo de conectividade, infraestrutura e disponibilidade operacional.</p></div></section><section className="login-panel"><form onSubmit={submit} noValidate><p className="eyebrow">ACESSO RESTRITO</p><h2>Entrar no centro de comando</h2><p className="muted">Utilize sua identidade corporativa.</p><label>E-mail corporativo<input type="email" maxLength={254} value={email} className={emailMissing || emailInvalid ? 'field-invalid' : ''} onChange={(event) => setEmail(event.target.value)} autoFocus />{emailMissing && <span className="field-error-text">Informe o e-mail.</span>}{emailInvalid && <span className="field-error-text">Informe um e-mail válido, como nome@dominio.com.</span>}</label><label>Senha<div className="password-field"><input type={showPassword ? 'text' : 'password'} maxLength={200} value={password} className={passwordMissing ? 'field-invalid' : ''} onChange={(event) => setPassword(event.target.value)} /><button type="button" className="password-toggle" onClick={() => setShowPassword((prev) => !prev)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOffIcon /> : <EyeIcon />}</button></div>{passwordMissing && <span className="field-error-text">Pelo menos 8 caracteres.</span>}</label>{error && <div className="error-banner" role="alert"><span className="error-banner-icon"><WarningIcon /></span><span className="error-banner-text">{error}</span></div>}<button className="primary">Acessar plataforma</button><button type="button" className="request-access-link" onClick={() => setRequestOpen(true)}>Criar conta <span>(sujeito a aprovação)</span></button></form></section>{requestOpen && <RequestAccessModal onClose={() => setRequestOpen(false)} onToast={addToast} />}<ToastStack toasts={toasts} /></div>;
+  return <div className="login-page"><section className="login-context"><div className="brand large"><img className="brand-mark" src={brandIcon} alt="HealthLink Sentinel" width={46} height={46} /><div><strong>HealthLink</strong><small>SENTINEL</small></div></div><div className="context-copy"><p className="eyebrow">PLATAFORMA DE MISSÃO CRÍTICA</p><AnimatedHeroTitle /><p>Monitoramento contínuo de conectividade, infraestrutura e disponibilidade operacional.</p></div></section><section className="login-panel"><form onSubmit={submit} noValidate><p className="eyebrow">ACESSO RESTRITO</p><h2>Entrar no centro de comando</h2><p className="muted">Utilize sua identidade corporativa.</p><div className="login-field"><div className="input-group has-icon"><span className="input-icon" aria-hidden="true"><UserIcon /></span><input id="login-email" type="email" maxLength={254} value={email} className={emailMissing || emailInvalid ? 'field-invalid' : ''} onChange={(event) => setEmail(event.target.value)} placeholder=" " autoFocus /><label htmlFor="login-email">E-mail corporativo</label></div>{emailMissing && <span className="field-error-text">Informe o e-mail.</span>}{emailInvalid && <span className="field-error-text">Informe um e-mail válido, como nome@dominio.com.</span>}</div><div className="login-field"><div className="input-group has-icon"><span className="input-icon" aria-hidden="true"><LockIcon /></span><div className="password-field"><input id="login-password" type={showPassword ? 'text' : 'password'} maxLength={200} value={password} className={passwordMissing ? 'field-invalid' : ''} onChange={(event) => setPassword(event.target.value)} placeholder=" " /><button type="button" className="password-toggle" onClick={() => setShowPassword((prev) => !prev)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOffIcon /> : <EyeIcon />}</button></div><label htmlFor="login-password">Senha</label></div>{passwordMissing && <span className="field-error-text">Pelo menos 8 caracteres.</span>}</div>{error && <div className="error-banner" role="alert"><span className="error-banner-icon"><WarningIcon /></span><span className="error-banner-text">{error}</span></div>}<button className="primary"><LoginIcon /> Acessar plataforma</button><button type="button" className="request-access-link" onClick={() => setRequestOpen(true)}><UserIcon /> Criar conta <span>(sujeito a aprovação)</span></button></form></section>{requestOpen && <RequestAccessModal onClose={() => setRequestOpen(false)} onToast={addToast} />}<ToastStack toasts={toasts} /></div>;
 }
 
 function AnimatedHeroTitle() {
@@ -2120,7 +2645,7 @@ function RequestAccessModal({ onClose, onToast }: { onClose: () => void; onToast
       onClose();
     } catch (reason) { onToast({ type: 'error', title: 'Falha ao solicitar acesso', detail: friendlyMessage(reason, 'Não foi possível enviar a solicitação. Tente novamente.') }); } finally { setSaving(false); }
   }
-  return <div className="approval-modal" role="dialog" aria-modal="true" onMouseDown={onClose}><form className="request-access-modal panel" onSubmit={submit} noValidate onMouseDown={(event) => event.stopPropagation()}><div className="panel-title"><div><p className="eyebrow">SOLICITAÇÃO DE ACESSO</p><h3>Criar conta</h3></div><button type="button" className="icon-button clear-filters-button" onClick={onClose} aria-label="Fechar"><CloseIcon /></button></div><p className="muted">Seu cadastro será analisado por um administrador.</p><label><span className="field-label">Nome completo <b className="req">*</b></span><input className={nameMissing ? 'field-invalid' : ''} value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} placeholder="Ex.: Nome" />{nameMissing && <span className="field-error-text">Informe o nome completo.</span>}</label><label><span className="field-label">E-mail corporativo <b className="req">*</b></span><input type="text" inputMode="email" name="hl-account-email-field" autoComplete="off" data-lpignore="true" data-1p-ignore className={emailMissing || emailInvalid ? 'field-invalid' : ''} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="nome@empresa.com" />{emailMissing && <span className="field-error-text">Informe o e-mail.</span>}{emailInvalid && <span className="field-error-text">Informe um e-mail válido, como nome@dominio.com.</span>}</label><label><span className="field-label">Perfil solicitado <b className="req">*</b></span><AppDropdown value={form.role} onChange={(next) => setForm({ ...form, role: next })} options={[{ value: 'viewer', label: 'Visualizador' }, { value: 'supervisor', label: 'Supervisor' }, { value: 'noc_operator', label: 'Operador NOC' }]} /></label><label><span className="field-label">Senha <b className="req">*</b></span><input type="password" name="hl-new-account-password" autoComplete="new-password" data-lpignore="true" data-1p-ignore minLength={8} className={passwordMissing ? 'field-invalid' : ''} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Mínimo de 8 caracteres" />{passwordMissing && <span className="field-error-text">A senha deve ter ao menos 8 caracteres.</span>}</label><div className="form-actions request-access-actions"><button type="button" className="secondary-button clear-filters-button" onClick={onClose}><CloseIcon /> Cancelar</button><button className="primary" disabled={saving}>{saving ? 'Enviando…' : 'Solicitar Acesso'}</button></div></form></div>;
+  return <div className="approval-modal" role="dialog" aria-modal="true" onMouseDown={onClose}><form className="request-access-modal panel" onSubmit={submit} noValidate onMouseDown={(event) => event.stopPropagation()}><div className="panel-title"><div><p className="eyebrow">SOLICITAÇÃO DE ACESSO</p><h3>Criar conta</h3></div><button type="button" className="icon-button clear-filters-button" onClick={onClose} aria-label="Fechar"><CloseIcon /></button></div><p className="muted">Seu cadastro será analisado por um administrador.</p><div className="mfield"><div className="input-group has-icon"><span className="input-icon" aria-hidden="true"><UserIcon /></span><input id="ra-name" className={nameMissing ? 'field-invalid' : ''} value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} placeholder=" " /><label htmlFor="ra-name">Nome completo <b className="req">*</b></label></div>{nameMissing && <span className="field-error-text">Informe o nome completo.</span>}</div><div className="mfield"><div className="input-group has-icon"><span className="input-icon" aria-hidden="true"><MailIcon /></span><input id="ra-email" type="text" inputMode="email" name="hl-account-email-field" autoComplete="off" data-lpignore="true" data-1p-ignore className={emailMissing || emailInvalid ? 'field-invalid' : ''} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder=" " /><label htmlFor="ra-email">E-mail corporativo <b className="req">*</b></label></div>{emailMissing && <span className="field-error-text">Informe o e-mail.</span>}{emailInvalid && <span className="field-error-text">Informe um e-mail válido, como nome@dominio.com.</span>}</div><div className="mfield"><div className="input-group has-icon is-dropdown"><span className="input-icon" aria-hidden="true"><BadgeIcon /></span><AppDropdown value={form.role} onChange={(next) => setForm({ ...form, role: next })} options={[{ value: 'viewer', label: 'Visualizador' }, { value: 'supervisor', label: 'Supervisor' }, { value: 'noc_operator', label: 'Operador NOC' }]} /><span className="input-group-label">Perfil solicitado <b className="req">*</b></span></div></div><div className="mfield"><div className="input-group has-icon"><span className="input-icon" aria-hidden="true"><LockIcon /></span><input id="ra-password" type="password" name="hl-new-account-password" autoComplete="new-password" data-lpignore="true" data-1p-ignore minLength={8} className={passwordMissing ? 'field-invalid' : ''} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder=" " /><label htmlFor="ra-password">Senha <b className="req">*</b></label></div>{passwordMissing && <span className="field-error-text">A senha deve ter ao menos 8 caracteres.</span>}</div><div className="form-actions request-access-actions"><button type="button" className="secondary-button clear-filters-button" onClick={onClose}><CloseIcon /> Cancelar</button><button className="primary" disabled={saving}><LockIcon /> {saving ? 'Enviando…' : 'Solicitar Acesso'}</button></div></form></div>;
 }
 
 function Login({ onSuccess }: { onSuccess: (session: LoginResponse) => void }) {
