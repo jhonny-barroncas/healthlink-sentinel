@@ -16,6 +16,7 @@ const schema = z.object({
   PUBLIC_APP_URL: z.string().url().optional(),
   ZABBIX_SYNC_INTERVAL_MS: z.coerce.number().int().min(10_000).default(60_000),
   ZABBIX_TELEMETRY_INTERVAL_MS: z.coerce.number().int().min(2_000).default(2_000),
+  AGENT_HEARTBEAT_WATCHDOG_INTERVAL_MS: z.coerce.number().int().min(10_000).default(15_000),
 });
 
 export const env = schema.parse(process.env);

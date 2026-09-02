@@ -20,6 +20,13 @@ describe('collapsible desktop sidebar', () => {
     expect(styles).toMatch(/\.sidebar:not\(:hover\):not\(:focus-within\)\s+\.brand\s*>\s*div,[^{]+\{[^}]*width:\s*0;[^}]*overflow:\s*hidden;/s);
   });
 
+  it('keeps the cyan glider visible on active primary and secondary navigation', () => {
+    expect(styles).toMatch(/\.nav-item::before\s*\{[^}]*background:\s*var\(--cyan\);[^}]*box-shadow:[^}]*rgba\(53,\s*211,\s*208,[^)]+\);[^}]*opacity:\s*0;/s);
+    expect(styles).toMatch(/\.nav-item\.active::before\s*\{[^}]*opacity:\s*1;/s);
+    expect(styles).toMatch(/\.nav-item\.active\s*\{[^}]*background:\s*linear-gradient\(90deg,\s*rgba\(53,\s*211,\s*208,[^)]+\),\s*transparent\);/s);
+    expect(styles).toMatch(/\.nav-subitem\.active::before\s*\{[^}]*background:\s*var\(--cyan\);[^}]*box-shadow:[^}]*rgba\(53,\s*211,\s*208,[^)]+\);/s);
+  });
+
   it('keeps every shared navigation icon exported and imported', () => {
     expect(iconSource).toContain('export function NavDashboardIcon()');
     expect(appSource).toMatch(/import \{[^}]*NavDashboardIcon[^}]*\} from '\.\/icons\.js';/s);

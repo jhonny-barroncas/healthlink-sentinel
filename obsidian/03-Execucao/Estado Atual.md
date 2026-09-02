@@ -4,6 +4,8 @@ updated: 2026-08-07
 phase: foundation
 ---
 
+> Atualização 2026-09-02: incidentes de indisponibilidade do agente passaram a ser persistidos. Um watchdog avalia agentes ativos a cada 15 segundos; após 30 segundos sem heartbeat, abre **Agente sem comunicação** em `alerts` e grava eventos em `alert_events`/`monitoring_events`. O primeiro heartbeat ou lote de telemetria posterior resolve o mesmo incidente e registra a recuperação. Pulsos normais não entram no histórico para evitar volume operacional inútil.
+
 > Atualização 2026-08-13: núcleo do módulo Starlink implementado com estratégia híbrida; consulte [[Modulo Starlink - Estrategia Hibrida]].
 
 > Atualização 2026-08-15: planejamento da coleta em unidade móvel definido com servidor local obrigatório, Starlink via gRPC local e MikroTik opcional; consulte [[Plano de Coleta Starlink e Unidade Movel]].

@@ -2,12 +2,13 @@ import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { hasPermission, permission } from '../../../platform/authorization.js';
-import { withTenant } from '../../../platform/database.js';
+import { database, withTenant } from '../../../platform/database.js';
 import { env } from '../../../platform/env.js';
 import { deriveStarlinkStatus, normalizeStarlinkPayload } from '../starlink/telemetry.js';
 import { persistStarlinkIncidents, type StarlinkIncident } from '../starlink/incidents.js';
 import { renderLinuxInstaller, renderWindowsInstaller } from './installers.js';
 import { validateEnrollment } from './lifecycle.js';
+import { persistCollectionAgentOffline, resolveCollectionAgentOffline } from './heartbeat-incidents.js';
 import {
   AGENT_SOURCE_TYPES,
   AGENT_SERVER_TYPES,
@@ -214,6 +215,12 @@ export const collectionAgentRoutes: FastifyPluginAsync = async (app) => {
         SET installed_version = $1, last_heartbeat_at = now(), status = 'active', updated_at = now()
         WHERE id = $2 AND tenant_id = $3
       `, [input.version, auth.agentId, auth.tenantId]);
+      await resolveCollectionAgentOffline(db, {
+        tenantId: auth.tenantId,
+        agentId: auth.agentId,
+        serverEquipmentId: auth.serverEquipmentId,
+        observedAt: new Date().toISOString(),
+      });
       return { ok: true, agentId: auth.agentId, serverTime: new Date().toISOString() };
     });
   });
@@ -270,6 +277,12 @@ export const collectionAgentRoutes: FastifyPluginAsync = async (app) => {
         UPDATE collection_agents SET last_heartbeat_at = now(), last_collection_at = $1, updated_at = now()
         WHERE id = $2 AND tenant_id = $3
       `, [observedAt, auth.agentId, auth.tenantId]);
+      await resolveCollectionAgentOffline(db, {
+        tenantId: auth.tenantId,
+        agentId: auth.agentId,
+        serverEquipmentId: auth.serverEquipmentId,
+        observedAt: new Date().toISOString(),
+      });
       return { duplicate: false, batchId: input.batchId, equipmentId: input.equipmentId, samplesPersisted: samples.length, incidentsOpened: incidentChanges.opened.length, incidentsRecovered: incidentChanges.recovered.length, operationalStatus: status, observedAt };
     });
   });
@@ -492,4 +505,43 @@ export const collectionAgentRoutes: FastifyPluginAsync = async (app) => {
       return { success: true, agentId, revoked: true };
     });
   });
+
+  let heartbeatWatchdogRunning = false;
+  const runHeartbeatWatchdog = async () => {
+    if (heartbeatWatchdogRunning) return;
+    heartbeatWatchdogRunning = true;
+    try {
+      const staleAgents = await database.query<{
+        id: string;
+        tenant_id: string;
+        unit_id: string;
+        server_equipment_id: string;
+        last_heartbeat_at: string;
+      }>(`
+        SELECT id, tenant_id, unit_id, server_equipment_id,
+               COALESCE(last_heartbeat_at, enrolled_at, created_at) AS last_heartbeat_at
+        FROM collection_agents
+        WHERE status = 'active' AND revoked_at IS NULL
+          AND COALESCE(last_heartbeat_at, enrolled_at, created_at) < now() - interval '30 seconds'
+      `);
+      const observedAt = new Date().toISOString();
+      for (const agent of staleAgents.rows) {
+        await withTenant(agent.tenant_id, (db) => persistCollectionAgentOffline(db, {
+          tenantId: agent.tenant_id,
+          agentId: agent.id,
+          unitId: agent.unit_id,
+          serverEquipmentId: agent.server_equipment_id,
+          lastHeartbeatAt: agent.last_heartbeat_at,
+          observedAt,
+        }));
+      }
+    } catch (error) {
+      app.log.error(error, 'Collection agent heartbeat watchdog failed');
+    } finally {
+      heartbeatWatchdogRunning = false;
+    }
+  };
+  setTimeout(runHeartbeatWatchdog, 10_000);
+  setInterval(runHeartbeatWatchdog, env.AGENT_HEARTBEAT_WATCHDOG_INTERVAL_MS);
+  app.log.info({ intervalMs: env.AGENT_HEARTBEAT_WATCHDOG_INTERVAL_MS }, 'Collection agent heartbeat watchdog enabled');
 };

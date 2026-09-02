@@ -5,6 +5,13 @@ updated: 2026-08-11
 status: active
 ---
 
+## Atualização 2026-09-02 — incidentes de indisponibilidade do agente
+
+- Corrigida a lacuna de persistência: a API agora possui watchdog de heartbeat dos agentes a cada 15 segundos (`AGENT_HEARTBEAT_WATCHDOG_INTERVAL_MS`).
+- Após 30 segundos sem heartbeat, o watchdog abre uma única vez o incidente crítico **Agente sem comunicação** em `alerts`, com eventos correlatos em `alert_events` e `monitoring_events`.
+- No próximo heartbeat ou envio de telemetria, o incidente é resolvido e a recuperação também é registrada. Heartbeats regulares não geram eventos para evitar ruído.
+- A correção independe de alertas internos enviados pela Starlink, que continuam sendo reconciliados separadamente.
+
 ## Atualização 2026-08-24 — revisão visual, repositório do agente e padronização do frontend
 
 Atualização 2026-08-24: a Visão geral recebeu filtros operacionais adicionais para tipo de unidade (fixa/móvel), situação e UF. O recorte selecionado agora alimenta indicadores, mapa e visão operacional, com controles responsivos para tablet e celular.
