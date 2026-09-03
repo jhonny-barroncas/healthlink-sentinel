@@ -152,6 +152,7 @@ Os itens abaixo descrevem o ponto de partida histórico e não representam o est
 - Em 2026-08-19, erros retornados pela API durante o cadastro de unidade aberto pelo mapa passaram a ser exibidos dentro do próprio modal, sem depender do banner da tela de fundo. A regressão foi coberta em `apps/web/src/form-modal-layout.test.ts`.
 
 - Em 2026-08-19, o worker do MapLibre foi incluído no bundle público do Docker (`maplibre-gl-worker.mjs`, `maplibre-gl-shared.mjs` e alias `.js`), evitando que o fallback SPA devolvesse HTML com MIME incorreto. Assets ausentes passaram a responder 404; a API foi rebuildada e o health check retornou 200.
+- Em 2026-09-03, revisada a troca Dark/Claro do mapa estadual: o filtro de inversão agora é aplicado somente quando o container está no fallback raster do OpenStreetMap. Estilos vetoriais não sofrem mais inversão indevida; a regra foi coberta por `apps/web/src/map-theme-filter.test.ts`.
 
 - A imagem runtime do Docker foi atualizada para instalar `iputils-ping` e `traceroute`; a presença de `/usr/bin/ping` e `/usr/bin/traceroute` foi conferida no container após o rebuild.
 

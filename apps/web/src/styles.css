@@ -957,12 +957,11 @@ button { transition: var(--transition-base); }
 .tunnel-status-body strong { color: #d8e7f1; font-size: 12px; }
 .tunnel-status-body small, .starlink-card-note { color: #7891a4; font-size: 11px; }
 .starlink-card .state-link-health-icon { color: #49d8ff; }
-/* O mapa usa tiles raster claros do OpenStreetMap. No tema dark aplicamos um
-   filtro de inversão para transformá-los em um basemap escuro; no tema claro os
-   tiles ficam praticamente como são. Só o canvas de tiles é filtrado — marcadores
-   e popups ficam em camadas DOM separadas e não são afetados. */
-.state-map-canvas .maplibregl-canvas { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.92) saturate(.82); }
-.state-map-canvas.map-theme-light .maplibregl-canvas { filter: brightness(.99) saturate(.9); }
+/* O filtro só vale para o fallback raster do OpenStreetMap. Estilos vetoriais
+   (como OpenFreeMap dark/bright) já entregam suas próprias cores e não podem
+   receber uma segunda inversão. Marcadores e popups ficam em camadas DOM. */
+.state-map-canvas.map-raster-fallback:not(.map-theme-light) .maplibregl-canvas { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.92) saturate(.82); }
+.state-map-canvas.map-raster-fallback.map-theme-light .maplibregl-canvas { filter: brightness(.99) saturate(.9); }
 .map-theme-switch { position: relative; display: inline-flex; align-items: center; gap: 3px; padding: 3px; border: 1px solid rgba(126,186,208,.24); border-radius: 999px; background: rgba(3,12,21,.42); }
 .map-theme-switch button { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 78px; border: 0; border-radius: 999px; padding: 7px 12px; color: #7890a4; background: transparent; cursor: pointer; font: 500 12px Arial, Helvetica, 'Segoe UI', sans-serif; transition: color .28s ease; }
 .map-theme-switch button svg { flex-shrink: 0; transition: transform .28s ease; }
