@@ -7,6 +7,8 @@ status: active
 
 ## Atualização 2026-09-02 — indicador ciano da navegação lateral
 
+- Correção 2026-09-04: a tabela de usuários passou a conter nomes, e-mails, papéis e status dentro das respectivas colunas. Textos longos usam reticências, o avatar não encolhe e o nome completo fica disponível no hover.
+
 - A navegação lateral recebeu o padrão visual de glider da referência fornecida, adaptado à identidade do HealthLink com ciano no lugar do amarelo.
 - Itens principais, subitens e o acesso à Integração Zabbix exibem uma barra luminosa e gradiente discreto quando ativos.
 - Foram preservados o recolhimento por hover/foco, RBAC, badges, estados operacionais e todos os manipuladores de navegação existentes.

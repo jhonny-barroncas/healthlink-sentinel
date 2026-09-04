@@ -2189,7 +2189,7 @@ function UsersPanel({ users, requests, loading, token, onRefresh, onChange, onTo
             {pagedUsers.map((user) => <article className={`user-row ${user.active ? '' : 'blocked'}`} key={user.id}>
               <div className="user-cell-name">
                 <span className={`user-avatar ${user.active ? 'active' : 'blocked'}`}>{initialsFromName(user.display_name)}</span>
-                <strong className="user-name-text">{user.display_name}</strong>
+                <strong className="user-name-text" title={user.display_name}>{user.display_name}</strong>
               </div>
               <div className="user-cell-email" title={user.email}>{user.email}</div>
               <div className="user-cell-role"><span className="role-badge">{roleLabel(user.roles)}</span></div>

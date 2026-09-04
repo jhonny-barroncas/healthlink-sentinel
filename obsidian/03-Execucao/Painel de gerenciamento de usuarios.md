@@ -53,3 +53,7 @@ Foi adicionada validação automatizada para o formulário, cobrindo criação s
 As mensagens de erro de autenticação e da API não expõem mais o payload bruto de validação no painel. O frontend traduz erros conhecidos para textos operacionais, sem exibir JSON, detalhes internos ou SQL. E-mail passou a ter limite de 254 caracteres e senha de 8 a 200 caracteres na autenticação, criação/edição de usuários e solicitação de acesso. A API aplica os mesmos limites com Zod.
 
 As consultas de usuários continuam usando parâmetros posicionais; a atualização dinâmica de usuário aceita somente nomes de colunas definidos internamente pelo código. Foi adicionada cobertura automatizada para mensagens amigáveis, rejeição de e-mail inválido e limites de senha.
+# Ajuste de contenção textual — 2026-09-04
+
+- A célula de identidade agora usa largura fluida limitada à coluna, evitando que nomes extensos empurrem e estourem o card.
+- Nome, e-mail e papel aplicam contenção com reticências; o avatar mantém tamanho fixo e o nome completo é exposto pelo atributo `title`.
