@@ -311,4 +311,6 @@ Hotfix de distribuição 2026-08-28: a versão embutida padrão do agente foi el
 
 Correção visual 2026-09-04: o sparkline compacto dos links agora normaliza o eixo vertical pelo histórico recente. Variações de ping abaixo de 1 ms passam a produzir subidas e descidas visíveis sem alterar tamanho, estrutura ou designer do card.
 
+Complemento visual 2026-09-04: a análise detalhada passou a renderizar o histórico com o mesmo componente visual do card compacto — trilha, pulso animado e ponto final — usando a mesma escala adaptativa, sem redimensionar o modal.
+
 Correção operacional 2026-08-31: o scheduler Zabbix deixou de chamar a própria API por HTTP em `127.0.0.1`. As sincronizações completa e de telemetria agora usam `app.inject`, funcionando também quando o container de produção atende HTTPS internamente. Ajustes locais de Docker permanecem fora do commit.

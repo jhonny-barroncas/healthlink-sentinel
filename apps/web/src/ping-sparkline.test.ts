@@ -30,4 +30,12 @@ describe('ping sparkline', () => {
       { x: 86, y: 4 },
     ]);
   });
+
+  it('preserves the same adaptive shape inside the detailed chart plot bounds', () => {
+    expect(buildPingSparkline([0.3, 0.55, 0.2], 680, 210, 250, 35, 20).points).toEqual([
+      { x: 0, y: 145.71 },
+      { x: 340, y: 35 },
+      { x: 680, y: 190 },
+    ]);
+  });
 });
