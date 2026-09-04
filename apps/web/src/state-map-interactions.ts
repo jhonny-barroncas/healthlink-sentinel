@@ -10,6 +10,15 @@ export function hasUnitAssets(unitId: string, equipment: MapAssetRef[], telemetr
   return equipment.some((item) => item.unit_id === unitId) || telemetry.some((item) => item.unit_id === unitId);
 }
 
+export function getUnitMapMenuAvailability(unitId: string, telemetry: MapAssetRef[]): { telemetryEquipmentId: string | null; telemetryAvailable: boolean } {
+  const telemetryEquipmentId = telemetry.find((item) => item.unit_id === unitId)?.equipment_id ?? null;
+  return { telemetryEquipmentId, telemetryAvailable: telemetryEquipmentId !== null };
+}
+
+export function getUnitInventoryView(unitType: 'fixed' | 'mobile'): 'fixed-units' | 'mobile-units' {
+  return unitType === 'fixed' ? 'fixed-units' : 'mobile-units';
+}
+
 export function getUnitMapAlertState(unit: MapUnitRef, alerts: MapAlertRef[]): { alertCount: number; tone: MapUnitRef['operational_status'] | 'attention' | 'critical' } {
   const activeAlerts = alerts.filter((alert) => alert.status !== 'resolved' && (alert.unit_id === unit.unit_id || alert.unit_code === unit.code) && alert.severity >= 2);
   const highestSeverity = activeAlerts.reduce((highest, alert) => Math.max(highest, alert.severity), 0);

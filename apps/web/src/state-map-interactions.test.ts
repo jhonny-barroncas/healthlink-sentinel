@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasUnitAssets, selectMapAsset } from './state-map-interactions.js';
+import { getUnitInventoryView, getUnitMapMenuAvailability, hasUnitAssets, selectMapAsset } from './state-map-interactions.js';
 
 describe('state map asset interactions', () => {
   it('keeps the exact link clicked as the command target', () => {
@@ -20,5 +20,18 @@ describe('state map asset interactions', () => {
       { unit_id: 'unit-manaus', unit_code: 'UNI-01', severity: 5, status: 'acknowledged' },
       { unit_id: 'unit-manaus', unit_code: 'UNI-01', severity: 5, status: 'resolved' },
     ])).toEqual({ alertCount: 2, tone: 'critical' });
+  });
+
+  it('enables telemetry action only when the unit has telemetry to open', () => {
+    expect(getUnitMapMenuAvailability('unit-1', [
+      { unit_id: 'unit-1', equipment_id: 'link-1' },
+      { unit_id: 'unit-2', equipment_id: 'link-2' },
+    ])).toEqual({ telemetryEquipmentId: 'link-1', telemetryAvailable: true });
+    expect(getUnitMapMenuAvailability('unit-empty', [])).toEqual({ telemetryEquipmentId: null, telemetryAvailable: false });
+  });
+
+  it('routes map units to the inventory view matching their type', () => {
+    expect(getUnitInventoryView('fixed')).toBe('fixed-units');
+    expect(getUnitInventoryView('mobile')).toBe('mobile-units');
   });
 });

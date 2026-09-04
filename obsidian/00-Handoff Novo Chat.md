@@ -28,6 +28,8 @@ Atualização 2026-08-24: a navegação Relatórios agora abre o relatório oper
 
 - Redesenhado o painel **Repositório do Agente** com estética NET-OPS mission-critical: seletor de sistema estilizado, custom file picker elegante (eliminando o botão nativo feio do browser), botão de publicação proporcional com estado desabilitado inteligente, e cartões de pacotes estruturados com tags monospace de versão (`v1.0.0`), tamanho em KB e hash SHA-256.
 - Revisada a troca de tema do mapa estadual: o filtro de inversão escura ficou restrito ao fallback raster, preservando as cores nativas dos estilos vetoriais Dark/Claro; teste dedicado adicionado.
+- Alertas do mapa estadual agora aparecem em card compacto separado do pin; a cor/formato do pin representa somente o status operacional da unidade.
+- A lateral de ativos do mapa estadual ganhou menu contextual por hover/foco/toque para abrir/editar unidade, relatórios e telemetria, sem exibir erros nesse painel. A linha de ping acompanha os valores reais em escala de 0–250 ms com pulso animado; a navegação também respeita corretamente unidades fixas e móveis.
 - Adotada a família tipográfica **Inter** (Google Fonts) integrada com fallback sans-serif e antialiasing/otimização de renderização no `body`.
 - Expandido o sistema de tokens CSS no `:root` de `apps/web/src/styles.css` com escala estruturada de `border-radius` (`--radius-xs` a `--radius-full`), superfícies (`--surface-1` a `--surface-3`), transições e z-index padronizados.
 - Consolidada a base visual dos botões (`.primary`, `.secondary-button`, `.danger-button`, `.warning-button`, `.positive-button`, `.icon-button`) com elevação uniforme, gradientes refinados e feedback `:focus-visible` em anel ciano para acessibilidade por teclado.

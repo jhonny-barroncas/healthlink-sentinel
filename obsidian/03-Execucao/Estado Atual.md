@@ -153,6 +153,8 @@ Os itens abaixo descrevem o ponto de partida histórico e não representam o est
 
 - Em 2026-08-19, o worker do MapLibre foi incluído no bundle público do Docker (`maplibre-gl-worker.mjs`, `maplibre-gl-shared.mjs` e alias `.js`), evitando que o fallback SPA devolvesse HTML com MIME incorreto. Assets ausentes passaram a responder 404; a API foi rebuildada e o health check retornou 200.
 - Em 2026-09-03, revisada a troca Dark/Claro do mapa estadual: o filtro de inversão agora é aplicado somente quando o container está no fallback raster do OpenStreetMap. Estilos vetoriais não sofrem mais inversão indevida; a regra foi coberta por `apps/web/src/map-theme-filter.test.ts`.
+- Em 2026-09-03, os alertas ativos do mapa estadual foram separados visualmente do marcador: o pin voltou a representar apenas o status operacional da unidade, enquanto uma caixa compacta informa quantidade e criticidade do alerta.
+- Em 2026-09-04, a lateral operacional do mapa estadual recebeu menu contextual por hover/foco/toque em cada unidade, com ações para abrir, editar, consultar relatórios e abrir telemetria. A lateral continua sem listar alertas. Os sparklines de ping passaram a usar escala estável de 0–250 ms e duas camadas (trilha e pulso animado) sobre o histórico real, incluindo o ping manual mais recente.
 
 - A imagem runtime do Docker foi atualizada para instalar `iputils-ping` e `traceroute`; a presença de `/usr/bin/ping` e `/usr/bin/traceroute` foi conferida no container após o rebuild.
 
