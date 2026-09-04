@@ -24,6 +24,11 @@ describe('state map unit cards', () => {
     expect(styles).toContain('background: #091827; opacity: 1;');
   });
 
+  it('expands the unit card when the pointer enters the arrow control', () => {
+    expect(source).toContain('onMouseEnter={() => expandUnitOnHover(unit.unit_id)}');
+    expect(source).toContain('const expandUnitOnHover = (unitId: string)');
+  });
+
   it('keeps equipment creation contextual to the unit card instead of the panel header', () => {
     expect(source).toContain('onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); openUnitContext(unit');
     expect(source).toContain('<PlusIcon /> Adicionar equipamento</button></div></div>');
