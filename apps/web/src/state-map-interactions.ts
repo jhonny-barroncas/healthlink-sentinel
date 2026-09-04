@@ -19,6 +19,12 @@ export function getUnitInventoryView(unitType: 'fixed' | 'mobile'): 'fixed-units
   return unitType === 'fixed' ? 'fixed-units' : 'mobile-units';
 }
 
+export type MapAssetView = 'all' | 'links' | 'equipment';
+
+export function shouldShowMapAssetKind(kind: 'link' | 'equipment', view: MapAssetView): boolean {
+  return view === 'all' || (view === 'links' ? kind === 'link' : kind === 'equipment');
+}
+
 export function getUnitMapAlertState(unit: MapUnitRef, alerts: MapAlertRef[]): { alertCount: number; tone: MapUnitRef['operational_status'] | 'attention' | 'critical' } {
   const activeAlerts = alerts.filter((alert) => alert.status !== 'resolved' && (alert.unit_id === unit.unit_id || alert.unit_code === unit.code) && alert.severity >= 2);
   const highestSeverity = activeAlerts.reduce((highest, alert) => Math.max(highest, alert.severity), 0);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getUnitInventoryView, getUnitMapMenuAvailability, hasUnitAssets, selectMapAsset } from './state-map-interactions.js';
+import { getUnitInventoryView, getUnitMapMenuAvailability, hasUnitAssets, selectMapAsset, shouldShowMapAssetKind } from './state-map-interactions.js';
 
 describe('state map asset interactions', () => {
   it('keeps the exact link clicked as the command target', () => {
@@ -33,5 +33,14 @@ describe('state map asset interactions', () => {
   it('routes map units to the inventory view matching their type', () => {
     expect(getUnitInventoryView('fixed')).toBe('fixed-units');
     expect(getUnitInventoryView('mobile')).toBe('mobile-units');
+  });
+
+  it('filters expanded map assets without mixing links and equipment', () => {
+    expect(shouldShowMapAssetKind('link', 'all')).toBe(true);
+    expect(shouldShowMapAssetKind('equipment', 'all')).toBe(true);
+    expect(shouldShowMapAssetKind('link', 'links')).toBe(true);
+    expect(shouldShowMapAssetKind('equipment', 'links')).toBe(false);
+    expect(shouldShowMapAssetKind('link', 'equipment')).toBe(false);
+    expect(shouldShowMapAssetKind('equipment', 'equipment')).toBe(true);
   });
 });
