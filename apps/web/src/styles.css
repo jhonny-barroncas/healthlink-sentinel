@@ -1542,6 +1542,7 @@ button, input, select, textarea { border-radius: 10px; }
 .state-unit-assets-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .state-unit-assets-actions > span { color: #8aa5b8; font: 10px Arial, Helvetica, 'Segoe UI', sans-serif; }
 .state-unit-action-menu { position: relative; z-index: 7; }
+.state-unit-action-buttons { display: flex; align-items: center; gap: 8px; }
 .state-unit-action-trigger { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid rgba(53,211,208,.3); border-radius: 8px; color: var(--cyan); background: rgba(53,211,208,.06); transition: transform .2s ease, border-color .2s ease, background .2s ease; }
 .state-unit-action-trigger svg { width: 15px; height: 15px; }
 .state-unit-action-menu:hover .state-unit-action-trigger, .state-unit-action-menu:focus-within .state-unit-action-trigger { border-color: rgba(53,211,208,.72); background: rgba(53,211,208,.13); transform: rotate(45deg); }
