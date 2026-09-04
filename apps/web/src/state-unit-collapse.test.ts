@@ -15,6 +15,15 @@ describe('state map unit cards', () => {
     expect(styles).toContain('.state-unit-expand-toggle');
   });
 
+  it('keeps the action hover and expand button independent with opaque menu items', () => {
+    expect(source).not.toContain('className="state-unit-action-buttons"');
+    expect(source).toContain('</div><button type="button" className="state-unit-expand-toggle"');
+    expect(styles).toContain('.state-unit-expand-toggle:hover');
+    expect(styles).not.toContain('.state-unit-action-menu:hover .state-unit-expand-toggle');
+    expect(styles).toContain('.state-unit-action-popover > button:disabled { opacity: 1;');
+    expect(styles).toContain('background: #091827; opacity: 1;');
+  });
+
   it('keeps equipment creation contextual to the unit card instead of the panel header', () => {
     expect(source).toContain('onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); openUnitContext(unit');
     expect(source).toContain('<PlusIcon /> Adicionar equipamento</button></div></div>');
