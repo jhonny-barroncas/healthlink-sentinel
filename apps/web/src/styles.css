@@ -1643,6 +1643,11 @@ button, input, select, textarea { border-radius: 10px; }
 .link-chart-tooltip strong, .link-chart-tooltip small { display: block; }
 .link-chart-tooltip strong { color: var(--cyan); font: 12px Arial, Helvetica, 'Segoe UI', sans-serif; }
 .link-chart-tooltip small { margin-top: 4px; color: #7f97a9; font: 12px Arial, Helvetica, 'Segoe UI', sans-serif; white-space: nowrap; }
+.link-sparkline-wrap { position: relative; display: inline-flex; width: 102px; height: 38px; align-items: center; justify-content: center; }
+.link-sparkline-tooltip { position: absolute; z-index: 8; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); min-width: 72px; padding: 5px 7px; border: 1px solid rgba(53,211,208,.58); border-radius: 6px; background: #071522; box-shadow: 0 6px 16px rgba(0,0,0,.45); pointer-events: none; text-align: center; }
+.link-sparkline-tooltip strong, .link-sparkline-tooltip small { display: block; }
+.link-sparkline-tooltip strong { color: var(--cyan); font: 11px Arial, Helvetica, 'Segoe UI', sans-serif; }
+.link-sparkline-tooltip small { margin-top: 2px; color: #8da3b4; font: 10px Arial, Helvetica, 'Segoe UI', sans-serif; white-space: nowrap; }
 
 /* Starlink telemetry detail */
 .starlink-telemetry-panel { margin-top: 14px; }

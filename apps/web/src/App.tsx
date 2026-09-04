@@ -602,10 +602,13 @@ function isLinkEquipmentType(type: string) {
   return ['mikrotik', 'starlink', 'vpn', 'internet_link'].includes(type);
 }
 
-function LinkSparkline({ values, status }: { values: number[]; status: Unit['operational_status'] }) {
+function LinkSparkline({ history, status }: { history: Array<{ value: number; observed_at: string }>; status: Unit['operational_status'] }) {
+  const [hovered, setHovered] = useState<{ value: number; observedAt: string; left: number } | null>(null);
+  const values = history.map((point) => point.value);
   const sparkline = buildPingSparkline(values);
   const points = sparkline.points.map((point) => `${point.x},${point.y}`).join(' ');
-  return <svg className={`link-sparkline ${status}`} viewBox="0 0 86 30" role="img" aria-label="Histórico recente de latência em escala de 0 a 250 milissegundos"><polyline className="link-sparkline-back" points={points} /><polyline className="link-sparkline-front" points={points} /><circle cx={sparkline.last.x} cy={sparkline.last.y} r="2.5" /></svg>;
+  if (!history.length) return null;
+  return <span className="link-sparkline-wrap" onMouseLeave={() => setHovered(null)}><svg className={`link-sparkline ${status}`} viewBox="0 0 86 30" role="img" aria-label="Histórico recente de latência; passe o mouse para ver o valor" onMouseMove={(event) => { const bounds = event.currentTarget.getBoundingClientRect(); const index = nearestLatencyIndex(event.clientX - bounds.left, bounds.width, history.length); const point = history[index]; if (point) setHovered({ value: point.value, observedAt: point.observed_at, left: Math.max(34, Math.min(bounds.width - 34, event.clientX - bounds.left)) }); }}><polyline className="link-sparkline-back" points={points} /><polyline className="link-sparkline-front" points={points} /><circle cx={sparkline.last.x} cy={sparkline.last.y} r="2.5" /></svg>{hovered && <span className="link-sparkline-tooltip"><strong>{formatLatencyMs(hovered.value)}</strong><small>{new Date(hovered.observedAt).toLocaleTimeString('pt-BR')}</small></span>}</span>;
 }
 
 function LinkTelemetryCard({ unit, link, located, diagnosticLatencyMs, onView, onContext }: { unit: Unit; link?: LinkTelemetry; located: boolean; diagnosticLatencyMs?: number; onView: () => void; onContext: (event: ReactMouseEvent<HTMLElement>) => void }) {
@@ -627,7 +630,7 @@ function LinkTelemetryCard({ unit, link, located, diagnosticLatencyMs, onView, o
     <div className="state-link-card-head"><strong>{link?.equipment_name ?? unit.name}</strong><span className="state-link-health-icon" aria-label={statusLabel[status]}>{statusIcon}</span><span className="state-link-badge">{statusCode}</span></div>
     <div className="state-link-card-body">
       <div className="state-link-values"><span>Latência: <b>{formatLatencyMs(latency)}</b></span><span>Perda: <b>{formatPercent(loss, 1)}</b></span><span>↓ Download: <b>{formatLinkRate(inbound)}</b></span><span>↑ Upload: <b>{formatLinkRate(outbound)}</b></span></div>
-      <LinkSparkline values={stale || diagnosticLatencyMs === undefined ? (link?.latency_history ?? []).map((point) => point.value) : [...(link?.latency_history ?? []).slice(-13).map((point) => point.value), diagnosticLatencyMs]} status={status} />
+      <LinkSparkline history={stale || diagnosticLatencyMs === undefined ? (link?.latency_history ?? []) : [...(link?.latency_history ?? []).slice(-13), { value: diagnosticLatencyMs, observed_at: new Date().toISOString() }]} status={status} />
       <span className="state-link-open-hint">{located ? '›' : '+'}</span>
     </div>
     {stale && <div className="state-link-zero-warning"><WarningIcon /> TELEMETRIA ZERADA · SEM COMUNICAÇÃO</div>}
